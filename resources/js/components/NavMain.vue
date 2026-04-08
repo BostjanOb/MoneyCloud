@@ -22,7 +22,10 @@ defineProps<{
 const { isCurrentUrl } = useCurrentUrl();
 
 function isGroupActive(item: NavItem): boolean {
-    if (isCurrentUrl(item.href)) return true;
+    if (isCurrentUrl(item.href)) {
+return true;
+}
+
     return item.children?.some((child) => isCurrentUrl(child.href)) ?? false;
 }
 </script>

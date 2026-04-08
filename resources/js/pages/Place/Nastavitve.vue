@@ -2,13 +2,13 @@
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ChevronRight } from 'lucide-vue-next';
 import { ref } from 'vue';
+import { index as placeIndex } from '@/actions/App/Http/Controllers/PaycheckController';
 import {
     create as settingCreatePage,
     destroy as settingDestroy,
     edit as settingEditPage,
     index as nastavitveIndex,
 } from '@/actions/App/Http/Controllers/TaxSettingController';
-import { index as placeIndex } from '@/actions/App/Http/Controllers/PaycheckController';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

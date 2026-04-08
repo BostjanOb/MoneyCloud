@@ -2,9 +2,9 @@
 import { Head, router, useForm } from '@inertiajs/vue3';
 import type { AcceptableValue } from 'reka-ui';
 import { computed, ref } from 'vue';
+import { store as bonusStore, destroy as bonusDestroy } from '@/actions/App/Http/Controllers/BonusController';
 import { index as placeIndex, store as paycheckStore, update as paycheckUpdate, destroy as paycheckDestroy } from '@/actions/App/Http/Controllers/PaycheckController';
 import { store as yearStore, update as yearUpdate } from '@/actions/App/Http/Controllers/PaycheckYearController';
-import { store as bonusStore, destroy as bonusDestroy } from '@/actions/App/Http/Controllers/BonusController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
@@ -12,9 +12,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { formatSlovenianNumber } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { formatSlovenianNumber } from '@/lib/utils';
 
 type Paycheck = {
     id: number;
@@ -156,7 +156,10 @@ const availableMonths = computed(() =>
 );
 
 function openAddPaycheck() {
-    if (!props.paycheckYear) return;
+    if (!props.paycheckYear) {
+return;
+}
+
     editingPaycheck.value = null;
     paycheckForm.reset();
     paycheckForm.paycheck_year_id = props.paycheckYear.id;
@@ -194,7 +197,10 @@ function submitPaycheck() {
 }
 
 function deletePaycheck(paycheck: Paycheck) {
-    if (!confirm('Ste prepričani, da želite izbrisati to plačo?')) return;
+    if (!confirm('Ste prepričani, da želite izbrisati to plačo?')) {
+return;
+}
+
     router.delete(paycheckDestroy.url(paycheck.id), { preserveScroll: true });
 }
 
@@ -209,7 +215,10 @@ const bonusForm = useForm({
 });
 
 function openAddBonus() {
-    if (!props.paycheckYear) return;
+    if (!props.paycheckYear) {
+return;
+}
+
     bonusForm.reset();
     bonusForm.paycheck_year_id = props.paycheckYear.id;
     showBonusModal.value = true;
@@ -225,7 +234,10 @@ function submitBonus() {
 }
 
 function deleteBonus(bonus: Bonus) {
-    if (!confirm('Ste prepričani, da želite izbrisati ta bonus?')) return;
+    if (!confirm('Ste prepričani, da želite izbrisati ta bonus?')) {
+return;
+}
+
     router.delete(bonusDestroy.url(bonus.id), { preserveScroll: true });
 }
 
@@ -262,7 +274,10 @@ const childForm = useForm({
 });
 
 function openEditChildren() {
-    if (!props.paycheckYear) return;
+    if (!props.paycheckYear) {
+return;
+}
+
     childForm.child1_months = String(props.paycheckYear.child1_months);
     childForm.child2_months = String(props.paycheckYear.child2_months);
     childForm.child3_months = String(props.paycheckYear.child3_months);
@@ -270,7 +285,10 @@ function openEditChildren() {
 }
 
 function submitChildren() {
-    if (!props.paycheckYear) return;
+    if (!props.paycheckYear) {
+return;
+}
+
     childForm.put(yearUpdate.url(props.paycheckYear.id), {
         preserveScroll: true,
         onSuccess: () => {
@@ -292,6 +310,7 @@ const monthRows = computed(() => {
     return Array.from({ length: 12 }, (_, i) => {
         const month = i + 1;
         const paycheck = props.paychecks.find((p) => p.month === month);
+
         return { month, name: monthNames[i], paycheck };
     });
 });

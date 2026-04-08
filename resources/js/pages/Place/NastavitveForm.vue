@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import { index as placeIndex } from '@/actions/App/Http/Controllers/PaycheckController';
 import {
     index as nastavitveIndex,
     store as settingStore,
     update as settingUpdate,
 } from '@/actions/App/Http/Controllers/TaxSettingController';
-import { index as placeIndex } from '@/actions/App/Http/Controllers/PaycheckController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
