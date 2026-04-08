@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, FolderGit2, LayoutGrid } from 'lucide-vue-next';
+import { BookOpen, FolderGit2, LayoutGrid, Settings, Wallet } from 'lucide-vue-next';
 import AppLogo from '@/components/AppLogo.vue';
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
@@ -15,6 +15,8 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { index as placeIndex } from '@/actions/App/Http/Controllers/PaycheckController';
+import { index as nastavitveIndex } from '@/actions/App/Http/Controllers/TaxSettingController';
 import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
@@ -23,19 +25,33 @@ const mainNavItems: NavItem[] = [
         href: dashboard(),
         icon: LayoutGrid,
     },
+    {
+        title: 'Plače',
+        href: placeIndex.url('bostjan'),
+        icon: Wallet,
+        children: [
+            {
+                title: 'Boštjan',
+                href: placeIndex.url('bostjan'),
+            },
+            {
+                title: 'Jasna',
+                href: placeIndex.url('jasna'),
+            },
+            {
+                title: 'Nastavitve',
+                href: nastavitveIndex.url(),
+            },
+        ],
+    },
 ];
 
 const footerNavItems: NavItem[] = [
     {
-        title: 'Repository',
-        href: 'https://github.com/laravel/vue-starter-kit',
+        title: 'Davčne nastavitve',
+        href: nastavitveIndex.url(),
         icon: FolderGit2,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#vue',
-        icon: BookOpen,
-    },
+    }
 ];
 </script>
 
@@ -58,7 +74,7 @@ const footerNavItems: NavItem[] = [
         </SidebarContent>
 
         <SidebarFooter>
-            <NavFooter :items="footerNavItems" />
+            <!-- <NavFooter :items="footerNavItems" /> -->
             <NavUser />
         </SidebarFooter>
     </Sidebar>
