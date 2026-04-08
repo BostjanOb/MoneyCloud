@@ -12,8 +12,19 @@ import {
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { formatSlovenianNumber } from '@/lib/utils';
 
 type GeneralReliefBracket = {
@@ -84,7 +95,10 @@ function formatBracketCount(count: number): string {
 }
 
 function formatGeneralReliefFormula(bracket: GeneralReliefBracket): string {
-    if (bracket.formula_constant === null || bracket.formula_multiplier === null) {
+    if (
+        bracket.formula_constant === null ||
+        bracket.formula_multiplier === null
+    ) {
         return `Fiksno: ${formatNumber(bracket.base_relief)} €`;
     }
 
@@ -108,7 +122,9 @@ function setSettingOpen(settingId: number, open: boolean): void {
 }
 
 const openSettings = ref<Record<number, boolean>>(
-    Object.fromEntries(props.taxSettings.map((setting, index) => [setting.id, index === 0])),
+    Object.fromEntries(
+        props.taxSettings.map((setting, index) => [setting.id, index === 0]),
+    ),
 );
 </script>
 
@@ -117,7 +133,10 @@ const openSettings = ref<Record<number, boolean>>(
 
     <div class="flex flex-col gap-6 p-4">
         <div class="flex items-center justify-between gap-4">
-            <Heading title="Davčne nastavitve" description="Upravljanje davčnih razredov in olajšav" />
+            <Heading
+                title="Davčne nastavitve"
+                description="Upravljanje davčnih razredov in olajšav"
+            />
             <Button as-child size="sm">
                 <Link :href="settingCreatePage.url()">Dodaj nastavitev</Link>
             </Button>
@@ -131,111 +150,284 @@ const openSettings = ref<Record<number, boolean>>(
         >
             <Card class="overflow-hidden">
                 <CardHeader class="gap-4">
-                    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div
+                        class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+                    >
                         <CollapsibleTrigger as-child>
                             <button
                                 type="button"
-                                class="flex min-w-0 flex-1 items-start gap-3 rounded-lg text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                class="flex min-w-0 flex-1 items-start gap-3 rounded-lg text-left transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
                             >
                                 <ChevronRight
                                     class="mt-0.5 size-4 shrink-0 transition-transform duration-200"
-                                    :class="isSettingOpen(setting.id, index) ? 'rotate-90' : ''"
+                                    :class="
+                                        isSettingOpen(setting.id, index)
+                                            ? 'rotate-90'
+                                            : ''
+                                    "
                                 />
                                 <div class="min-w-0 flex-1">
-                                    <div class="flex flex-wrap items-center gap-2">
+                                    <div
+                                        class="flex flex-wrap items-center gap-2"
+                                    >
                                         <CardTitle>
-                                            {{ setting.year_from }}{{ setting.year_to ? ` – ${setting.year_to}` : ' –' }}
+                                            {{ setting.year_from
+                                            }}{{
+                                                setting.year_to
+                                                    ? ` – ${setting.year_to}`
+                                                    : ' –'
+                                            }}
                                         </CardTitle>
                                         <span
                                             class="inline-flex items-center rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
                                         >
-                                            {{ index === 0 ? 'Najnovejša nastavitev' : 'Starejša nastavitev' }}
+                                            {{
+                                                index === 0
+                                                    ? 'Najnovejša nastavitev'
+                                                    : 'Starejša nastavitev'
+                                            }}
                                         </span>
                                     </div>
                                 </div>
                             </button>
                         </CollapsibleTrigger>
 
-                        <div class="flex flex-wrap items-center justify-end gap-2">
+                        <div
+                            class="flex flex-wrap items-center justify-end gap-2"
+                        >
                             <Button as-child variant="outline" size="sm">
-                                <Link :href="settingEditPage.url(setting.id)">Uredi</Link>
+                                <Link :href="settingEditPage.url(setting.id)"
+                                    >Uredi</Link
+                                >
                             </Button>
-                            <Button variant="outline" size="sm" class="text-destructive" @click="deleteSetting(setting)">Briši</Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                class="text-destructive"
+                                @click="deleteSetting(setting)"
+                                >Briši</Button
+                            >
                         </div>
                     </div>
                 </CardHeader>
 
                 <CollapsibleContent>
                     <CardContent class="border-t pt-6">
-                        <div class="mb-6 grid grid-cols-1 gap-4 text-sm sm:grid-cols-3">
+                        <div
+                            class="mb-6 grid grid-cols-1 gap-4 text-sm sm:grid-cols-3"
+                        >
                             <div>
-                                <span class="text-muted-foreground">1. otrok:</span>
-                                <span class="ml-1 font-medium">{{ formatNumber(setting.child_relief1) }} €</span>
+                                <span class="text-muted-foreground"
+                                    >1. otrok:</span
+                                >
+                                <span class="ml-1 font-medium"
+                                    >{{
+                                        formatNumber(setting.child_relief1)
+                                    }}
+                                    €</span
+                                >
                             </div>
                             <div>
-                                <span class="text-muted-foreground">2. otrok:</span>
-                                <span class="ml-1 font-medium">{{ formatNumber(setting.child_relief2) }} €</span>
+                                <span class="text-muted-foreground"
+                                    >2. otrok:</span
+                                >
+                                <span class="ml-1 font-medium"
+                                    >{{
+                                        formatNumber(setting.child_relief2)
+                                    }}
+                                    €</span
+                                >
                             </div>
                             <div>
-                                <span class="text-muted-foreground">3. otrok:</span>
-                                <span class="ml-1 font-medium">{{ formatNumber(setting.child_relief3) }} €</span>
+                                <span class="text-muted-foreground"
+                                    >3. otrok:</span
+                                >
+                                <span class="ml-1 font-medium"
+                                    >{{
+                                        formatNumber(setting.child_relief3)
+                                    }}
+                                    €</span
+                                >
                             </div>
                         </div>
 
                         <div class="space-y-6">
                             <div>
-                                <div class="mb-3 flex items-center justify-between">
-                                    <h3 class="text-sm font-semibold">Razredi splošne olajšave</h3>
-                                    <span class="text-xs text-muted-foreground">Spodnja meja je ekskluzivna, zgornja inkluzivna.</span>
+                                <div
+                                    class="mb-3 flex items-center justify-between"
+                                >
+                                    <h3 class="text-sm font-semibold">
+                                        Razredi splošne olajšave
+                                    </h3>
+                                    <span class="text-xs text-muted-foreground"
+                                        >Spodnja meja je ekskluzivna, zgornja
+                                        inkluzivna.</span
+                                    >
                                 </div>
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead>Od (€)</TableHead>
-                                            <TableHead>Do (€)</TableHead>
-                                            <TableHead class="text-right">Osnovna olajšava (€)</TableHead>
-                                            <TableHead class="text-right">Konstanta formule</TableHead>
-                                            <TableHead class="text-right">Koeficient formule</TableHead>
+                                            <TableHead numeric
+                                                >Od (€)</TableHead
+                                            >
+                                            <TableHead numeric
+                                                >Do (€)</TableHead
+                                            >
+                                            <TableHead
+                                                numeric
+                                                class="text-right"
+                                                >Osnovna olajšava (€)</TableHead
+                                            >
+                                            <TableHead
+                                                numeric
+                                                class="text-right"
+                                                >Konstanta formule</TableHead
+                                            >
+                                            <TableHead
+                                                numeric
+                                                class="text-right"
+                                                >Koeficient formule</TableHead
+                                            >
                                             <TableHead>Pravilo</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        <TableRow v-for="(bracket, bracketIndex) in setting.general_relief_brackets" :key="bracketIndex">
-                                            <TableCell>{{ formatNumber(bracket.income_from) }}</TableCell>
-                                            <TableCell>{{ bracket.income_to === null ? '∞' : formatNumber(bracket.income_to) }}</TableCell>
-                                            <TableCell class="text-right">{{ formatNumber(bracket.base_relief) }}</TableCell>
-                                            <TableCell class="text-right">
-                                                {{ bracket.formula_constant === null ? '–' : formatNumber(bracket.formula_constant) }}
+                                        <TableRow
+                                            v-for="(
+                                                bracket, bracketIndex
+                                            ) in setting.general_relief_brackets"
+                                            :key="bracketIndex"
+                                        >
+                                            <TableCell numeric>{{
+                                                formatNumber(
+                                                    bracket.income_from,
+                                                )
+                                            }}</TableCell>
+                                            <TableCell numeric>{{
+                                                bracket.income_to === null
+                                                    ? '∞'
+                                                    : formatNumber(
+                                                          bracket.income_to,
+                                                      )
+                                            }}</TableCell>
+                                            <TableCell
+                                                numeric
+                                                class="text-right"
+                                                >{{
+                                                    formatNumber(
+                                                        bracket.base_relief,
+                                                    )
+                                                }}</TableCell
+                                            >
+                                            <TableCell
+                                                numeric
+                                                class="text-right"
+                                            >
+                                                {{
+                                                    bracket.formula_constant ===
+                                                    null
+                                                        ? '–'
+                                                        : formatNumber(
+                                                              bracket.formula_constant,
+                                                          )
+                                                }}
                                             </TableCell>
-                                            <TableCell class="text-right">
-                                                {{ bracket.formula_multiplier === null ? '–' : formatNumber(bracket.formula_multiplier) }}
+                                            <TableCell
+                                                numeric
+                                                class="text-right"
+                                            >
+                                                {{
+                                                    bracket.formula_multiplier ===
+                                                    null
+                                                        ? '–'
+                                                        : formatNumber(
+                                                              bracket.formula_multiplier,
+                                                          )
+                                                }}
                                             </TableCell>
-                                            <TableCell>{{ formatGeneralReliefFormula(bracket) }}</TableCell>
+                                            <TableCell>{{
+                                                formatGeneralReliefFormula(
+                                                    bracket,
+                                                )
+                                            }}</TableCell>
                                         </TableRow>
                                     </TableBody>
                                 </Table>
                             </div>
 
                             <div>
-                                <div class="mb-3 flex items-center justify-between">
-                                    <h3 class="text-sm font-semibold">Davčni razredi</h3>
-                                    <span class="text-xs text-muted-foreground">{{ formatBracketCount(setting.brackets.length) }}</span>
+                                <div
+                                    class="mb-3 flex items-center justify-between"
+                                >
+                                    <h3 class="text-sm font-semibold">
+                                        Davčni razredi
+                                    </h3>
+                                    <span
+                                        class="text-xs text-muted-foreground"
+                                        >{{
+                                            formatBracketCount(
+                                                setting.brackets.length,
+                                            )
+                                        }}</span
+                                    >
                                 </div>
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead>Od (€)</TableHead>
-                                            <TableHead>Do (€)</TableHead>
-                                            <TableHead class="text-right">Fiksni znesek (€)</TableHead>
-                                            <TableHead class="text-right">Stopnja (%)</TableHead>
+                                            <TableHead numeric
+                                                >Od (€)</TableHead
+                                            >
+                                            <TableHead numeric
+                                                >Do (€)</TableHead
+                                            >
+                                            <TableHead
+                                                numeric
+                                                class="text-right"
+                                                >Fiksni znesek (€)</TableHead
+                                            >
+                                            <TableHead
+                                                numeric
+                                                class="text-right"
+                                                >Stopnja (%)</TableHead
+                                            >
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        <TableRow v-for="(bracket, bracketIndex) in setting.brackets" :key="bracketIndex">
-                                            <TableCell>{{ formatNumber(bracket.bracket_from) }}</TableCell>
-                                            <TableCell>{{ bracket.bracket_to ? formatNumber(bracket.bracket_to) : '∞' }}</TableCell>
-                                            <TableCell class="text-right">{{ formatNumber(bracket.base_tax) }}</TableCell>
-                                            <TableCell class="text-right">{{ formatNumber(bracket.rate) }} %</TableCell>
+                                        <TableRow
+                                            v-for="(
+                                                bracket, bracketIndex
+                                            ) in setting.brackets"
+                                            :key="bracketIndex"
+                                        >
+                                            <TableCell numeric>{{
+                                                formatNumber(
+                                                    bracket.bracket_from,
+                                                )
+                                            }}</TableCell>
+                                            <TableCell numeric>{{
+                                                bracket.bracket_to
+                                                    ? formatNumber(
+                                                          bracket.bracket_to,
+                                                      )
+                                                    : '∞'
+                                            }}</TableCell>
+                                            <TableCell
+                                                numeric
+                                                class="text-right"
+                                                >{{
+                                                    formatNumber(
+                                                        bracket.base_tax,
+                                                    )
+                                                }}</TableCell
+                                            >
+                                            <TableCell
+                                                numeric
+                                                class="text-right"
+                                                >{{
+                                                    formatNumber(bracket.rate)
+                                                }}
+                                                %</TableCell
+                                            >
                                         </TableRow>
                                     </TableBody>
                                 </Table>
@@ -246,7 +438,10 @@ const openSettings = ref<Record<number, boolean>>(
             </Card>
         </Collapsible>
 
-        <div v-if="taxSettings.length === 0" class="py-12 text-center text-muted-foreground">
+        <div
+            v-if="taxSettings.length === 0"
+            class="py-12 text-center text-muted-foreground"
+        >
             Ni davčnih nastavitev. Dodajte prvo nastavitev.
         </div>
     </div>

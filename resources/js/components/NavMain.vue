@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import { ChevronRight } from 'lucide-vue-next';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { reactive, watch } from 'vue';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import {
     SidebarGroup,
     SidebarGroupLabel,
@@ -11,22 +12,57 @@ import {
     SidebarMenuSub,
     SidebarMenuSubButton,
     SidebarMenuSubItem,
+    useSidebar,
 } from '@/components/ui/sidebar';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
+import { resolveSidebarSubmenuToggle } from '@/lib/sidebarSubmenu';
 import type { NavItem } from '@/types';
 
-defineProps<{
+const props = defineProps<{
     items: NavItem[];
 }>();
 
-const { isCurrentUrl } = useCurrentUrl();
+const { currentUrl, isCurrentUrl } = useCurrentUrl();
+const { isMobile, setOpen, state } = useSidebar();
 
 function isGroupActive(item: NavItem): boolean {
     if (isCurrentUrl(item.href)) {
-return true;
-}
+        return true;
+    }
 
     return item.children?.some((child) => isCurrentUrl(child.href)) ?? false;
+}
+
+const openItems = reactive<Record<string, boolean>>({});
+
+watch(
+    currentUrl,
+    () => {
+        props.items.forEach((item) => {
+            if (item.children?.length && isGroupActive(item)) {
+                openItems[item.title] = true;
+            }
+        });
+    },
+    { immediate: true },
+);
+
+function isGroupOpen(item: NavItem): boolean {
+    return openItems[item.title] ?? false;
+}
+
+function toggleGroup(item: NavItem): void {
+    const { nextSubmenuOpen, shouldExpandSidebar } = resolveSidebarSubmenuToggle({
+        currentSubmenuOpen: isGroupOpen(item),
+        isMobile: isMobile.value,
+        sidebarState: state.value,
+    });
+
+    openItems[item.title] = nextSubmenuOpen;
+
+    if (shouldExpandSidebar) {
+        setOpen(true);
+    }
 }
 </script>
 
@@ -36,15 +72,20 @@ return true;
         <SidebarMenu>
             <template v-for="item in items" :key="item.title">
                 <!-- Items with children: collapsible -->
-                <Collapsible v-if="item.children?.length" as-child :default-open="isGroupActive(item)">
+                <Collapsible v-if="item.children?.length" as-child :open="isGroupOpen(item)">
                     <SidebarMenuItem>
-                        <CollapsibleTrigger as-child>
-                            <SidebarMenuButton :tooltip="item.title">
-                                <component :is="item.icon" v-if="item.icon" />
-                                <span>{{ item.title }}</span>
-                                <ChevronRight class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                            </SidebarMenuButton>
-                        </CollapsibleTrigger>
+                        <SidebarMenuButton
+                            :is-active="isGroupActive(item)"
+                            :tooltip="item.title"
+                            aria-haspopup="true"
+                            :aria-expanded="isGroupOpen(item)"
+                            type="button"
+                            @click="toggleGroup(item)"
+                        >
+                            <component :is="item.icon" v-if="item.icon" />
+                            <span>{{ item.title }}</span>
+                            <ChevronRight class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                        </SidebarMenuButton>
                         <CollapsibleContent>
                             <SidebarMenuSub>
                                 <SidebarMenuSubItem v-for="child in item.children" :key="child.title">

@@ -3,6 +3,8 @@
 use App\Http\Controllers\BonusController;
 use App\Http\Controllers\PaycheckController;
 use App\Http\Controllers\PaycheckYearController;
+use App\Http\Controllers\SavingsAccountController;
+use App\Http\Controllers\SavingsInterestController;
 use App\Http\Controllers\TaxSettingController;
 use Illuminate\Support\Facades\Route;
 
@@ -20,6 +22,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('place/bonus', [BonusController::class, 'store'])->name('place.bonus.store');
     Route::put('place/bonus/{bonus}', [BonusController::class, 'update'])->name('place.bonus.update');
     Route::delete('place/bonus/{bonus}', [BonusController::class, 'destroy'])->name('place.bonus.destroy');
+
+    Route::prefix('varcevanje')->group(function () {
+        Route::get('/', [SavingsAccountController::class, 'index'])->name('savings.index');
+        Route::post('/', [SavingsAccountController::class, 'store'])->name('savings.store');
+        Route::put('/{savingsAccount}', [SavingsAccountController::class, 'update'])->name('savings.update');
+        Route::delete('/{savingsAccount}', [SavingsAccountController::class, 'destroy'])->name('savings.destroy');
+        Route::post('/{savingsAccount}/obresti', [SavingsInterestController::class, 'store'])->name('savings.interest.store');
+    });
 
     Route::get('place/nastavitve', [TaxSettingController::class, 'index'])->name('place.nastavitve');
     Route::get('place/nastavitve/novo', [TaxSettingController::class, 'create'])->name('place.nastavitve.create');

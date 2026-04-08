@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { LayoutGrid, Wallet } from 'lucide-vue-next';
+import { LayoutGrid, PiggyBank, Wallet } from 'lucide-vue-next';
 import { index as placeIndex } from '@/actions/App/Http/Controllers/PaycheckController';
+import { index as savingsIndex } from '@/actions/App/Http/Controllers/SavingsAccountController';
 import { index as nastavitveIndex } from '@/actions/App/Http/Controllers/TaxSettingController';
 import AppLogo from '@/components/AppLogo.vue';
 import NavMain from '@/components/NavMain.vue';
@@ -42,6 +43,11 @@ const mainNavItems: NavItem[] = [
                 href: nastavitveIndex.url(),
             },
         ],
+    },
+    {
+        title: 'Varčevanje',
+        href: savingsIndex.url(),
+        icon: PiggyBank,
     },
 ];
 </script>
