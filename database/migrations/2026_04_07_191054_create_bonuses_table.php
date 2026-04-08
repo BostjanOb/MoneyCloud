@@ -6,27 +6,23 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
-        Schema::create('bonuses', function (Blueprint $table) {
+        Schema::create('paycheck_bonuses', function (Blueprint $table) {
             $table->id();
             $table->foreignId('paycheck_year_id')->constrained()->cascadeOnDelete();
             $table->string('type');
             $table->decimal('amount', 10, 2);
+            $table->boolean('taxable')->default(false);
+            $table->decimal('paid_tax', 10, 2)->default(0);
             $table->string('description')->nullable();
             $table->date('paid_at')->nullable();
             $table->timestamps();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::dropIfExists('bonuses');
+        Schema::dropIfExists('paycheck_bonuses');
     }
 };

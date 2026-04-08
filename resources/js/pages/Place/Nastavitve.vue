@@ -83,32 +83,12 @@ function formatBracketCount(count: number): string {
     return `${count} davčnih razredov`;
 }
 
-function formatGeneralReliefBracketCount(count: number): string {
-    if (count === 1) {
-        return '1 razred splošne olajšave';
-    }
-
-    if (count === 2) {
-        return '2 razreda splošne olajšave';
-    }
-
-    if (count <= 4) {
-        return `${count} razredi splošne olajšave`;
-    }
-
-    return `${count} razredov splošne olajšave`;
-}
-
 function formatGeneralReliefFormula(bracket: GeneralReliefBracket): string {
     if (bracket.formula_constant === null || bracket.formula_multiplier === null) {
         return `Fiksno: ${formatNumber(bracket.base_relief)} €`;
     }
 
     return `${formatNumber(bracket.base_relief)} + (${formatNumber(bracket.formula_constant)} - ${formatNumber(bracket.formula_multiplier)} × skupni dohodek)`;
-}
-
-function formatSettingSummary(setting: TaxSettingType): string {
-    return `${formatGeneralReliefBracketCount(setting.general_relief_brackets.length)} · ${formatBracketCount(setting.brackets.length)}`;
 }
 
 function deleteSetting(setting: TaxSettingType) {
@@ -152,30 +132,31 @@ const openSettings = ref<Record<number, boolean>>(
             <Card class="overflow-hidden">
                 <CardHeader class="gap-4">
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div class="min-w-0 flex-1 space-y-3">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <CardTitle>
-                                    {{ setting.year_from }}{{ setting.year_to ? ` – ${setting.year_to}` : ' –' }}
-                                </CardTitle>
-                                <span class="inline-flex items-center rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                                    {{ index === 0 ? 'Najnovejša nastavitev' : 'Starejša nastavitev' }}
-                                </span>
-                            </div>
-                            <p class="text-sm text-muted-foreground">
-                                {{ formatSettingSummary(setting) }}
-                            </p>
-                        </div>
+                        <CollapsibleTrigger as-child>
+                            <button
+                                type="button"
+                                class="flex min-w-0 flex-1 items-start gap-3 rounded-lg text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            >
+                                <ChevronRight
+                                    class="mt-0.5 size-4 shrink-0 transition-transform duration-200"
+                                    :class="isSettingOpen(setting.id, index) ? 'rotate-90' : ''"
+                                />
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <CardTitle>
+                                            {{ setting.year_from }}{{ setting.year_to ? ` – ${setting.year_to}` : ' –' }}
+                                        </CardTitle>
+                                        <span
+                                            class="inline-flex items-center rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                                        >
+                                            {{ index === 0 ? 'Najnovejša nastavitev' : 'Starejša nastavitev' }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </button>
+                        </CollapsibleTrigger>
 
                         <div class="flex flex-wrap items-center justify-end gap-2">
-                            <CollapsibleTrigger v-if="index > 0" as-child>
-                                <Button variant="ghost" size="sm" class="gap-1.5">
-                                    <ChevronRight
-                                        class="size-4 transition-transform duration-200"
-                                        :class="isSettingOpen(setting.id, index) ? 'rotate-90' : ''"
-                                    />
-                                    {{ isSettingOpen(setting.id, index) ? 'Skrij podrobnosti' : 'Pokaži podrobnosti' }}
-                                </Button>
-                            </CollapsibleTrigger>
                             <Button as-child variant="outline" size="sm">
                                 <Link :href="settingEditPage.url(setting.id)">Uredi</Link>
                             </Button>
@@ -187,10 +168,6 @@ const openSettings = ref<Record<number, boolean>>(
                 <CollapsibleContent>
                     <CardContent class="border-t pt-6">
                         <div class="mb-6 grid grid-cols-1 gap-4 text-sm sm:grid-cols-3">
-                            <div>
-                                <span class="text-muted-foreground">Razredi splošne olajšave:</span>
-                                <span class="ml-1 font-medium">{{ formatGeneralReliefBracketCount(setting.general_relief_brackets.length) }}</span>
-                            </div>
                             <div>
                                 <span class="text-muted-foreground">1. otrok:</span>
                                 <span class="ml-1 font-medium">{{ formatNumber(setting.child_relief1) }} €</span>

@@ -1,6 +1,8 @@
 <?php
 
+use App\Enums\BonusType;
 use App\Enums\Employee;
+use App\Models\Bonus;
 use App\Models\Paycheck;
 use App\Models\PaycheckYear;
 use App\Models\TaxSetting;
@@ -348,6 +350,168 @@ test('uses the precise yearly calculation when all 12 months are entered', funct
     expect($result['projection']['osnova'])->toBe($result['osnova']);
     expect($result['projection']['olajsave'])->toBe($result['olajsave']);
     expect($result['projection']['davcna_osnova'])->toBe($result['davcna_osnova']);
+    expect($result['projection']['dohodnina'])->toBe($result['dohodnina']);
+    expect($result['projection']['razlika'])->toBe($result['razlika']);
+});
+
+test('non-taxable bonus does not affect tax calculation', function () {
+    createTaxSettings2026();
+
+    $year = PaycheckYear::create([
+        'employee' => Employee::BOSTJAN,
+        'year' => 2026,
+        'child1_months' => 0,
+        'child2_months' => 0,
+        'child3_months' => 0,
+    ]);
+
+    Paycheck::create([
+        'paycheck_year_id' => $year->id,
+        'month' => 1,
+        'net' => 1000,
+        'gross' => 1500,
+        'contributions' => 300,
+        'taxes' => 150,
+    ]);
+
+    Bonus::create([
+        'paycheck_year_id' => $year->id,
+        'type' => BonusType::REGRES,
+        'amount' => 1200,
+        'taxable' => false,
+        'paid_tax' => 0,
+    ]);
+
+    $service = new TaxCalculationService;
+    $result = $service->calculate($year);
+
+    expect($result['sum_gross'])->toBe('1500.00');
+    expect($result['sum_taxes'])->toBe('150.00');
+    expect($result['dohodnina'])->toBe('0.00');
+    expect($result['razlika'])->toBe('-150.00');
+});
+
+test('taxable bonus affects gross, paid taxes, and tax calculation', function () {
+    createTaxSettings2026();
+
+    $year = PaycheckYear::create([
+        'employee' => Employee::BOSTJAN,
+        'year' => 2026,
+        'child1_months' => 0,
+        'child2_months' => 0,
+        'child3_months' => 0,
+    ]);
+
+    Paycheck::create([
+        'paycheck_year_id' => $year->id,
+        'month' => 1,
+        'net' => 10000,
+        'gross' => 20000,
+        'contributions' => 3548.07,
+        'taxes' => 0,
+    ]);
+
+    Bonus::create([
+        'paycheck_year_id' => $year->id,
+        'type' => BonusType::SP,
+        'amount' => 1000,
+        'taxable' => true,
+        'paid_tax' => 200,
+    ]);
+
+    $service = new TaxCalculationService;
+    $result = $service->calculate($year);
+
+    expect($result['sum_gross'])->toBe('21000.00');
+    expect($result['sum_taxes'])->toBe('200.00');
+    expect($result['osnova'])->toBe('17451.93');
+    expect($result['davcna_osnova'])->toBe('11900.00');
+    expect($result['dohodnina'])->toBe('2121.86');
+    expect($result['razlika'])->toBe('1921.86');
+});
+
+test('projection adds taxable bonus once instead of projecting it across the year', function () {
+    createTaxSettings2026();
+
+    $year = PaycheckYear::create([
+        'employee' => Employee::BOSTJAN,
+        'year' => 2026,
+        'child1_months' => 0,
+        'child2_months' => 0,
+        'child3_months' => 0,
+    ]);
+
+    Paycheck::create([
+        'paycheck_year_id' => $year->id,
+        'month' => 1,
+        'net' => 1000,
+        'gross' => 1500,
+        'contributions' => 300,
+        'taxes' => 150,
+    ]);
+
+    Paycheck::create([
+        'paycheck_year_id' => $year->id,
+        'month' => 2,
+        'net' => 1100,
+        'gross' => 1700,
+        'contributions' => 320,
+        'taxes' => 160,
+    ]);
+
+    Bonus::create([
+        'paycheck_year_id' => $year->id,
+        'type' => BonusType::BONI_MALICA,
+        'amount' => 1200,
+        'taxable' => true,
+        'paid_tax' => 120,
+    ]);
+
+    $service = new TaxCalculationService;
+    $result = $service->calculate($year);
+
+    expect($result['projection']['months_used'])->toBe(2);
+    expect($result['projection']['sum_gross'])->toBe('20400.00');
+    expect($result['projection']['sum_taxes'])->toBe('1980.00');
+});
+
+test('final projection matches actual calculation when taxable bonuses are present', function () {
+    createTaxSettings2026();
+
+    $year = PaycheckYear::create([
+        'employee' => Employee::JASNA,
+        'year' => 2026,
+        'child1_months' => 12,
+        'child2_months' => 0,
+        'child3_months' => 0,
+    ]);
+
+    for ($month = 1; $month <= 12; $month++) {
+        Paycheck::create([
+            'paycheck_year_id' => $year->id,
+            'month' => $month,
+            'net' => 1000,
+            'gross' => 1500,
+            'contributions' => 300,
+            'taxes' => 150,
+        ]);
+    }
+
+    Bonus::create([
+        'paycheck_year_id' => $year->id,
+        'type' => BonusType::SP,
+        'amount' => 1000,
+        'taxable' => true,
+        'paid_tax' => 100,
+    ]);
+
+    $service = new TaxCalculationService;
+    $result = $service->calculate($year);
+
+    expect($result['projection']['is_final'])->toBeTrue();
+    expect($result['projection']['sum_gross'])->toBe($result['sum_gross']);
+    expect($result['projection']['sum_taxes'])->toBe($result['sum_taxes']);
+    expect($result['projection']['osnova'])->toBe($result['osnova']);
     expect($result['projection']['dohodnina'])->toBe($result['dohodnina']);
     expect($result['projection']['razlika'])->toBe($result['razlika']);
 });

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\BonusType;
 use App\Enums\Employee;
 use App\Http\Requests\StorePaycheckRequest;
 use App\Http\Requests\UpdatePaycheckRequest;
@@ -29,7 +30,7 @@ class PaycheckController extends Controller
 
         $availableYears = PaycheckYear::where('employee', $employee)
             ->pluck('year')
-            ->sort()
+            ->sortDesc()
             ->values();
 
         return Inertia::render('Place/Index', [
@@ -39,6 +40,13 @@ class PaycheckController extends Controller
             'paycheckYear' => $paycheckYear,
             'paychecks' => $paycheckYear?->paychecks ?? [],
             'bonuses' => $paycheckYear?->bonuses ?? [],
+            'bonusTypeOptions' => collect(BonusType::cases())
+                ->map(fn (BonusType $bonusType): array => [
+                    'value' => $bonusType->value,
+                    'label' => $bonusType->label(),
+                ])
+                ->values()
+                ->all(),
             'calculation' => $calculation,
             'availableYears' => $availableYears,
         ]);

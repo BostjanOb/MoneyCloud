@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\BonusType;
 use App\Enums\Employee;
 use App\Models\Paycheck;
 use App\Models\PaycheckYear;
@@ -53,6 +54,50 @@ test('index page renders for authenticated user', function () {
         ->get(route('place.index', 'bostjan'))
         ->assertOk()
         ->assertInertia(fn ($page) => $page->component('Place/Index'));
+});
+
+test('index page includes all bonus type options', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->get(route('place.index', 'bostjan'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Place/Index')
+            ->where('bonusTypeOptions', [
+                ['value' => BonusType::REGRES->value, 'label' => BonusType::REGRES->label()],
+                ['value' => BonusType::SP->value, 'label' => BonusType::SP->label()],
+                ['value' => BonusType::BONI_MALICA->value, 'label' => BonusType::BONI_MALICA->label()],
+                ['value' => BonusType::OSTALO->value, 'label' => BonusType::OSTALO->label()],
+            ])
+        );
+});
+
+test('index page lists available years newest first', function () {
+    $user = User::factory()->create();
+
+    PaycheckYear::factory()->create([
+        'employee' => Employee::BOSTJAN,
+        'year' => 2024,
+    ]);
+
+    PaycheckYear::factory()->create([
+        'employee' => Employee::BOSTJAN,
+        'year' => 2026,
+    ]);
+
+    PaycheckYear::factory()->create([
+        'employee' => Employee::BOSTJAN,
+        'year' => 2025,
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('place.index', 'bostjan'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Place/Index')
+            ->where('availableYears', [2026, 2025, 2024])
+        );
 });
 
 test('index page shows paycheck year data', function () {
@@ -178,6 +223,30 @@ test('can store a paycheck', function () {
     ]);
 });
 
+test('can store a paycheck without net amount', function () {
+    $user = User::factory()->create();
+    $year = PaycheckYear::factory()->create([
+        'employee' => Employee::BOSTJAN,
+        'year' => 2026,
+    ]);
+
+    $this->actingAs($user)
+        ->post(route('place.paycheck.store'), [
+            'paycheck_year_id' => $year->id,
+            'month' => 1,
+            'gross' => 1500,
+            'contributions' => 300,
+            'taxes' => 150,
+        ])
+        ->assertRedirect();
+
+    $this->assertDatabaseHas('paychecks', [
+        'paycheck_year_id' => $year->id,
+        'month' => 1,
+        'net' => null,
+    ]);
+});
+
 test('can update a paycheck', function () {
     $user = User::factory()->create();
     $year = PaycheckYear::factory()->create();
@@ -199,6 +268,27 @@ test('can update a paycheck', function () {
     expect($paycheck->fresh()->net)->toBe('1200.00');
 });
 
+test('can update a paycheck without net amount', function () {
+    $user = User::factory()->create();
+    $year = PaycheckYear::factory()->create();
+    $paycheck = Paycheck::factory()->create([
+        'paycheck_year_id' => $year->id,
+        'month' => 1,
+        'net' => 1000,
+    ]);
+
+    $this->actingAs($user)
+        ->put(route('place.paycheck.update', $paycheck), [
+            'net' => '',
+            'gross' => 1800,
+            'contributions' => 350,
+            'taxes' => 180,
+        ])
+        ->assertRedirect();
+
+    expect($paycheck->fresh()->net)->toBeNull();
+});
+
 test('can delete a paycheck', function () {
     $user = User::factory()->create();
     $year = PaycheckYear::factory()->create();
@@ -216,5 +306,6 @@ test('validates paycheck store request', function () {
 
     $this->actingAs($user)
         ->post(route('place.paycheck.store'), [])
-        ->assertSessionHasErrors(['paycheck_year_id', 'month', 'net', 'gross', 'contributions', 'taxes']);
+        ->assertSessionHasErrors(['paycheck_year_id', 'month', 'gross', 'contributions', 'taxes'])
+        ->assertSessionDoesntHaveErrors(['net']);
 });

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Bonus;
 use App\Models\Paycheck;
 use App\Models\PaycheckYear;
 use App\Models\TaxSetting;
@@ -39,18 +40,20 @@ class TaxCalculationService
      */
     public function calculate(PaycheckYear $paycheckYear): array
     {
-        $paycheckYear->loadMissing('paychecks');
+        $paycheckYear->loadMissing(['paychecks', 'bonuses']);
 
         $paycheckSummary = $this->summarizePaychecks($paycheckYear->paychecks);
+        $bonusSummary = $this->summarizeTaxableBonuses($paycheckYear->bonuses);
+        $actualSummary = $this->mergeIncomeSummaries($paycheckSummary, $bonusSummary);
 
         $taxSetting = TaxSetting::findForYear($paycheckYear->year);
 
         if (! $taxSetting) {
             return [
-                'sum_gross' => $this->formatAmount($paycheckSummary['sum_gross']),
-                'sum_net' => $this->formatAmount($paycheckSummary['sum_net']),
-                'sum_contributions' => $this->formatAmount($paycheckSummary['sum_contributions']),
-                'sum_taxes' => $this->formatAmount($paycheckSummary['sum_taxes']),
+                'sum_gross' => $this->formatAmount($actualSummary['sum_gross']),
+                'sum_net' => $this->formatAmount($actualSummary['sum_net']),
+                'sum_contributions' => $this->formatAmount($actualSummary['sum_contributions']),
+                'sum_taxes' => $this->formatAmount($actualSummary['sum_taxes']),
                 'osnova' => '0.00',
                 'olajsave' => '0.00',
                 'davcna_osnova' => '0.00',
@@ -63,24 +66,24 @@ class TaxCalculationService
         }
 
         $childReliefs = $this->calculateChildReliefs($paycheckYear, $taxSetting);
-        $generalRelief = $this->calculateGeneralRelief($paycheckSummary['sum_gross'], $taxSetting);
+        $generalRelief = $this->calculateGeneralRelief($actualSummary['sum_gross'], $taxSetting);
         $olajsave = $generalRelief + $childReliefs['total'];
 
         $actualCalculation = $this->calculateAmounts(
-            gross: $paycheckSummary['sum_gross'],
-            contributions: $paycheckSummary['sum_contributions'],
-            taxes: $paycheckSummary['sum_taxes'],
+            gross: $actualSummary['sum_gross'],
+            contributions: $actualSummary['sum_contributions'],
+            taxes: $actualSummary['sum_taxes'],
             olajsave: $olajsave,
             taxSetting: $taxSetting,
         );
 
-        $projection = $this->buildProjection($paycheckYear->paychecks, $childReliefs, $taxSetting);
+        $projection = $this->buildProjection($paycheckYear->paychecks, $paycheckYear->bonuses, $childReliefs, $taxSetting);
 
         return [
-            'sum_gross' => $this->formatAmount($paycheckSummary['sum_gross']),
-            'sum_net' => $this->formatAmount($paycheckSummary['sum_net']),
-            'sum_contributions' => $this->formatAmount($paycheckSummary['sum_contributions']),
-            'sum_taxes' => $this->formatAmount($paycheckSummary['sum_taxes']),
+            'sum_gross' => $this->formatAmount($actualSummary['sum_gross']),
+            'sum_net' => $this->formatAmount($actualSummary['sum_net']),
+            'sum_contributions' => $this->formatAmount($actualSummary['sum_contributions']),
+            'sum_taxes' => $this->formatAmount($actualSummary['sum_taxes']),
             'osnova' => $this->formatAmount($actualCalculation['osnova']),
             'olajsave' => $this->formatAmount($olajsave),
             'davcna_osnova' => $this->formatAmount($actualCalculation['davcna_osnova']),
@@ -193,7 +196,37 @@ class TaxCalculationService
     }
 
     /**
+     * @param  Collection<int, Bonus>  $bonuses
+     * @return array{sum_gross: float, sum_taxes: float}
+     */
+    private function summarizeTaxableBonuses(Collection $bonuses): array
+    {
+        $taxableBonuses = $bonuses->where('taxable', true);
+
+        return [
+            'sum_gross' => (float) $taxableBonuses->sum('amount'),
+            'sum_taxes' => (float) $taxableBonuses->sum('paid_tax'),
+        ];
+    }
+
+    /**
+     * @param  array{sum_gross: float, sum_net: float, sum_contributions: float, sum_taxes: float}  $paycheckSummary
+     * @param  array{sum_gross: float, sum_taxes: float}  $bonusSummary
+     * @return array{sum_gross: float, sum_net: float, sum_contributions: float, sum_taxes: float}
+     */
+    private function mergeIncomeSummaries(array $paycheckSummary, array $bonusSummary): array
+    {
+        return [
+            'sum_gross' => $paycheckSummary['sum_gross'] + $bonusSummary['sum_gross'],
+            'sum_net' => $paycheckSummary['sum_net'],
+            'sum_contributions' => $paycheckSummary['sum_contributions'],
+            'sum_taxes' => $paycheckSummary['sum_taxes'] + $bonusSummary['sum_taxes'],
+        ];
+    }
+
+    /**
      * @param  Collection<int, Paycheck>  $paychecks
+     * @param  Collection<int, Bonus>  $bonuses
      * @return array{
      *     months_used: int,
      *     is_final: bool,
@@ -208,15 +241,20 @@ class TaxCalculationService
      *     razlika: string
      * }
      */
-    private function buildProjection(Collection $paychecks, array $childReliefs, TaxSetting $taxSetting): array
-    {
+    private function buildProjection(
+        Collection $paychecks,
+        Collection $bonuses,
+        array $childReliefs,
+        TaxSetting $taxSetting,
+    ): array {
         $monthsEntered = $paychecks
             ->pluck('month')
             ->unique()
             ->count();
+        $bonusSummary = $this->summarizeTaxableBonuses($bonuses);
 
         if ($monthsEntered === 12) {
-            $yearSummary = $this->summarizePaychecks($paychecks);
+            $yearSummary = $this->mergeIncomeSummaries($this->summarizePaychecks($paychecks), $bonusSummary);
             $generalRelief = $this->calculateGeneralRelief($yearSummary['sum_gross'], $taxSetting);
             $olajsave = $generalRelief + $childReliefs['total'];
             $finalCalculation = $this->calculateAmounts(
@@ -255,10 +293,10 @@ class TaxCalculationService
 
         $recentSummary = $this->summarizePaychecks($recentPaychecks);
 
-        $projectedGross = $recentSummary['sum_gross'] / $monthsUsed * 12;
+        $projectedGross = $recentSummary['sum_gross'] / $monthsUsed * 12 + $bonusSummary['sum_gross'];
         $projectedNet = $recentSummary['sum_net'] / $monthsUsed * 12;
         $projectedContributions = $recentSummary['sum_contributions'] / $monthsUsed * 12;
-        $projectedTaxes = $recentSummary['sum_taxes'] / $monthsUsed * 12;
+        $projectedTaxes = $recentSummary['sum_taxes'] / $monthsUsed * 12 + $bonusSummary['sum_taxes'];
         $generalRelief = $this->calculateGeneralRelief($projectedGross, $taxSetting);
         $olajsave = $generalRelief + $childReliefs['total'];
 

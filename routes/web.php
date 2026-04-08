@@ -18,6 +18,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('place/year/{paycheckYear}', [PaycheckYearController::class, 'update'])->name('place.year.update');
 
     Route::post('place/bonus', [BonusController::class, 'store'])->name('place.bonus.store');
+    Route::put('place/bonus/{bonus}', [BonusController::class, 'update'])->name('place.bonus.update');
     Route::delete('place/bonus/{bonus}', [BonusController::class, 'destroy'])->name('place.bonus.destroy');
 
     Route::get('place/nastavitve', [TaxSettingController::class, 'index'])->name('place.nastavitve');

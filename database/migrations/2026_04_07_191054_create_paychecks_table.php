@@ -6,16 +6,13 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('paychecks', function (Blueprint $table) {
             $table->id();
             $table->foreignId('paycheck_year_id')->constrained()->cascadeOnDelete();
             $table->tinyInteger('month');
-            $table->decimal('net', 10, 2);
+            $table->decimal('net', 10, 2)->nullable();
             $table->decimal('gross', 10, 2);
             $table->decimal('contributions', 10, 2);
             $table->decimal('taxes', 10, 2);
@@ -25,9 +22,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('paychecks');

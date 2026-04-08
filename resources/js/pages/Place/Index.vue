@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { Head, router, useForm } from '@inertiajs/vue3';
 import type { AcceptableValue } from 'reka-ui';
-import { computed, ref } from 'vue';
-import { store as bonusStore, destroy as bonusDestroy } from '@/actions/App/Http/Controllers/BonusController';
+import { computed, ref, watch } from 'vue';
+import { store as bonusStore, update as bonusUpdate, destroy as bonusDestroy } from '@/actions/App/Http/Controllers/BonusController';
 import { index as placeIndex, store as paycheckStore, update as paycheckUpdate, destroy as paycheckDestroy } from '@/actions/App/Http/Controllers/PaycheckController';
 import { store as yearStore, update as yearUpdate } from '@/actions/App/Http/Controllers/PaycheckYearController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,7 +21,7 @@ type Paycheck = {
     id: number;
     paycheck_year_id: number;
     month: number;
-    net: string;
+    net: string | null;
     gross: string;
     contributions: string;
     taxes: string;
@@ -31,8 +32,15 @@ type Bonus = {
     paycheck_year_id: number;
     type: string;
     amount: string;
+    taxable: boolean;
+    paid_tax: string;
     description: string | null;
     paid_at: string | null;
+};
+
+type BonusTypeOption = {
+    value: string;
+    label: string;
 };
 
 type PaycheckYear = {
@@ -83,6 +91,7 @@ type Props = {
     paycheckYear: PaycheckYear | null;
     paychecks: Paycheck[];
     bonuses: Bonus[];
+    bonusTypeOptions: BonusTypeOption[];
     calculation: Calculation | null;
     availableYears: number[];
 };
@@ -106,6 +115,14 @@ const monthNames = [
 ];
 
 function formatNumber(value: string | number): string {
+    return formatSlovenianNumber(value);
+}
+
+function formatOptionalNumber(value: string | number | null): string {
+    if (value === null || value === '') {
+        return '–';
+    }
+
     return formatSlovenianNumber(value);
 }
 
@@ -135,6 +152,30 @@ function settlementTitle(calculation: Calculation): string {
     }
 
     return settlementLabel(calculation.projection.razlika);
+}
+
+const bonusTypeLabels = computed(() => {
+    return new Map(props.bonusTypeOptions.map((option) => [option.value, option.label]));
+});
+
+const hasTaxableBonuses = computed(() => props.bonuses.some((bonus) => bonus.taxable));
+
+const defaultBonusType = props.bonusTypeOptions[0]?.value ?? 'regres';
+
+function blankBonusFormData() {
+    return {
+        paycheck_year_id: 0,
+        type: defaultBonusType,
+        amount: '',
+        taxable: false,
+        paid_tax: '',
+        description: '',
+        paid_at: '',
+    };
+}
+
+function bonusTypeLabel(type: string): string {
+    return bonusTypeLabels.value.get(type) ?? type;
 }
 
 // Paycheck modal state
@@ -171,7 +212,7 @@ function openEditPaycheck(paycheck: Paycheck) {
     editingPaycheck.value = paycheck;
     paycheckForm.paycheck_year_id = paycheck.paycheck_year_id;
     paycheckForm.month = String(paycheck.month);
-    paycheckForm.net = paycheck.net;
+    paycheckForm.net = paycheck.net ?? '';
     paycheckForm.gross = paycheck.gross;
     paycheckForm.contributions = paycheck.contributions;
     paycheckForm.taxes = paycheck.taxes;
@@ -206,31 +247,57 @@ return;
 
 // Bonus modal state
 const showBonusModal = ref(false);
-const bonusForm = useForm({
-    paycheck_year_id: 0,
-    type: 'regres',
-    amount: '',
-    description: '',
-    paid_at: '',
-});
+const editingBonus = ref<Bonus | null>(null);
+const bonusForm = useForm(blankBonusFormData());
+
+function resetBonusForm() {
+    bonusForm.defaults(blankBonusFormData());
+    bonusForm.reset();
+    bonusForm.clearErrors();
+}
 
 function openAddBonus() {
     if (!props.paycheckYear) {
 return;
 }
 
-    bonusForm.reset();
+    editingBonus.value = null;
+    resetBonusForm();
     bonusForm.paycheck_year_id = props.paycheckYear.id;
+    bonusForm.type = defaultBonusType;
+    showBonusModal.value = true;
+}
+
+function openEditBonus(bonus: Bonus) {
+    editingBonus.value = bonus;
+    bonusForm.clearErrors();
+    bonusForm.paycheck_year_id = bonus.paycheck_year_id;
+    bonusForm.type = bonus.type;
+    bonusForm.amount = bonus.amount;
+    bonusForm.taxable = bonus.taxable;
+    bonusForm.paid_tax = bonus.taxable ? bonus.paid_tax : '';
+    bonusForm.description = bonus.description ?? '';
+    bonusForm.paid_at = bonus.paid_at ?? '';
     showBonusModal.value = true;
 }
 
 function submitBonus() {
-    bonusForm.post(bonusStore.url(), {
+    const options = {
         preserveScroll: true,
         onSuccess: () => {
+            resetBonusForm();
             showBonusModal.value = false;
+            editingBonus.value = null;
         },
-    });
+    };
+
+    if (editingBonus.value) {
+        bonusForm.put(bonusUpdate.url(editingBonus.value.id), options);
+
+        return;
+    }
+
+    bonusForm.post(bonusStore.url(), options);
 }
 
 function deleteBonus(bonus: Bonus) {
@@ -240,6 +307,12 @@ return;
 
     router.delete(bonusDestroy.url(bonus.id), { preserveScroll: true });
 }
+
+watch(() => bonusForm.taxable, (taxable) => {
+    if (!taxable) {
+        bonusForm.paid_tax = '';
+    }
+});
 
 // New year modal state
 const showYearModal = ref(false);
@@ -368,7 +441,7 @@ const monthRows = computed(() => {
                             <TableRow v-for="row in monthRows" :key="row.month" :class="{ 'text-muted-foreground': !row.paycheck }">
                                 <TableCell>{{ row.name }}</TableCell>
                                 <template v-if="row.paycheck">
-                                    <TableCell class="text-right">{{ formatNumber(row.paycheck.net) }} €</TableCell>
+                                    <TableCell class="text-right">{{ formatOptionalNumber(row.paycheck.net) }}<span v-if="row.paycheck.net !== null"> €</span></TableCell>
                                     <TableCell class="text-right">{{ formatNumber(row.paycheck.gross) }} €</TableCell>
                                     <TableCell class="text-right">{{ formatNumber(row.paycheck.contributions) }} €</TableCell>
                                     <TableCell class="text-right">{{ formatNumber(row.paycheck.taxes) }} €</TableCell>
@@ -388,7 +461,7 @@ const monthRows = computed(() => {
                                 </template>
                             </TableRow>
                             <TableRow v-if="calculation" class="bg-muted/40 font-medium text-foreground hover:bg-muted/40">
-                                <TableCell>Skupaj</TableCell>
+                                <TableCell>{{ hasTaxableBonuses ? 'Skupaj (z obdavčljivimi bonusi)' : 'Skupaj' }}</TableCell>
                                 <TableCell class="text-right">{{ formatNumber(calculation.sum_net) }} €</TableCell>
                                 <TableCell class="text-right">{{ formatNumber(calculation.sum_gross) }} €</TableCell>
                                 <TableCell class="text-right">{{ formatNumber(calculation.sum_contributions) }} €</TableCell>
@@ -412,17 +485,24 @@ const monthRows = computed(() => {
                             <TableRow>
                                 <TableHead>Tip</TableHead>
                                 <TableHead>Opis</TableHead>
+                                <TableHead>Obdavčljiv</TableHead>
                                 <TableHead class="text-right">Znesek</TableHead>
+                                <TableHead class="text-right">Plačan davek</TableHead>
                                 <TableHead class="text-right">Akcije</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             <TableRow v-for="bonus in bonuses" :key="bonus.id">
-                                <TableCell>{{ bonus.type }}</TableCell>
+                                <TableCell>{{ bonusTypeLabel(bonus.type) }}</TableCell>
                                 <TableCell>{{ bonus.description || '–' }}</TableCell>
+                                <TableCell>{{ bonus.taxable ? 'Da' : 'Ne' }}</TableCell>
                                 <TableCell class="text-right">{{ formatNumber(bonus.amount) }} €</TableCell>
+                                <TableCell class="text-right">{{ bonus.taxable ? `${formatNumber(bonus.paid_tax)} €` : '–' }}</TableCell>
                                 <TableCell class="text-right">
-                                    <Button variant="ghost" size="sm" class="text-destructive" @click="deleteBonus(bonus)">Briši</Button>
+                                    <div class="flex justify-end gap-1">
+                                        <Button variant="ghost" size="sm" @click="openEditBonus(bonus)">Uredi</Button>
+                                        <Button variant="ghost" size="sm" class="text-destructive" @click="deleteBonus(bonus)">Briši</Button>
+                                    </div>
                                 </TableCell>
                             </TableRow>
                         </TableBody>
@@ -568,8 +648,8 @@ const monthRows = computed(() => {
                     <InputError :message="paycheckForm.errors.month" />
                 </div>
                 <div class="space-y-1.5">
-                    <Label for="net">Neto</Label>
-                    <Input id="net" v-model="paycheckForm.net" type="number" step="0.01" min="0" />
+                    <Label for="net">Neto (neobvezno)</Label>
+                    <Input id="net" v-model="paycheckForm.net" type="number" step="0.01" min="0" placeholder="Pustite prazno, če zneska nimate" />
                     <InputError :message="paycheckForm.errors.net" />
                 </div>
                 <div class="space-y-1.5">
@@ -599,19 +679,41 @@ const monthRows = computed(() => {
     <Dialog v-model:open="showBonusModal">
         <DialogContent>
             <DialogHeader>
-                <DialogTitle>Dodaj dodatek</DialogTitle>
-                <DialogDescription>Vnesite podatke o dodatku (regres, božičnica...)</DialogDescription>
+                <DialogTitle>{{ editingBonus ? 'Uredi dodatek' : 'Dodaj dodatek' }}</DialogTitle>
+                <DialogDescription>
+                    {{ editingBonus ? 'Posodobite podatke o dodatku.' : 'Vnesite podatke o dodatku (regres, božičnica...)' }}
+                </DialogDescription>
             </DialogHeader>
             <form @submit.prevent="submitBonus" class="flex flex-col gap-4">
                 <div class="space-y-1.5">
                     <Label for="bonus-type">Tip</Label>
-                    <Input id="bonus-type" v-model="bonusForm.type" />
+                    <Select v-model="bonusForm.type">
+                        <SelectTrigger id="bonus-type">
+                            <SelectValue placeholder="Izberite tip dodatka" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem v-for="option in bonusTypeOptions" :key="option.value" :value="option.value">
+                                {{ option.label }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
                     <InputError :message="bonusForm.errors.type" />
                 </div>
                 <div class="space-y-1.5">
                     <Label for="bonus-amount">Znesek</Label>
                     <Input id="bonus-amount" v-model="bonusForm.amount" type="number" step="0.01" min="0" />
                     <InputError :message="bonusForm.errors.amount" />
+                </div>
+                <div class="space-y-1.5">
+                    <Label for="bonus-taxable" class="flex items-center gap-3">
+                        <Checkbox id="bonus-taxable" v-model="bonusForm.taxable" />
+                        <span>Bonus je obdavčljiv</span>
+                    </Label>
+                </div>
+                <div v-if="bonusForm.taxable" class="space-y-1.5">
+                    <Label for="bonus-paid-tax">Plačan davek</Label>
+                    <Input id="bonus-paid-tax" v-model="bonusForm.paid_tax" type="number" step="0.01" min="0" />
+                    <InputError :message="bonusForm.errors.paid_tax" />
                 </div>
                 <div class="space-y-1.5">
                     <Label for="bonus-description">Opis (neobvezno)</Label>

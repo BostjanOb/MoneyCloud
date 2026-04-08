@@ -17,7 +17,7 @@ class StorePaycheckRequest extends FormRequest
         return [
             'paycheck_year_id' => ['required', 'exists:paycheck_years,id'],
             'month' => ['required', 'integer', 'between:1,12'],
-            'net' => ['required', 'numeric', 'min:0'],
+            'net' => ['nullable', 'numeric', 'min:0'],
             'gross' => ['required', 'numeric', 'min:0'],
             'contributions' => ['required', 'numeric', 'min:0'],
             'taxes' => ['required', 'numeric', 'min:0'],

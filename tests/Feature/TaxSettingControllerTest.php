@@ -65,7 +65,12 @@ test('nastavitve page lists newest tax settings first', function () {
         ->assertInertia(fn ($page) => $page
             ->component('Place/Nastavitve')
             ->where('taxSettings.0.id', $newerSetting->id)
+            ->where('taxSettings.0.year_from', 2026)
+            ->where('taxSettings.0.year_to', null)
+            ->where('taxSettings.0.general_relief_brackets', fn ($brackets) => count($brackets) === 2)
             ->where('taxSettings.1.id', $olderSetting->id)
+            ->where('taxSettings.1.year_from', 2024)
+            ->where('taxSettings.1.year_to', 2024)
             ->where('taxSettings.0.general_relief_brackets.0.base_relief', 5551.93)
         );
 });
