@@ -473,21 +473,11 @@ function deletePurchase(purchase: Purchase): void {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Simbol</TableHead>
-                            <TableHead numeric class="text-right"
-                                >Trenutno</TableHead
-                            >
-                            <TableHead numeric class="text-right"
-                                >Donos</TableHead
-                            >
-                            <TableHead numeric class="text-right"
-                                >Količina</TableHead
-                            >
-                            <TableHead numeric class="text-right"
-                                >Nakup</TableHead
-                            >
-                            <TableHead numeric class="text-right"
-                                >P/L</TableHead
-                            >
+                            <TableHead numeric class="text-right">Nakup</TableHead>
+                            <TableHead numeric class="text-right">Količina</TableHead>
+                            <TableHead numeric class="text-right">Donos</TableHead>
+                            <TableHead numeric class="text-right">Trenutno</TableHead>
+                            <TableHead numeric class="text-right">P/L</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -501,7 +491,10 @@ function deletePurchase(purchase: Purchase): void {
                                 </div>
                             </TableCell>
                             <TableCell numeric class="text-right">
-                                {{ formatMoney(row.current_value) }}
+                                {{ formatMoney(row.total_invested) }}
+                            </TableCell>
+                            <TableCell numeric class="text-right">
+                                {{ formatQuantity(row.quantity) }}
                             </TableCell>
                             <TableCell
                                 numeric
@@ -511,11 +504,9 @@ function deletePurchase(purchase: Purchase): void {
                                 {{ formatPercent(row.return_percentage) }}
                             </TableCell>
                             <TableCell numeric class="text-right">
-                                {{ formatQuantity(row.quantity) }}
+                                {{ formatMoney(row.current_value) }}
                             </TableCell>
-                            <TableCell numeric class="text-right">
-                                {{ formatMoney(row.total_invested) }}
-                            </TableCell>
+                        
                             <TableCell
                                 numeric
                                 class="text-right"

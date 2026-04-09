@@ -15,6 +15,7 @@ import {
     useSidebar,
 } from '@/components/ui/sidebar';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
+import { isSidebarNavGroupActive } from '@/lib/sidebarNavigation';
 import { resolveSidebarSubmenuToggle } from '@/lib/sidebarSubmenu';
 import type { NavItem } from '@/types';
 
@@ -26,11 +27,7 @@ const { currentUrl, isCurrentUrl } = useCurrentUrl();
 const { isMobile, setOpen, state } = useSidebar();
 
 function isGroupActive(item: NavItem): boolean {
-    if (isCurrentUrl(item.href)) {
-        return true;
-    }
-
-    return item.children?.some((child) => isCurrentUrl(child.href)) ?? false;
+    return isSidebarNavGroupActive(item, isCurrentUrl);
 }
 
 const openItems = reactive<Record<string, boolean>>({});
@@ -52,11 +49,12 @@ function isGroupOpen(item: NavItem): boolean {
 }
 
 function toggleGroup(item: NavItem): void {
-    const { nextSubmenuOpen, shouldExpandSidebar } = resolveSidebarSubmenuToggle({
-        currentSubmenuOpen: isGroupOpen(item),
-        isMobile: isMobile.value,
-        sidebarState: state.value,
-    });
+    const { nextSubmenuOpen, shouldExpandSidebar } =
+        resolveSidebarSubmenuToggle({
+            currentSubmenuOpen: isGroupOpen(item),
+            isMobile: isMobile.value,
+            sidebarState: state.value,
+        });
 
     openItems[item.title] = nextSubmenuOpen;
 
@@ -72,7 +70,11 @@ function toggleGroup(item: NavItem): void {
         <SidebarMenu>
             <template v-for="item in items" :key="item.title">
                 <!-- Items with children: collapsible -->
-                <Collapsible v-if="item.children?.length" as-child :open="isGroupOpen(item)">
+                <Collapsible
+                    v-if="item.children?.length"
+                    as-child
+                    :open="isGroupOpen(item)"
+                >
                     <SidebarMenuItem>
                         <SidebarMenuButton
                             :is-active="isGroupActive(item)"
@@ -84,12 +86,20 @@ function toggleGroup(item: NavItem): void {
                         >
                             <component :is="item.icon" v-if="item.icon" />
                             <span>{{ item.title }}</span>
-                            <ChevronRight class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                            <ChevronRight
+                                class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
+                            />
                         </SidebarMenuButton>
                         <CollapsibleContent>
                             <SidebarMenuSub>
-                                <SidebarMenuSubItem v-for="child in item.children" :key="child.title">
-                                    <SidebarMenuSubButton as-child :is-active="isCurrentUrl(child.href)">
+                                <SidebarMenuSubItem
+                                    v-for="child in item.children"
+                                    :key="child.title"
+                                >
+                                    <SidebarMenuSubButton
+                                        as-child
+                                        :is-active="isCurrentUrl(child.href)"
+                                    >
                                         <Link :href="child.href">
                                             <span>{{ child.title }}</span>
                                         </Link>
