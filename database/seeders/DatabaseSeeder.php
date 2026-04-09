@@ -16,5 +16,6 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $this->call(TaxSettingSeeder::class);
+        $this->call(InvestmentProviderSeeder::class);
     }
 }

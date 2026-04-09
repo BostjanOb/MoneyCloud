@@ -1160,16 +1160,16 @@
         },
         {
             "name": "inertiajs/inertia-laravel",
-            "version": "v3.0.2",
+            "version": "v3.0.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/inertiajs/inertia-laravel.git",
-                "reference": "25fe835d0fadf988d2cd8974d4a7b64048f84eda"
+                "reference": "2918fb04f49d18eca13debfcd58dd27ac966ca3c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/inertiajs/inertia-laravel/zipball/25fe835d0fadf988d2cd8974d4a7b64048f84eda",
-                "reference": "25fe835d0fadf988d2cd8974d4a7b64048f84eda",
+                "url": "https://api.github.com/repos/inertiajs/inertia-laravel/zipball/2918fb04f49d18eca13debfcd58dd27ac966ca3c",
+                "reference": "2918fb04f49d18eca13debfcd58dd27ac966ca3c",
                 "shasum": ""
             },
             "require": {
@@ -1227,9 +1227,9 @@
             ],
             "support": {
                 "issues": "https://github.com/inertiajs/inertia-laravel/issues",
-                "source": "https://github.com/inertiajs/inertia-laravel/tree/v3.0.2"
+                "source": "https://github.com/inertiajs/inertia-laravel/tree/v3.0.4"
             },
-            "time": "2026-04-07T14:00:22+00:00"
+            "time": "2026-04-09T11:41:21+00:00"
         },
         {
             "name": "laravel/fortify",
@@ -8719,16 +8719,16 @@
         },
         {
             "name": "sebastian/comparator",
-            "version": "7.1.4",
+            "version": "7.1.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/sebastianbergmann/comparator.git",
-                "reference": "6a7de5df2e094f9a80b40a522391a7e6022df5f6"
+                "reference": "c284f55811f43d555e51e8e5c166ac40d3e33c63"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/sebastianbergmann/comparator/zipball/6a7de5df2e094f9a80b40a522391a7e6022df5f6",
-                "reference": "6a7de5df2e094f9a80b40a522391a7e6022df5f6",
+                "url": "https://api.github.com/repos/sebastianbergmann/comparator/zipball/c284f55811f43d555e51e8e5c166ac40d3e33c63",
+                "reference": "c284f55811f43d555e51e8e5c166ac40d3e33c63",
                 "shasum": ""
             },
             "require": {
@@ -8787,7 +8787,7 @@
             "support": {
                 "issues": "https://github.com/sebastianbergmann/comparator/issues",
                 "security": "https://github.com/sebastianbergmann/comparator/security/policy",
-                "source": "https://github.com/sebastianbergmann/comparator/tree/7.1.4"
+                "source": "https://github.com/sebastianbergmann/comparator/tree/7.1.5"
             },
             "funding": [
                 {
@@ -8807,7 +8807,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-01-24T09:28:48+00:00"
+            "time": "2026-04-08T04:43:00+00:00"
         },
         {
             "name": "sebastian/complexity",

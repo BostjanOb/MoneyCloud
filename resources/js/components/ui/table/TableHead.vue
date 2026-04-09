@@ -14,7 +14,7 @@ const props = defineProps<{
     :class="
       cn(
         'text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
-        props.numeric && 'font-mono tabular-nums',
+        props.numeric && 'tabular-nums',
         props.class,
       )
     "

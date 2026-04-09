@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\BonusController;
+use App\Http\Controllers\InvestmentProviderController;
+use App\Http\Controllers\InvestmentPurchaseController;
+use App\Http\Controllers\InvestmentSymbolController;
 use App\Http\Controllers\PaycheckController;
 use App\Http\Controllers\PaycheckYearController;
 use App\Http\Controllers\SavingsAccountController;
@@ -29,6 +32,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/{savingsAccount}', [SavingsAccountController::class, 'update'])->name('savings.update');
         Route::delete('/{savingsAccount}', [SavingsAccountController::class, 'destroy'])->name('savings.destroy');
         Route::post('/{savingsAccount}/obresti', [SavingsInterestController::class, 'store'])->name('savings.interest.store');
+    });
+
+    Route::prefix('investicije')->group(function () {
+        Route::get('simboli', [InvestmentSymbolController::class, 'index'])->name('investments.symbols.index');
+        Route::get('simboli/novo', [InvestmentSymbolController::class, 'create'])->name('investments.symbols.create');
+        Route::get('simboli/{investmentSymbol}/uredi', [InvestmentSymbolController::class, 'edit'])->name('investments.symbols.edit');
+        Route::post('simboli', [InvestmentSymbolController::class, 'store'])->name('investments.symbols.store');
+        Route::put('simboli/{investmentSymbol}', [InvestmentSymbolController::class, 'update'])->name('investments.symbols.update');
+        Route::delete('simboli/{investmentSymbol}', [InvestmentSymbolController::class, 'destroy'])->name('investments.symbols.destroy');
+
+        Route::post('{investmentProvider:slug}/nakupi', [InvestmentPurchaseController::class, 'store'])->name('investments.purchases.store');
+        Route::put('{investmentProvider:slug}/nakupi/{investmentPurchase}', [InvestmentPurchaseController::class, 'update'])->name('investments.purchases.update');
+        Route::delete('{investmentProvider:slug}/nakupi/{investmentPurchase}', [InvestmentPurchaseController::class, 'destroy'])->name('investments.purchases.destroy');
+        Route::put('{investmentProvider:slug}', [InvestmentProviderController::class, 'update'])->name('investments.providers.update');
+        Route::get('{investmentProvider:slug}', [InvestmentProviderController::class, 'show'])->name('investments.providers.show');
     });
 
     Route::get('place/nastavitve', [TaxSettingController::class, 'index'])->name('place.nastavitve');

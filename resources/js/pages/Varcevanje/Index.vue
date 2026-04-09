@@ -375,10 +375,10 @@ function updateParent(value: AcceptableValue): void {
                                 >APY</TableHead
                             >
                             <TableHead numeric class="text-right"
-                                >Letni donos</TableHead
+                                >Mesečni donos</TableHead
                             >
                             <TableHead numeric class="text-right"
-                                >Mesečni donos</TableHead
+                                >Letni donos</TableHead
                             >
                             <TableHead class="text-right">Akcije</TableHead>
                         </TableRow>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { LayoutGrid, PiggyBank, Wallet } from 'lucide-vue-next';
+import { ChartCandlestick, LayoutGrid, PiggyBank, Wallet } from 'lucide-vue-next';
+import { show as investmentProviderShow } from '@/actions/App/Http/Controllers/InvestmentProviderController';
+import { index as investmentSymbolIndex } from '@/actions/App/Http/Controllers/InvestmentSymbolController';
 import { index as placeIndex } from '@/actions/App/Http/Controllers/PaycheckController';
 import { index as savingsIndex } from '@/actions/App/Http/Controllers/SavingsAccountController';
 import { index as nastavitveIndex } from '@/actions/App/Http/Controllers/TaxSettingController';
@@ -48,6 +50,25 @@ const mainNavItems: NavItem[] = [
         title: 'Varčevanje',
         href: savingsIndex.url(),
         icon: PiggyBank,
+    },
+    {
+        title: 'Investicije',
+        href: investmentProviderShow.url('ibkr'),
+        icon: ChartCandlestick,
+        children: [
+            {
+                title: 'IBKR',
+                href: investmentProviderShow.url('ibkr'),
+            },
+            {
+                title: 'Ilirika',
+                href: investmentProviderShow.url('ilirika'),
+            },
+            {
+                title: 'Simboli',
+                href: investmentSymbolIndex.url(),
+            },
+        ],
     },
 ];
 </script>
