@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\InvestmentSymbolType;
 use App\Http\Requests\UpdateInvestmentProviderRequest;
 use App\Models\InvestmentProvider;
 use App\Models\InvestmentSymbol;
@@ -19,13 +20,22 @@ class InvestmentProviderController extends Controller
     ): Response {
         $investmentProvider->load([
             'linkedSavingsAccount.parent',
+            'purchases' => fn ($query) => $query->whereHas(
+                'symbol',
+                fn ($query) => $query->where('type', '!=', InvestmentSymbolType::CRYPTO->value),
+            ),
             'purchases.symbol',
         ]);
+
+        $nonCryptoTypes = collect($investmentProvider->supportedSymbolTypes())
+            ->reject(fn (InvestmentSymbolType $type): bool => $type === InvestmentSymbolType::CRYPTO)
+            ->map(fn (InvestmentSymbolType $type): string => $type->value)
+            ->all();
 
         return Inertia::render('Investicije/Provider', [
             'provider' => [
                 'id' => $investmentProvider->id,
-                'slug' => $investmentProvider->slug->value,
+                'slug' => $investmentProvider->slug,
                 'name' => $investmentProvider->name,
                 'linked_savings_account_id' => $investmentProvider->linked_savings_account_id,
                 'linked_savings_account_name' => $investmentProvider->linkedSavingsAccount?->name,
@@ -36,12 +46,7 @@ class InvestmentProviderController extends Controller
             'symbolSummary' => $portfolioService->summarizeProviderBySymbol($investmentProvider),
             'purchases' => $portfolioService->transformPurchases($investmentProvider->purchases),
             'symbolOptions' => InvestmentSymbol::query()
-                ->whereIn(
-                    'type',
-                    collect($investmentProvider->supportedSymbolTypes())
-                        ->map(fn ($type): string => $type->value)
-                        ->all(),
-                )
+                ->whereIn('type', $nonCryptoTypes)
                 ->orderBy('symbol')
                 ->get()
                 ->map(fn (InvestmentSymbol $symbol): array => [

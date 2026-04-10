@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, setLayoutProps, usePage } from '@inertiajs/vue3';
+import { computed, watchEffect } from 'vue';
 import { show as providerShow } from '@/actions/App/Http/Controllers/InvestmentProviderController';
 import {
     create as symbolCreate,
@@ -37,19 +38,28 @@ type Props = {
 
 defineProps<Props>();
 
-defineOptions({
-    layout: {
+const page = usePage();
+const investmentsHref = computed(() => {
+    const firstProvider = page.props.investmentProviders[0];
+
+    return firstProvider
+        ? providerShow.url(firstProvider.slug)
+        : symbolIndex.url();
+});
+
+watchEffect(() => {
+    setLayoutProps({
         breadcrumbs: [
             {
                 title: 'Investicije',
-                href: providerShow.url('ibkr'),
+                href: investmentsHref.value,
             },
             {
                 title: 'Simboli',
                 href: symbolIndex.url(),
             },
         ],
-    },
+    });
 });
 
 function formatMoney(value: string | number): string {

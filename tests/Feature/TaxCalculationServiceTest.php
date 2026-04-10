@@ -1,12 +1,24 @@
 <?php
 
 use App\Enums\BonusType;
-use App\Enums\Employee;
 use App\Models\Bonus;
 use App\Models\Paycheck;
 use App\Models\PaycheckYear;
+use App\Models\Person;
 use App\Models\TaxSetting;
 use App\Services\TaxCalculationService;
+
+function defaultPersonIdForTaxCalculationServiceTest(): int
+{
+    return Person::firstOrCreate(
+        ['slug' => 'bostjan'],
+        [
+            'name' => 'Bostjan',
+            'is_active' => true,
+            'sort_order' => 0,
+        ],
+    )->id;
+}
 
 function createTaxSettings2026(): TaxSetting
 {
@@ -75,7 +87,7 @@ test('calculates formula-based general relief below the 2026 threshold', functio
     createTaxSettings2026();
 
     $year = PaycheckYear::create([
-        'employee' => Employee::BOSTJAN,
+        'person_id' => defaultPersonIdForTaxCalculationServiceTest(),
         'year' => 2026,
         'child1_months' => 0,
         'child2_months' => 0,
@@ -115,7 +127,7 @@ test('uses a fixed general relief bracket when no formula is configured', functi
     createTaxSettings2020();
 
     $year = PaycheckYear::create([
-        'employee' => Employee::BOSTJAN,
+        'person_id' => defaultPersonIdForTaxCalculationServiceTest(),
         'year' => 2020,
         'child1_months' => 0,
         'child2_months' => 0,
@@ -142,7 +154,7 @@ test('calculates tax in second bracket with children', function () {
     createTaxSettings2026();
 
     $year = PaycheckYear::create([
-        'employee' => Employee::JASNA,
+        'person_id' => defaultPersonIdForTaxCalculationServiceTest(),
         'year' => 2026,
         'child1_months' => 12,
         'child2_months' => 12,
@@ -185,7 +197,7 @@ test('uses the fixed 2026 general relief above the threshold', function () {
     createTaxSettings2026();
 
     $year = PaycheckYear::create([
-        'employee' => Employee::BOSTJAN,
+        'person_id' => defaultPersonIdForTaxCalculationServiceTest(),
         'year' => 2026,
         'child1_months' => 0,
         'child2_months' => 0,
@@ -214,7 +226,7 @@ test('uses the fixed 2026 general relief above the threshold', function () {
 
 test('returns has_tax_settings false when no settings exist', function () {
     $year = PaycheckYear::create([
-        'employee' => Employee::BOSTJAN,
+        'person_id' => defaultPersonIdForTaxCalculationServiceTest(),
         'year' => 2030,
         'child1_months' => 0,
         'child2_months' => 0,
@@ -231,7 +243,7 @@ test('prorates child relief by months', function () {
     createTaxSettings2026();
 
     $year = PaycheckYear::create([
-        'employee' => Employee::BOSTJAN,
+        'person_id' => defaultPersonIdForTaxCalculationServiceTest(),
         'year' => 2026,
         'child1_months' => 6,
         'child2_months' => 0,
@@ -258,7 +270,7 @@ test('projects annual tax estimate from the last three paychecks', function () {
     createTaxSettings2026();
 
     $year = PaycheckYear::create([
-        'employee' => Employee::BOSTJAN,
+        'person_id' => defaultPersonIdForTaxCalculationServiceTest(),
         'year' => 2026,
         'child1_months' => 0,
         'child2_months' => 0,
@@ -309,18 +321,22 @@ test('projects annual tax estimate from the last three paychecks', function () {
     expect($result['projection']['sum_net'])->toBe('16800.00');
     expect($result['projection']['sum_contributions'])->toBe('4080.00');
     expect($result['projection']['sum_taxes'])->toBe('1800.00');
+    expect($result['projection']['breakdown']['general_relief'])->toBe('5551.93');
     expect($result['projection']['olajsave'])->toBe('5551.93');
     expect($result['projection']['osnova'])->toBe('23120.00');
     expect($result['projection']['davcna_osnova'])->toBe('17568.07');
     expect($result['projection']['dohodnina'])->toBe('3595.56');
     expect($result['projection']['razlika'])->toBe('1795.56');
+    expect($result['projection']['breakdown']['general_relief'])
+        ->not
+        ->toBe($result['breakdown']['general_relief']);
 });
 
 test('uses the precise yearly calculation when all 12 months are entered', function () {
     createTaxSettings2026();
 
     $year = PaycheckYear::create([
-        'employee' => Employee::JASNA,
+        'person_id' => defaultPersonIdForTaxCalculationServiceTest(),
         'year' => 2026,
         'child1_months' => 12,
         'child2_months' => 12,
@@ -352,13 +368,14 @@ test('uses the precise yearly calculation when all 12 months are entered', funct
     expect($result['projection']['davcna_osnova'])->toBe($result['davcna_osnova']);
     expect($result['projection']['dohodnina'])->toBe($result['dohodnina']);
     expect($result['projection']['razlika'])->toBe($result['razlika']);
+    expect($result['projection']['breakdown'])->toBe($result['breakdown']);
 });
 
 test('non-taxable bonus does not affect tax calculation', function () {
     createTaxSettings2026();
 
     $year = PaycheckYear::create([
-        'employee' => Employee::BOSTJAN,
+        'person_id' => defaultPersonIdForTaxCalculationServiceTest(),
         'year' => 2026,
         'child1_months' => 0,
         'child2_months' => 0,
@@ -395,7 +412,7 @@ test('taxable bonus affects gross, paid taxes, and tax calculation', function ()
     createTaxSettings2026();
 
     $year = PaycheckYear::create([
-        'employee' => Employee::BOSTJAN,
+        'person_id' => defaultPersonIdForTaxCalculationServiceTest(),
         'year' => 2026,
         'child1_months' => 0,
         'child2_months' => 0,
@@ -434,7 +451,7 @@ test('projection adds taxable bonus once instead of projecting it across the yea
     createTaxSettings2026();
 
     $year = PaycheckYear::create([
-        'employee' => Employee::BOSTJAN,
+        'person_id' => defaultPersonIdForTaxCalculationServiceTest(),
         'year' => 2026,
         'child1_months' => 0,
         'child2_months' => 0,
@@ -479,7 +496,7 @@ test('final projection matches actual calculation when taxable bonuses are prese
     createTaxSettings2026();
 
     $year = PaycheckYear::create([
-        'employee' => Employee::JASNA,
+        'person_id' => defaultPersonIdForTaxCalculationServiceTest(),
         'year' => 2026,
         'child1_months' => 12,
         'child2_months' => 0,

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, setLayoutProps, useForm } from '@inertiajs/vue3';
 import type { AcceptableValue } from 'reka-ui';
 import { computed, ref } from 'vue';
 import {
@@ -124,15 +124,13 @@ type Props = {
 
 const props = defineProps<Props>();
 
-defineOptions({
-    layout: {
-        breadcrumbs: [
-            {
-                title: 'Investicije',
-                href: providerShow.url('ibkr'),
-            },
-        ],
-    },
+setLayoutProps({
+    breadcrumbs: [
+        {
+            title: 'Investicije',
+            href: providerShow.url(props.provider.slug),
+        },
+    ],
 });
 
 const NO_SAVINGS_ACCOUNT = '__none__';
@@ -430,8 +428,9 @@ function deletePurchase(purchase: Purchase): void {
             "
             class="rounded-lg border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-800"
         >
-            Pred vnosom IBKR nakupa najprej povežite leaf varčevalni račun, ker
-            se bo ob vsakem nakupu stanje samodejno zmanjšalo.
+            Pred vnosom nakupa pri ponudniku {{ provider.name }} najprej
+            povežite leaf varčevalni račun, ker se bo ob vsakem nakupu stanje
+            samodejno zmanjšalo.
         </div>
 
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -801,8 +800,8 @@ function deletePurchase(purchase: Purchase): void {
             <DialogHeader>
                 <DialogTitle>Povezava z varčevalnim računom</DialogTitle>
                 <DialogDescription>
-                    Izberite leaf račun, iz katerega se bo IBKR nakupom samodejno
-                    odštelo stanje.
+                    Izberite leaf račun, iz katerega se bo nakupom pri ponudniku
+                    {{ provider.name }} samodejno odštelo stanje.
                 </DialogDescription>
             </DialogHeader>
 

@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Enums\Employee;
 use App\Models\Paycheck;
 use App\Models\PaycheckYear;
+use App\Models\Person;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -23,11 +23,11 @@ class ImportPaychecksCommand extends Command
         try {
             $filePath = $this->validateFile((string) $this->argument('file'));
             $rows = $this->readRows($filePath);
-            $employee = $this->promptForEmployee();
+            $person = $this->promptForPerson();
 
-            $this->info("Izbran zaposleni: {$employee->label()}");
+            $this->info("Izbrana oseba: {$person->name}");
 
-            $summary = $this->importRows($employee, $rows);
+            $summary = $this->importRows($person, $rows);
 
             $this->newLine();
             $this->info('Uvoz plač je uspešno zaključen.');
@@ -57,20 +57,31 @@ class ImportPaychecksCommand extends Command
         return $filePath;
     }
 
-    private function promptForEmployee(): Employee
+    private function promptForPerson(): Person
     {
-        $employeesByLabel = [];
+        $peopleByName = Person::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->keyBy('name');
 
-        foreach (Employee::cases() as $employee) {
-            $employeesByLabel[$employee->label()] = $employee;
+        if ($peopleByName->isEmpty()) {
+            throw new RuntimeException('Ni aktivnih oseb za uvoz plač.');
         }
 
         $selectedLabel = $this->choice(
-            'Izberi zaposlenega za uvoz plač',
-            array_keys($employeesByLabel),
+            'Izberi osebo za uvoz plač',
+            $peopleByName->keys()->all(),
         );
 
-        return $employeesByLabel[$selectedLabel];
+        $person = $peopleByName->get($selectedLabel);
+
+        if (! $person instanceof Person) {
+            throw new RuntimeException('Izbrana oseba ne obstaja.');
+        }
+
+        return $person;
     }
 
     /**
@@ -240,9 +251,9 @@ class ImportPaychecksCommand extends Command
      * @param  list<array{month: int, year: int, net: string|null, gross: string, contributions: string, taxes: string}>  $rows
      * @return array{processed_rows: int, created_years: int, created_paychecks: int, updated_paychecks: int}
      */
-    private function importRows(Employee $employee, array $rows): array
+    private function importRows(Person $person, array $rows): array
     {
-        return DB::transaction(function () use ($employee, $rows): array {
+        return DB::transaction(function () use ($person, $rows): array {
             $processedRows = 0;
             $createdYears = 0;
             $createdPaychecks = 0;
@@ -251,7 +262,7 @@ class ImportPaychecksCommand extends Command
             foreach ($rows as $row) {
                 $paycheckYear = PaycheckYear::firstOrCreate(
                     [
-                        'employee' => $employee->value,
+                        'person_id' => $person->id,
                         'year' => $row['year'],
                     ],
                     [

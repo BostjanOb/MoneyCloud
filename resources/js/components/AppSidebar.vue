@@ -1,15 +1,21 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import {
+    Bitcoin,
     ChartCandlestick,
     LayoutGrid,
     PiggyBank,
     Settings,
     Wallet,
 } from 'lucide-vue-next';
+import { computed } from 'vue';
+import { index as cryptoBalanceIndex } from '@/actions/App/Http/Controllers/CryptoBalanceController';
+import { index as cryptoDcaIndex } from '@/actions/App/Http/Controllers/CryptoDcaPurchaseController';
 import { show as investmentProviderShow } from '@/actions/App/Http/Controllers/InvestmentProviderController';
+import { index as investmentProviderSettingsIndex } from '@/actions/App/Http/Controllers/InvestmentProviderSettingsController';
 import { index as investmentSymbolIndex } from '@/actions/App/Http/Controllers/InvestmentSymbolController';
 import { index as placeIndex } from '@/actions/App/Http/Controllers/PaycheckController';
+import { index as peopleIndex } from '@/actions/App/Http/Controllers/PersonController';
 import { index as savingsIndex } from '@/actions/App/Http/Controllers/SavingsAccountController';
 import { index as nastavitveIndex } from '@/actions/App/Http/Controllers/TaxSettingController';
 import AppLogo from '@/components/AppLogo.vue';
@@ -28,48 +34,64 @@ import {
 import { dashboard } from '@/routes';
 import type { NavItem } from '@/types';
 
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-    {
-        title: 'Varčevanje',
-        href: savingsIndex.url(),
-        icon: PiggyBank,
-    },
-    {
-        title: 'Plače',
-        href: placeIndex.url('bostjan'),
-        icon: Wallet,
-        children: [
-            {
-                title: 'Boštjan',
-                href: placeIndex.url('bostjan'),
-            },
-            {
-                title: 'Jasna',
-                href: placeIndex.url('jasna'),
-            },
-        ],
-    },
-    {
-        title: 'Investicije',
-        href: investmentProviderShow.url('ibkr'),
-        icon: ChartCandlestick,
-        children: [
-            {
-                title: 'IBKR',
-                href: investmentProviderShow.url('ibkr'),
-            },
-            {
-                title: 'Ilirika',
-                href: investmentProviderShow.url('ilirika'),
-            },
-        ],
-    },
-];
+const page = usePage();
+
+const mainNavItems = computed<NavItem[]>(() => {
+    const people = page.props.activePeople;
+    const firstPerson = people[0];
+    const investmentProviders = page.props.investmentProviders;
+    const firstInvestmentProvider = investmentProviders[0];
+
+    return [
+        {
+            title: 'Dashboard',
+            href: dashboard(),
+            icon: LayoutGrid,
+        },
+        {
+            title: 'Varčevanje',
+            href: savingsIndex.url(),
+            icon: PiggyBank,
+        },
+        {
+            title: 'Plače',
+            href: firstPerson
+                ? placeIndex.url(firstPerson.slug)
+                : peopleIndex.url(),
+            icon: Wallet,
+            children: people.map((person) => ({
+                title: person.name,
+                href: placeIndex.url(person.slug),
+            })),
+        },
+        {
+            title: 'Investicije',
+            href: firstInvestmentProvider
+                ? investmentProviderShow.url(firstInvestmentProvider.slug)
+                : investmentSymbolIndex.url(),
+            icon: ChartCandlestick,
+            children: investmentProviders.map((provider) => ({
+                title: provider.name,
+                href: investmentProviderShow.url(provider.slug),
+            })),
+        },
+        {
+            title: 'Kripto',
+            href: cryptoBalanceIndex.url(),
+            icon: Bitcoin,
+            children: [
+                {
+                    title: 'Stanja',
+                    href: cryptoBalanceIndex.url(),
+                },
+                {
+                    title: 'DCA nakupi',
+                    href: cryptoDcaIndex.url(),
+                },
+            ],
+        },
+    ];
+});
 
 const footerNavItems: NavItem[] = [
     {
@@ -84,6 +106,14 @@ const footerNavItems: NavItem[] = [
             {
                 title: 'Simboli',
                 href: investmentSymbolIndex.url(),
+            },
+            {
+                title: 'Ponudniki',
+                href: investmentProviderSettingsIndex.url(),
+            },
+            {
+                title: 'Osebe',
+                href: peopleIndex.url(),
             },
         ],
     },

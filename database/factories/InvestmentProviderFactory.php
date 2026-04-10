@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Enums\InvestmentProviderSlug;
 use App\Models\InvestmentProvider;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -22,6 +21,8 @@ class InvestmentProviderFactory extends Factory
             'slug' => fake()->unique()->slug(2),
             'name' => fake()->company(),
             'linked_savings_account_id' => null,
+            'requires_linked_savings_account' => false,
+            'supported_symbol_types' => [],
             'sort_order' => 0,
         ];
     }
@@ -29,8 +30,10 @@ class InvestmentProviderFactory extends Factory
     public function ibkr(): self
     {
         return $this->state(fn (): array => [
-            'slug' => InvestmentProviderSlug::IBKR,
-            'name' => InvestmentProviderSlug::IBKR->label(),
+            'slug' => 'ibkr',
+            'name' => 'IBKR',
+            'requires_linked_savings_account' => true,
+            'supported_symbol_types' => ['etf', 'stock', 'crypto'],
             'sort_order' => 1,
         ]);
     }
@@ -38,9 +41,22 @@ class InvestmentProviderFactory extends Factory
     public function ilirika(): self
     {
         return $this->state(fn (): array => [
-            'slug' => InvestmentProviderSlug::ILIRIKA,
-            'name' => InvestmentProviderSlug::ILIRIKA->label(),
+            'slug' => 'ilirika',
+            'name' => 'Ilirika',
+            'requires_linked_savings_account' => false,
+            'supported_symbol_types' => ['bond'],
             'sort_order' => 2,
+        ]);
+    }
+
+    public function crypto(string $slug = 'nexo', string $name = 'NEXO'): self
+    {
+        return $this->state(fn (): array => [
+            'slug' => $slug,
+            'name' => $name,
+            'requires_linked_savings_account' => false,
+            'supported_symbol_types' => ['crypto'],
+            'sort_order' => 10,
         ]);
     }
 }

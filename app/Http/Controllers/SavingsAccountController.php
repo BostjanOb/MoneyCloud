@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\Employee;
 use App\Http\Requests\StoreSavingsAccountRequest;
 use App\Http\Requests\UpdateSavingsAccountRequest;
+use App\Models\Person;
 use App\Models\SavingsAccount;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +17,7 @@ class SavingsAccountController extends Controller
     {
         $accounts = SavingsAccount::query()
             ->roots()
-            ->with('children')
+            ->with(['person', 'children.person'])
             ->orderBy('sort_order')
             ->orderBy('name')
             ->orderBy('id')
@@ -25,10 +25,15 @@ class SavingsAccountController extends Controller
 
         return Inertia::render('Varcevanje/Index', [
             'accounts' => $accounts->map(fn (SavingsAccount $account): array => $this->transformAccount($account))->values()->all(),
-            'ownerOptions' => collect(Employee::cases())->map(fn (Employee $employee): array => [
-                'value' => $employee->value,
-                'label' => $employee->label(),
-            ])->values()->all(),
+            'personOptions' => Person::query()
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get()
+                ->map(fn (Person $person): array => [
+                    'value' => (string) $person->id,
+                    'label' => $person->name,
+                ])->values()->all(),
             'totals' => [
                 'amount' => SavingsAccount::fromCents(
                     $accounts->sum(fn (SavingsAccount $account): int => SavingsAccount::toCents($account->amount)),
@@ -105,8 +110,8 @@ class SavingsAccountController extends Controller
             'id' => $account->id,
             'parent_id' => $account->parent_id,
             'name' => $account->name,
-            'owner' => $account->owner->value,
-            'owner_label' => $account->owner->label(),
+            'person_id' => $account->person_id,
+            'person_label' => $account->person->name,
             'amount' => $account->amount,
             'apy' => $account->apy,
             'sort_order' => $account->sort_order,

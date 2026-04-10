@@ -1,11 +1,23 @@
 <?php
 
 use App\Enums\BonusType;
-use App\Enums\Employee;
 use App\Models\Paycheck;
 use App\Models\PaycheckYear;
+use App\Models\Person;
 use App\Models\TaxSetting;
 use App\Models\User;
+
+function createBostjanPersonForPaycheckControllerTest(): Person
+{
+    return Person::firstOrCreate(
+        ['slug' => 'bostjan'],
+        [
+            'name' => 'Bostjan',
+            'is_active' => true,
+            'sort_order' => 0,
+        ],
+    );
+}
 
 function createTaxSettingsForPaycheckControllerTest(): TaxSetting
 {
@@ -49,6 +61,7 @@ test('index page requires authentication', function () {
 
 test('index page renders for authenticated user', function () {
     $user = User::factory()->create();
+    createBostjanPersonForPaycheckControllerTest();
 
     $this->actingAs($user)
         ->get(route('place.index', 'bostjan'))
@@ -58,6 +71,7 @@ test('index page renders for authenticated user', function () {
 
 test('index page includes all bonus type options', function () {
     $user = User::factory()->create();
+    createBostjanPersonForPaycheckControllerTest();
 
     $this->actingAs($user)
         ->get(route('place.index', 'bostjan'))
@@ -75,19 +89,20 @@ test('index page includes all bonus type options', function () {
 
 test('index page lists available years newest first', function () {
     $user = User::factory()->create();
+    $person = createBostjanPersonForPaycheckControllerTest();
 
     PaycheckYear::factory()->create([
-        'employee' => Employee::BOSTJAN,
+        'person_id' => $person->id,
         'year' => 2024,
     ]);
 
     PaycheckYear::factory()->create([
-        'employee' => Employee::BOSTJAN,
+        'person_id' => $person->id,
         'year' => 2026,
     ]);
 
     PaycheckYear::factory()->create([
-        'employee' => Employee::BOSTJAN,
+        'person_id' => $person->id,
         'year' => 2025,
     ]);
 
@@ -102,9 +117,10 @@ test('index page lists available years newest first', function () {
 
 test('index page shows paycheck year data', function () {
     $user = User::factory()->create();
+    $person = createBostjanPersonForPaycheckControllerTest();
 
     $year = PaycheckYear::factory()->create([
-        'employee' => Employee::BOSTJAN,
+        'person_id' => $person->id,
         'year' => 2026,
     ]);
 
@@ -114,7 +130,7 @@ test('index page shows paycheck year data', function () {
     ]);
 
     $this->actingAs($user)
-        ->get(route('place.index', ['employee' => 'bostjan', 'year' => 2026]))
+        ->get(route('place.index', ['person' => 'bostjan', 'year' => 2026]))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('Place/Index')
@@ -124,9 +140,10 @@ test('index page shows paycheck year data', function () {
 
 test('index page includes paycheck totals for the summary row', function () {
     $user = User::factory()->create();
+    $person = createBostjanPersonForPaycheckControllerTest();
 
     $year = PaycheckYear::factory()->create([
-        'employee' => Employee::BOSTJAN,
+        'person_id' => $person->id,
         'year' => 2026,
     ]);
 
@@ -149,7 +166,7 @@ test('index page includes paycheck totals for the summary row', function () {
     ]);
 
     $this->actingAs($user)
-        ->get(route('place.index', ['employee' => 'bostjan', 'year' => 2026]))
+        ->get(route('place.index', ['person' => 'bostjan', 'year' => 2026]))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('Place/Index')
@@ -162,10 +179,11 @@ test('index page includes paycheck totals for the summary row', function () {
 
 test('index page includes projected tax calculation based on available paychecks', function () {
     $user = User::factory()->create();
+    $person = createBostjanPersonForPaycheckControllerTest();
     createTaxSettingsForPaycheckControllerTest();
 
     $year = PaycheckYear::factory()->create([
-        'employee' => Employee::BOSTJAN,
+        'person_id' => $person->id,
         'year' => 2026,
     ]);
 
@@ -188,7 +206,7 @@ test('index page includes projected tax calculation based on available paychecks
     ]);
 
     $this->actingAs($user)
-        ->get(route('place.index', ['employee' => 'bostjan', 'year' => 2026]))
+        ->get(route('place.index', ['person' => 'bostjan', 'year' => 2026]))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('Place/Index')
@@ -196,13 +214,13 @@ test('index page includes projected tax calculation based on available paychecks
             ->where('calculation.projection.sum_gross', '18600.00')
             ->where('calculation.projection.sum_contributions', '3720.00')
             ->where('calculation.projection.sum_taxes', '1860.00')
+            ->where('calculation.projection.breakdown.general_relief', '5551.93')
         );
 });
 
 test('can store a paycheck', function () {
     $user = User::factory()->create();
     $year = PaycheckYear::factory()->create([
-        'employee' => Employee::BOSTJAN,
         'year' => 2026,
     ]);
 
@@ -226,7 +244,6 @@ test('can store a paycheck', function () {
 test('can store a paycheck without net amount', function () {
     $user = User::factory()->create();
     $year = PaycheckYear::factory()->create([
-        'employee' => Employee::BOSTJAN,
         'year' => 2026,
     ]);
 

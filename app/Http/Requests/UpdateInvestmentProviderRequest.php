@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-use App\Enums\InvestmentProviderSlug;
 use App\Models\InvestmentProvider;
 use App\Models\SavingsAccount;
 use Illuminate\Foundation\Http\FormRequest;
@@ -48,12 +47,12 @@ class UpdateInvestmentProviderRequest extends FormRequest
             }
 
             if (
-                $provider->slug !== InvestmentProviderSlug::IBKR
+                ! $provider->requiresLinkedSavingsAccount()
                 && $this->filled('linked_savings_account_id')
             ) {
                 $validator->errors()->add(
                     'linked_savings_account_id',
-                    'Povezava z varčevalnim računom je na voljo samo za IBKR.',
+                    sprintf('Povezava z varčevalnim računom ni omogočena za ponudnika %s.', $provider->name),
                 );
             }
 

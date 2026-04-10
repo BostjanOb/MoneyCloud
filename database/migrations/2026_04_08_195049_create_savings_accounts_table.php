@@ -11,6 +11,7 @@ return new class extends Migration
         Schema::create('savings_accounts', function (Blueprint $table) {
             $table->id();
             $table->foreignId('parent_id')->nullable()->constrained('savings_accounts')->cascadeOnDelete();
+            $table->foreignId('person_id')->constrained();
             $table->string('name');
             $table->string('owner');
             $table->decimal('amount', 12, 2)->default(0);

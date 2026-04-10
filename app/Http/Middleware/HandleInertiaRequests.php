@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\InvestmentProvider;
+use App\Models\Person;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -41,6 +43,34 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            'activePeople' => fn (): array => $request->user()
+                ? Person::query()
+                    ->where('is_active', true)
+                    ->orderBy('sort_order')
+                    ->orderBy('name')
+                    ->get()
+                    ->map(fn (Person $person): array => [
+                        'id' => $person->id,
+                        'slug' => $person->slug,
+                        'name' => $person->name,
+                    ])
+                    ->values()
+                    ->all()
+                : [],
+            'investmentProviders' => fn (): array => $request->user()
+                ? InvestmentProvider::query()
+                    ->orderBy('sort_order')
+                    ->orderBy('name')
+                    ->get()
+                    ->filter(fn (InvestmentProvider $provider): bool => $provider->supportsNonCrypto())
+                    ->map(fn (InvestmentProvider $provider): array => [
+                        'id' => $provider->id,
+                        'slug' => $provider->slug,
+                        'name' => $provider->name,
+                    ])
+                    ->values()
+                    ->all()
+                : [],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
     }

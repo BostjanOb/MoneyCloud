@@ -45,8 +45,8 @@ type AccountNode = {
     id: number;
     parent_id: number | null;
     name: string;
-    owner: string;
-    owner_label: string;
+    person_id: number;
+    person_label: string;
     amount: string;
     apy: string;
     sort_order: number;
@@ -56,7 +56,7 @@ type AccountNode = {
     children: AccountNode[];
 };
 
-type OwnerOption = {
+type PersonOption = {
     value: string;
     label: string;
 };
@@ -69,7 +69,7 @@ type Totals = {
 
 type Props = {
     accounts: AccountNode[];
-    ownerOptions: OwnerOption[];
+    personOptions: PersonOption[];
     totals: Totals;
 };
 
@@ -93,7 +93,7 @@ defineOptions({
 });
 
 const NO_PARENT_VALUE = '__none__';
-const defaultOwner = props.ownerOptions[0]?.value ?? 'bostjan';
+const defaultPerson = props.personOptions[0]?.value ?? '';
 
 const showAccountModal = ref(false);
 const showInterestModal = ref(false);
@@ -102,7 +102,7 @@ const selectedInterestAccount = ref<AccountNode | null>(null);
 
 const accountForm = useForm({
     name: '',
-    owner: defaultOwner,
+    person_id: defaultPerson,
     amount: '0',
     apy: '0',
     sort_order: '0',
@@ -213,7 +213,7 @@ function fromCents(value: number): string {
 function resetAccountForm(): void {
     accountForm.defaults({
         name: '',
-        owner: defaultOwner,
+        person_id: defaultPerson,
         amount: '0',
         apy: '0',
         sort_order: '0',
@@ -233,7 +233,7 @@ function openEditAccount(account: AccountNode): void {
     editingAccount.value = account;
     accountForm.clearErrors();
     accountForm.name = account.name;
-    accountForm.owner = account.owner;
+    accountForm.person_id = String(account.person_id);
     accountForm.amount = account.amount;
     accountForm.apy = account.apy;
     accountForm.sort_order = String(account.sort_order);
@@ -249,7 +249,7 @@ function submitAccount(): void {
         if (editingAccount.value?.has_children) {
             return {
                 name: data.name,
-                owner: data.owner,
+                person_id: Number(data.person_id),
                 apy: data.apy,
                 sort_order: Number(data.sort_order),
             };
@@ -257,7 +257,7 @@ function submitAccount(): void {
 
         return {
             name: data.name,
-            owner: data.owner,
+            person_id: Number(data.person_id),
             amount: data.amount,
             apy: data.apy,
             sort_order: Number(data.sort_order),
@@ -331,9 +331,9 @@ function submitInterest(): void {
     });
 }
 
-function updateOwner(value: AcceptableValue): void {
+function updatePerson(value: AcceptableValue): void {
     if (typeof value === 'string') {
-        accountForm.owner = value;
+        accountForm.person_id = value;
     }
 }
 
@@ -367,7 +367,7 @@ function updateParent(value: AcceptableValue): void {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Ime</TableHead>
-                            <TableHead>Lastnik</TableHead>
+                            <TableHead>Oseba</TableHead>
                             <TableHead numeric class="text-right"
                                 >Znesek</TableHead
                             >
@@ -428,7 +428,7 @@ function updateParent(value: AcceptableValue): void {
                                 </div>
                             </TableCell>
                             <TableCell>{{
-                                row.isRoot ? row.account.owner_label : ''
+                                row.isRoot ? row.account.person_label : ''
                             }}</TableCell>
                             <TableCell numeric class="text-right"
                                 >{{
@@ -537,17 +537,17 @@ function updateParent(value: AcceptableValue): void {
                 </div>
 
                 <div class="grid gap-2">
-                    <Label for="account-owner">Lastnik</Label>
+                    <Label for="account-person">Oseba</Label>
                     <Select
-                        :model-value="accountForm.owner"
-                        @update:model-value="updateOwner"
+                        :model-value="accountForm.person_id"
+                        @update:model-value="updatePerson"
                     >
-                        <SelectTrigger id="account-owner">
-                            <SelectValue placeholder="Izberite lastnika" />
+                        <SelectTrigger id="account-person">
+                            <SelectValue placeholder="Izberite osebo" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem
-                                v-for="option in ownerOptions"
+                                v-for="option in personOptions"
                                 :key="option.value"
                                 :value="option.value"
                             >
@@ -555,7 +555,7 @@ function updateParent(value: AcceptableValue): void {
                             </SelectItem>
                         </SelectContent>
                     </Select>
-                    <InputError :message="accountForm.errors.owner" />
+                    <InputError :message="accountForm.errors.person_id" />
                 </div>
 
                 <div class="grid gap-2">

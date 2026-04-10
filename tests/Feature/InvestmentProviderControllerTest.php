@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\InvestmentProviderSlug;
 use App\Enums\InvestmentSymbolType;
 use App\Models\InvestmentProvider;
 use App\Models\InvestmentPurchase;
@@ -8,8 +7,13 @@ use App\Models\InvestmentSymbol;
 use App\Models\SavingsAccount;
 use App\Models\User;
 
+beforeEach(function () {
+    InvestmentProvider::factory()->ibkr()->create();
+    InvestmentProvider::factory()->ilirika()->create();
+});
+
 test('investment provider page requires authentication', function () {
-    InvestmentProvider::query()->firstWhere('slug', InvestmentProviderSlug::IBKR);
+    InvestmentProvider::query()->firstWhere('slug', 'ibkr');
 
     $this->get(route('investments.providers.show', 'ibkr'))
         ->assertRedirect(route('login'));
@@ -17,8 +21,8 @@ test('investment provider page requires authentication', function () {
 
 test('authenticated user can view provider pages with summary and filtered symbols', function () {
     $user = User::factory()->create();
-    $ibkr = InvestmentProvider::query()->firstWhere('slug', InvestmentProviderSlug::IBKR);
-    $ilirika = InvestmentProvider::query()->firstWhere('slug', InvestmentProviderSlug::ILIRIKA);
+    $ibkr = InvestmentProvider::query()->firstWhere('slug', 'ibkr');
+    $ilirika = InvestmentProvider::query()->firstWhere('slug', 'ilirika');
 
     $stock = InvestmentSymbol::factory()->create([
         'type' => InvestmentSymbolType::STOCK,
@@ -69,7 +73,12 @@ test('authenticated user can view provider pages with summary and filtered symbo
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('Investicije/Provider')
-            ->where('provider.slug', InvestmentProviderSlug::IBKR->value)
+            ->where('provider.slug', 'ibkr')
+            ->has('investmentProviders', 2)
+            ->where('investmentProviders.0.slug', 'ibkr')
+            ->where('investmentProviders.0.name', 'IBKR')
+            ->where('investmentProviders.1.slug', 'ilirika')
+            ->where('investmentProviders.1.name', 'Ilirika')
             ->where('summary.total_invested', '450.00')
             ->where('summary.current_value', '540.00')
             ->where('summary.profit_loss', '72.00')
@@ -98,18 +107,93 @@ test('authenticated user can view provider pages with summary and filtered symbo
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('Investicije/Provider')
-            ->where('provider.slug', InvestmentProviderSlug::ILIRIKA->value)
+            ->where('provider.slug', 'ilirika')
             ->has('symbolOptions', 1)
             ->where('symbolOptions.0.symbol', $bond->symbol)
         );
 });
 
+test('provider supported symbol types are database driven', function () {
+    $user = User::factory()->create();
+    $provider = InvestmentProvider::query()->firstWhere('slug', 'ibkr');
+    $provider->update([
+        'supported_symbol_types' => [InvestmentSymbolType::BOND->value],
+    ]);
+
+    $stock = InvestmentSymbol::factory()->create([
+        'type' => InvestmentSymbolType::STOCK,
+        'symbol' => 'AAPL',
+    ]);
+    $bond = InvestmentSymbol::factory()->bond()->create([
+        'symbol' => 'SI123',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('investments.providers.show', $provider->slug))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Investicije/Provider')
+            ->has('symbolOptions', 1)
+            ->where('symbolOptions.0.symbol', $bond->symbol)
+        );
+
+    $this->actingAs($user)
+        ->post(route('investments.purchases.store', $provider->slug), [
+            'investment_symbol_id' => $stock->id,
+            'purchased_at' => now()->toDateTimeString(),
+            'quantity' => '1',
+            'price_per_unit' => '100.00',
+            'fee' => '0.00',
+        ])
+        ->assertSessionHasErrors('investment_symbol_id');
+});
+
+test('provider linked savings account requirement is database driven', function () {
+    $user = User::factory()->create();
+    $provider = InvestmentProvider::factory()->create([
+        'slug' => 'nova',
+        'name' => 'Nova',
+        'requires_linked_savings_account' => true,
+        'supported_symbol_types' => [InvestmentSymbolType::ETF->value],
+    ]);
+    $linkedAccount = SavingsAccount::factory()->create([
+        'owner' => 'bostjan',
+        'amount' => '1000.00',
+    ]);
+    $symbol = InvestmentSymbol::factory()->create([
+        'type' => InvestmentSymbolType::ETF,
+    ]);
+
+    $payload = [
+        'investment_symbol_id' => $symbol->id,
+        'purchased_at' => now()->toDateTimeString(),
+        'quantity' => '2',
+        'price_per_unit' => '100.00',
+        'fee' => '5.00',
+    ];
+
+    $this->actingAs($user)
+        ->post(route('investments.purchases.store', $provider->slug), $payload)
+        ->assertSessionHasErrors('investment_symbol_id');
+
+    $provider->update([
+        'linked_savings_account_id' => $linkedAccount->id,
+    ]);
+
+    $this->actingAs($user)
+        ->post(route('investments.purchases.store', $provider->slug), $payload)
+        ->assertRedirect();
+
+    expect($linkedAccount->fresh()->amount)->toBe('795.00');
+});
+
 test('creating an ibkr purchase decreases the linked savings balance', function () {
     $user = User::factory()->create();
     $linkedAccount = SavingsAccount::factory()->create([
+        'owner' => 'bostjan',
         'amount' => '1000.00',
     ]);
-    $provider = InvestmentProvider::query()->firstWhere('slug', InvestmentProviderSlug::IBKR);
+    $provider = InvestmentProvider::query()->firstWhere('slug', 'ibkr');
     $provider->update([
         'linked_savings_account_id' => $linkedAccount->id,
     ]);
@@ -118,7 +202,7 @@ test('creating an ibkr purchase decreases the linked savings balance', function 
     ]);
 
     $this->actingAs($user)
-        ->post(route('investments.purchases.store', $provider->slug->value), [
+        ->post(route('investments.purchases.store', $provider->slug), [
             'investment_symbol_id' => $symbol->id,
             'purchased_at' => now()->toDateTimeString(),
             'quantity' => '2',
@@ -138,9 +222,10 @@ test('creating an ibkr purchase decreases the linked savings balance', function 
 test('updating an ibkr purchase adjusts the linked savings balance by the delta', function () {
     $user = User::factory()->create();
     $linkedAccount = SavingsAccount::factory()->create([
+        'owner' => 'bostjan',
         'amount' => '1000.00',
     ]);
-    $provider = InvestmentProvider::query()->firstWhere('slug', InvestmentProviderSlug::IBKR);
+    $provider = InvestmentProvider::query()->firstWhere('slug', 'ibkr');
     $provider->update([
         'linked_savings_account_id' => $linkedAccount->id,
     ]);
@@ -148,7 +233,7 @@ test('updating an ibkr purchase adjusts the linked savings balance by the delta'
         'type' => InvestmentSymbolType::STOCK,
     ]);
 
-    $this->actingAs($user)->post(route('investments.purchases.store', $provider->slug->value), [
+    $this->actingAs($user)->post(route('investments.purchases.store', $provider->slug), [
         'investment_symbol_id' => $symbol->id,
         'purchased_at' => now()->toDateTimeString(),
         'quantity' => '2',
@@ -160,7 +245,7 @@ test('updating an ibkr purchase adjusts the linked savings balance by the delta'
 
     $this->actingAs($user)
         ->put(route('investments.purchases.update', [
-            'investmentProvider' => $provider->slug->value,
+            'investmentProvider' => $provider->slug,
             'investmentPurchase' => $purchase->id,
         ]), [
             'investment_symbol_id' => $symbol->id,
@@ -177,9 +262,10 @@ test('updating an ibkr purchase adjusts the linked savings balance by the delta'
 test('deleting an ibkr purchase refunds the linked savings balance', function () {
     $user = User::factory()->create();
     $linkedAccount = SavingsAccount::factory()->create([
+        'owner' => 'bostjan',
         'amount' => '1000.00',
     ]);
-    $provider = InvestmentProvider::query()->firstWhere('slug', InvestmentProviderSlug::IBKR);
+    $provider = InvestmentProvider::query()->firstWhere('slug', 'ibkr');
     $provider->update([
         'linked_savings_account_id' => $linkedAccount->id,
     ]);
@@ -187,7 +273,7 @@ test('deleting an ibkr purchase refunds the linked savings balance', function ()
         'type' => InvestmentSymbolType::ETF,
     ]);
 
-    $this->actingAs($user)->post(route('investments.purchases.store', $provider->slug->value), [
+    $this->actingAs($user)->post(route('investments.purchases.store', $provider->slug), [
         'investment_symbol_id' => $symbol->id,
         'purchased_at' => now()->toDateTimeString(),
         'quantity' => '2',
@@ -199,7 +285,7 @@ test('deleting an ibkr purchase refunds the linked savings balance', function ()
 
     $this->actingAs($user)
         ->delete(route('investments.purchases.destroy', [
-            'investmentProvider' => $provider->slug->value,
+            'investmentProvider' => $provider->slug,
             'investmentPurchase' => $purchase->id,
         ]))
         ->assertRedirect();
@@ -211,9 +297,10 @@ test('deleting an ibkr purchase refunds the linked savings balance', function ()
 test('ibkr purchase cannot exceed linked savings balance', function () {
     $user = User::factory()->create();
     $linkedAccount = SavingsAccount::factory()->create([
+        'owner' => 'bostjan',
         'amount' => '100.00',
     ]);
-    $provider = InvestmentProvider::query()->firstWhere('slug', InvestmentProviderSlug::IBKR);
+    $provider = InvestmentProvider::query()->firstWhere('slug', 'ibkr');
     $provider->update([
         'linked_savings_account_id' => $linkedAccount->id,
     ]);
@@ -222,7 +309,7 @@ test('ibkr purchase cannot exceed linked savings balance', function () {
     ]);
 
     $this->actingAs($user)
-        ->post(route('investments.purchases.store', $provider->slug->value), [
+        ->post(route('investments.purchases.store', $provider->slug), [
             'investment_symbol_id' => $symbol->id,
             'purchased_at' => now()->toDateTimeString(),
             'quantity' => '2',
@@ -237,11 +324,11 @@ test('ibkr purchase cannot exceed linked savings balance', function () {
 
 test('bond purchases require bond specific fields', function () {
     $user = User::factory()->create();
-    $provider = InvestmentProvider::query()->firstWhere('slug', InvestmentProviderSlug::ILIRIKA);
+    $provider = InvestmentProvider::query()->firstWhere('slug', 'ilirika');
     $bond = InvestmentSymbol::factory()->bond()->create();
 
     $this->actingAs($user)
-        ->post(route('investments.purchases.store', $provider->slug->value), [
+        ->post(route('investments.purchases.store', $provider->slug), [
             'investment_symbol_id' => $bond->id,
             'purchased_at' => now()->toDateTimeString(),
             'quantity' => '5',
@@ -249,4 +336,48 @@ test('bond purchases require bond specific fields', function () {
             'fee' => '2.00',
         ])
         ->assertSessionHasErrors(['yield', 'coupon_date', 'expiry_date']);
+});
+
+test('generic investment pages hide crypto only providers and crypto purchases', function () {
+    $user = User::factory()->create();
+    $provider = InvestmentProvider::query()->firstWhere('slug', 'ibkr');
+    InvestmentProvider::factory()->crypto('nexo', 'NEXO')->create();
+    $stock = InvestmentSymbol::factory()->create([
+        'type' => InvestmentSymbolType::STOCK,
+        'symbol' => 'AAPL',
+        'current_price' => '120.00',
+    ]);
+    $crypto = InvestmentSymbol::factory()->crypto('BTC')->create([
+        'current_price' => '50000.00',
+    ]);
+
+    InvestmentPurchase::factory()->create([
+        'investment_provider_id' => $provider->id,
+        'investment_symbol_id' => $stock->id,
+        'quantity' => '1.00000000',
+        'price_per_unit' => '100.00',
+        'fee' => '0.00',
+    ]);
+    InvestmentPurchase::factory()->create([
+        'investment_provider_id' => $provider->id,
+        'investment_symbol_id' => $crypto->id,
+        'quantity' => '1.00000000',
+        'price_per_unit' => '40000.00',
+        'fee' => '0.00',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('investments.providers.show', $provider->slug))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Investicije/Provider')
+            ->has('investmentProviders', 2)
+            ->where('investmentProviders.0.slug', 'ibkr')
+            ->where('investmentProviders.1.slug', 'ilirika')
+            ->where('summary.total_invested', '100.00')
+            ->has('purchases', 1)
+            ->where('purchases.0.symbol.symbol', 'AAPL')
+            ->has('symbolOptions', 1)
+            ->where('symbolOptions.0.symbol', 'AAPL')
+        );
 });

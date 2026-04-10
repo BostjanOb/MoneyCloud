@@ -1,8 +1,8 @@
 <?php
 
-use App\Enums\Employee;
 use App\Models\Paycheck;
 use App\Models\PaycheckYear;
+use App\Models\Person;
 use Illuminate\Console\Command;
 
 function createPaycheckImportCsv(string $contents): string
@@ -27,18 +27,20 @@ date,net,gross,contributions,taxes
 CSV);
 
     $this->artisan('paychecks:import', ['file' => $path])
-        ->expectsChoice('Izberi zaposlenega za uvoz plač', 'Jasna', ['Boštjan', 'Jasna'])
-        ->expectsOutputToContain('Izbran zaposleni: Jasna')
+        ->expectsChoice('Izberi osebo za uvoz plač', 'Jasna', ['Boštjan', 'Jasna'])
+        ->expectsOutputToContain('Izbrana oseba: Jasna')
         ->expectsOutputToContain('Obdelane vrstice: 3')
         ->expectsOutputToContain('Ustvarjena leta plač: 2')
         ->expectsOutputToContain('Ustvarjene plače: 3')
         ->expectsOutputToContain('Posodobljene plače: 0')
         ->assertExitCode(Command::SUCCESS);
 
-    $year2010 = PaycheckYear::where('employee', Employee::JASNA)
+    $jasna = Person::where('slug', 'jasna')->firstOrFail();
+
+    $year2010 = PaycheckYear::whereBelongsTo($jasna)
         ->where('year', 2010)
         ->first();
-    $year2011 = PaycheckYear::where('employee', Employee::JASNA)
+    $year2011 = PaycheckYear::whereBelongsTo($jasna)
         ->where('year', 2011)
         ->first();
 
@@ -68,8 +70,9 @@ CSV);
 });
 
 test('updates an existing paycheck when the imported month already exists', function () {
+    $bostjan = Person::where('slug', 'bostjan')->firstOrFail();
     $paycheckYear = PaycheckYear::factory()->create([
-        'employee' => Employee::BOSTJAN,
+        'person_id' => $bostjan->id,
         'year' => 2011,
         'child1_months' => 0,
         'child2_months' => 0,
@@ -91,7 +94,7 @@ date,net,gross,contributions,taxes
 CSV);
 
     $this->artisan('paychecks:import', ['file' => $path])
-        ->expectsChoice('Izberi zaposlenega za uvoz plač', 'Boštjan', ['Boštjan', 'Jasna'])
+        ->expectsChoice('Izberi osebo za uvoz plač', 'Boštjan', ['Boštjan', 'Jasna'])
         ->expectsOutputToContain('Ustvarjena leta plač: 0')
         ->expectsOutputToContain('Ustvarjene plače: 0')
         ->expectsOutputToContain('Posodobljene plače: 1')

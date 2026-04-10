@@ -2,14 +2,14 @@
 
 namespace App\Models;
 
-use App\Enums\Employee;
 use Database\Factories\PaycheckYearFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['employee', 'year', 'child1_months', 'child2_months', 'child3_months'])]
+#[Fillable(['person_id', 'year', 'child1_months', 'child2_months', 'child3_months'])]
 class PaycheckYear extends Model
 {
     /** @use HasFactory<PaycheckYearFactory> */
@@ -18,12 +18,18 @@ class PaycheckYear extends Model
     protected function casts(): array
     {
         return [
-            'employee' => Employee::class,
+            'person_id' => 'integer',
             'year' => 'integer',
             'child1_months' => 'integer',
             'child2_months' => 'integer',
             'child3_months' => 'integer',
         ];
+    }
+
+    /** @return BelongsTo<Person, $this> */
+    public function person(): BelongsTo
+    {
+        return $this->belongsTo(Person::class);
     }
 
     /** @return HasMany<Paycheck, $this> */

@@ -1,5 +1,17 @@
 import type { Auth } from '@/types/auth';
 
+type SharedPerson = {
+    id: number;
+    slug: string;
+    name: string;
+};
+
+type SharedInvestmentProvider = {
+    id: number;
+    slug: string;
+    name: string;
+};
+
 // Extend ImportMeta interface for Vite...
 declare module 'vite/client' {
     interface ImportMetaEnv {
@@ -18,6 +30,8 @@ declare module '@inertiajs/core' {
         sharedPageProps: {
             name: string;
             auth: Auth;
+            activePeople: SharedPerson[];
+            investmentProviders: SharedInvestmentProvider[];
             sidebarOpen: boolean;
             [key: string]: unknown;
         };

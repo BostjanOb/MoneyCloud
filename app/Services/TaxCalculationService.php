@@ -34,7 +34,8 @@ class TaxCalculationService
      *         olajsave: string,
      *         davcna_osnova: string,
      *         dohodnina: string,
-     *         razlika: string
+     *         razlika: string,
+     *         breakdown: array<string, string>
      *     },
      * }
      */
@@ -90,12 +91,7 @@ class TaxCalculationService
             'dohodnina' => $this->formatAmount($actualCalculation['dohodnina']),
             'razlika' => $this->formatAmount($actualCalculation['razlika']),
             'has_tax_settings' => true,
-            'breakdown' => [
-                'general_relief' => $this->formatAmount($generalRelief),
-                'child_relief1' => $this->formatAmount($childReliefs['child_relief1']),
-                'child_relief2' => $this->formatAmount($childReliefs['child_relief2']),
-                'child_relief3' => $this->formatAmount($childReliefs['child_relief3']),
-            ],
+            'breakdown' => $this->formatReliefBreakdown($generalRelief, $childReliefs),
             'projection' => $projection,
         ];
     }
@@ -227,6 +223,7 @@ class TaxCalculationService
     /**
      * @param  Collection<int, Paycheck>  $paychecks
      * @param  Collection<int, Bonus>  $bonuses
+     * @param  array{child_relief1: float, child_relief2: float, child_relief3: float, total: float}  $childReliefs
      * @return array{
      *     months_used: int,
      *     is_final: bool,
@@ -238,7 +235,8 @@ class TaxCalculationService
      *     olajsave: string,
      *     davcna_osnova: string,
      *     dohodnina: string,
-     *     razlika: string
+     *     razlika: string,
+     *     breakdown: array<string, string>
      * }
      */
     private function buildProjection(
@@ -277,6 +275,7 @@ class TaxCalculationService
                 'davcna_osnova' => $this->formatAmount($finalCalculation['davcna_osnova']),
                 'dohodnina' => $this->formatAmount($finalCalculation['dohodnina']),
                 'razlika' => $this->formatAmount($finalCalculation['razlika']),
+                'breakdown' => $this->formatReliefBreakdown($generalRelief, $childReliefs),
             ];
         }
 
@@ -320,6 +319,7 @@ class TaxCalculationService
             'davcna_osnova' => $this->formatAmount($projectionCalculation['davcna_osnova']),
             'dohodnina' => $this->formatAmount($projectionCalculation['dohodnina']),
             'razlika' => $this->formatAmount($projectionCalculation['razlika']),
+            'breakdown' => $this->formatReliefBreakdown($generalRelief, $childReliefs),
         ];
     }
 
@@ -357,7 +357,8 @@ class TaxCalculationService
      *     olajsave: string,
      *     davcna_osnova: string,
      *     dohodnina: string,
-     *     razlika: string
+     *     razlika: string,
+     *     breakdown: array<string, string>
      * }
      */
     private function emptyProjection(): array
@@ -374,6 +375,34 @@ class TaxCalculationService
             'davcna_osnova' => '0.00',
             'dohodnina' => '0.00',
             'razlika' => '0.00',
+            'breakdown' => $this->emptyReliefBreakdown(),
+        ];
+    }
+
+    /**
+     * @param  array{child_relief1: float, child_relief2: float, child_relief3: float, total: float}  $childReliefs
+     * @return array{general_relief: string, child_relief1: string, child_relief2: string, child_relief3: string}
+     */
+    private function formatReliefBreakdown(float $generalRelief, array $childReliefs): array
+    {
+        return [
+            'general_relief' => $this->formatAmount($generalRelief),
+            'child_relief1' => $this->formatAmount($childReliefs['child_relief1']),
+            'child_relief2' => $this->formatAmount($childReliefs['child_relief2']),
+            'child_relief3' => $this->formatAmount($childReliefs['child_relief3']),
+        ];
+    }
+
+    /**
+     * @return array{general_relief: string, child_relief1: string, child_relief2: string, child_relief3: string}
+     */
+    private function emptyReliefBreakdown(): array
+    {
+        return [
+            'general_relief' => '0.00',
+            'child_relief1' => '0.00',
+            'child_relief2' => '0.00',
+            'child_relief3' => '0.00',
         ];
     }
 

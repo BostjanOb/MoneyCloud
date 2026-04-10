@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-use App\Enums\Employee;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -17,7 +16,11 @@ class StorePaycheckYearRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'employee' => ['required', Rule::enum(Employee::class)],
+            'person_id' => [
+                'required',
+                'integer',
+                Rule::exists('people', 'id')->where('is_active', true),
+            ],
             'year' => ['required', 'integer', 'min:2020'],
             'child1_months' => ['required', 'integer', 'between:0,12'],
             'child2_months' => ['required', 'integer', 'between:0,12'],

@@ -1,6 +1,6 @@
 <?php
 
-use App\Enums\Employee;
+use App\Models\Person;
 use App\Models\SavingsAccount;
 use App\Models\User;
 
@@ -10,10 +10,12 @@ test('savings index requires authentication', function () {
 
 test('authenticated user can view savings index with totals and hierarchy', function () {
     $user = User::factory()->create();
+    $bostjan = Person::where('slug', 'bostjan')->firstOrFail();
+    $jasna = Person::where('slug', 'jasna')->firstOrFail();
 
     $firstAlpha = SavingsAccount::factory()->create([
         'name' => 'Alpha',
-        'owner' => Employee::JASNA,
+        'person_id' => $jasna->id,
         'amount' => 300,
         'apy' => 3,
         'sort_order' => 1,
@@ -21,7 +23,7 @@ test('authenticated user can view savings index with totals and hierarchy', func
 
     $secondAlpha = SavingsAccount::factory()->create([
         'name' => 'Alpha',
-        'owner' => Employee::BOSTJAN,
+        'person_id' => $bostjan->id,
         'amount' => 100,
         'apy' => 1.2,
         'sort_order' => 1,
@@ -29,7 +31,7 @@ test('authenticated user can view savings index with totals and hierarchy', func
 
     $parent = SavingsAccount::factory()->create([
         'name' => 'Skupni račun',
-        'owner' => Employee::BOSTJAN,
+        'person_id' => $bostjan->id,
         'amount' => 0,
         'apy' => 2.5,
         'sort_order' => 2,
@@ -38,7 +40,7 @@ test('authenticated user can view savings index with totals and hierarchy', func
     SavingsAccount::factory()->create([
         'parent_id' => $parent->id,
         'name' => 'Podračun B',
-        'owner' => Employee::BOSTJAN,
+        'person_id' => $bostjan->id,
         'amount' => 200,
         'apy' => 1.5,
         'sort_order' => 2,
@@ -47,7 +49,7 @@ test('authenticated user can view savings index with totals and hierarchy', func
     SavingsAccount::factory()->create([
         'parent_id' => $parent->id,
         'name' => 'Podračun A',
-        'owner' => Employee::JASNA,
+        'person_id' => $jasna->id,
         'amount' => 50,
         'apy' => 1.1,
         'sort_order' => 1,
@@ -76,17 +78,18 @@ test('authenticated user can view savings index with totals and hierarchy', func
             ->where('accounts.2.children.1.name', 'Podračun B')
             ->where('accounts.2.children.1.sort_order', 2)
             ->where('totals.amount', '650.00')
-            ->where('ownerOptions.0.label', 'Boštjan')
+            ->where('personOptions.0.label', 'Boštjan')
         );
 });
 
 test('can store a root savings account', function () {
     $user = User::factory()->create();
+    $person = Person::factory()->create();
 
     $this->actingAs($user)
         ->post(route('savings.store'), [
             'name' => 'GBKR',
-            'owner' => Employee::BOSTJAN->value,
+            'person_id' => $person->id,
             'amount' => 1200,
             'apy' => 2.5,
             'sort_order' => 7,
@@ -96,7 +99,7 @@ test('can store a root savings account', function () {
 
     $this->assertDatabaseHas('savings_accounts', [
         'name' => 'GBKR',
-        'owner' => Employee::BOSTJAN->value,
+        'person_id' => $person->id,
         'amount' => 1200,
         'apy' => 2.5,
         'sort_order' => 7,
@@ -106,6 +109,7 @@ test('can store a root savings account', function () {
 
 test('creating the first subaccount converts parent amount to sum of children', function () {
     $user = User::factory()->create();
+    $person = Person::factory()->create();
     $parent = SavingsAccount::factory()->create([
         'amount' => 999.99,
     ]);
@@ -113,7 +117,7 @@ test('creating the first subaccount converts parent amount to sum of children', 
     $this->actingAs($user)
         ->post(route('savings.store'), [
             'name' => 'Podračun',
-            'owner' => Employee::JASNA->value,
+            'person_id' => $person->id,
             'amount' => 250,
             'apy' => 1.2,
             'sort_order' => 3,
@@ -126,6 +130,7 @@ test('creating the first subaccount converts parent amount to sum of children', 
 
 test('cannot create a subaccount under another subaccount', function () {
     $user = User::factory()->create();
+    $person = Person::factory()->create();
     $parent = SavingsAccount::factory()->create();
     $child = SavingsAccount::factory()->create([
         'parent_id' => $parent->id,
@@ -136,7 +141,7 @@ test('cannot create a subaccount under another subaccount', function () {
     $this->actingAs($user)
         ->post(route('savings.store'), [
             'name' => 'Neveljavni podračun',
-            'owner' => Employee::BOSTJAN->value,
+            'person_id' => $person->id,
             'amount' => 10,
             'apy' => 0,
             'sort_order' => 0,
@@ -152,7 +157,7 @@ test('cannot set savings account as its own parent', function () {
     $this->actingAs($user)
         ->put(route('savings.update', $account), [
             'name' => $account->name,
-            'owner' => $account->owner->value,
+            'person_id' => $account->person_id,
             'amount' => $account->amount,
             'apy' => $account->apy,
             'sort_order' => $account->sort_order,
@@ -163,6 +168,7 @@ test('cannot set savings account as its own parent', function () {
 
 test('updating a subaccount updates its parent amount', function () {
     $user = User::factory()->create();
+    $person = Person::factory()->create();
     $parent = SavingsAccount::factory()->create([
         'amount' => 0,
     ]);
@@ -178,7 +184,7 @@ test('updating a subaccount updates its parent amount', function () {
     $this->actingAs($user)
         ->put(route('savings.update', $child), [
             'name' => 'Posodobljen podračun',
-            'owner' => Employee::JASNA->value,
+            'person_id' => $person->id,
             'amount' => 180,
             'apy' => 2.5,
             'sort_order' => 4,
@@ -193,9 +199,11 @@ test('updating a subaccount updates its parent amount', function () {
 
 test('parent account with children allows meta updates but rejects manual amount changes', function () {
     $user = User::factory()->create();
+    $bostjan = Person::where('slug', 'bostjan')->firstOrFail();
+    $jasna = Person::where('slug', 'jasna')->firstOrFail();
     $parent = SavingsAccount::factory()->create([
         'name' => 'Staro ime',
-        'owner' => Employee::BOSTJAN,
+        'person_id' => $bostjan->id,
         'apy' => 1,
     ]);
 
@@ -209,14 +217,14 @@ test('parent account with children allows meta updates but rejects manual amount
     $this->actingAs($user)
         ->put(route('savings.update', $parent), [
             'name' => 'Novo ime',
-            'owner' => Employee::JASNA->value,
+            'person_id' => $jasna->id,
             'apy' => 3.5,
             'sort_order' => 9,
         ])
         ->assertRedirect();
 
     expect($parent->fresh()->name)->toBe('Novo ime')
-        ->and($parent->fresh()->owner)->toBe(Employee::JASNA)
+        ->and($parent->fresh()->person_id)->toBe($jasna->id)
         ->and($parent->fresh()->apy)->toBe('3.50')
         ->and($parent->fresh()->sort_order)->toBe(9)
         ->and($parent->fresh()->amount)->toBe('400.00');
@@ -224,7 +232,7 @@ test('parent account with children allows meta updates but rejects manual amount
     $this->actingAs($user)
         ->put(route('savings.update', $parent), [
             'name' => 'Še eno ime',
-            'owner' => Employee::JASNA->value,
+            'person_id' => $jasna->id,
             'apy' => 4,
             'sort_order' => 9,
             'amount' => 999,

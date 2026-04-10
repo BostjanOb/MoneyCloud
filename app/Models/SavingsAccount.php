@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Enums\Employee;
 use Database\Factories\SavingsAccountFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -11,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['parent_id', 'name', 'owner', 'amount', 'apy', 'sort_order'])]
+#[Fillable(['parent_id', 'person_id', 'name', 'amount', 'apy', 'sort_order'])]
 class SavingsAccount extends Model
 {
     /** @use HasFactory<SavingsAccountFactory> */
@@ -21,7 +20,7 @@ class SavingsAccount extends Model
     {
         return [
             'parent_id' => 'integer',
-            'owner' => Employee::class,
+            'person_id' => 'integer',
             'amount' => 'decimal:2',
             'apy' => 'decimal:2',
             'sort_order' => 'integer',
@@ -38,6 +37,12 @@ class SavingsAccount extends Model
     public function parent(): BelongsTo
     {
         return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    /** @return BelongsTo<Person, $this> */
+    public function person(): BelongsTo
+    {
+        return $this->belongsTo(Person::class);
     }
 
     /** @return HasMany<SavingsAccount, $this> */

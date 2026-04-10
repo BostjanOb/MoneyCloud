@@ -1,14 +1,16 @@
 <?php
 
 use App\Models\PaycheckYear;
+use App\Models\Person;
 use App\Models\User;
 
 test('can create a new paycheck year', function () {
     $user = User::factory()->create();
+    $person = Person::where('slug', 'bostjan')->firstOrFail();
 
     $this->actingAs($user)
         ->post(route('place.year.store'), [
-            'employee' => 'bostjan',
+            'person_id' => $person->id,
             'year' => 2026,
             'child1_months' => 12,
             'child2_months' => 12,
@@ -17,7 +19,7 @@ test('can create a new paycheck year', function () {
         ->assertRedirect();
 
     $this->assertDatabaseHas('paycheck_years', [
-        'employee' => 'bostjan',
+        'person_id' => $person->id,
         'year' => 2026,
     ]);
 });
@@ -42,18 +44,18 @@ test('can update paycheck year child months', function () {
     expect($year->fresh()->child2_months)->toBe(3);
 });
 
-test('validates employee enum', function () {
+test('validates person exists', function () {
     $user = User::factory()->create();
 
     $this->actingAs($user)
         ->post(route('place.year.store'), [
-            'employee' => 'invalid',
+            'person_id' => 999,
             'year' => 2026,
             'child1_months' => 12,
             'child2_months' => 12,
             'child3_months' => 0,
         ])
-        ->assertSessionHasErrors('employee');
+        ->assertSessionHasErrors('person_id');
 });
 
 test('validates child months range', function () {

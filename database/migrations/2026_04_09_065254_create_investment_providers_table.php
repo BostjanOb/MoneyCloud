@@ -16,6 +16,8 @@ return new class extends Migration
                 ->nullable()
                 ->constrained('savings_accounts')
                 ->nullOnDelete();
+            $table->boolean('requires_linked_savings_account')->default(false);
+            $table->json('supported_symbol_types')->nullable();
             $table->integer('sort_order')->default(0);
             $table->timestamps();
 

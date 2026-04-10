@@ -29,4 +29,10 @@ class InvestmentSymbol extends Model
     {
         return $this->hasMany(InvestmentPurchase::class);
     }
+
+    /** @return HasMany<CryptoBalance, $this> */
+    public function cryptoBalances(): HasMany
+    {
+        return $this->hasMany(CryptoBalance::class);
+    }
 }

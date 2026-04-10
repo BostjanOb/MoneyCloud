@@ -77,11 +77,18 @@ type BonusTypeOption = {
 
 type PaycheckYear = {
     id: number;
-    employee: string;
+    person_id: number;
     year: number;
     child1_months: number;
     child2_months: number;
     child3_months: number;
+};
+
+type Person = {
+    id: number;
+    slug: string;
+    name: string;
+    is_active: boolean;
 };
 
 type Calculation = {
@@ -113,12 +120,17 @@ type Calculation = {
         davcna_osnova: string;
         dohodnina: string;
         razlika: string;
+        breakdown: {
+            general_relief: string;
+            child_relief1: string;
+            child_relief2: string;
+            child_relief3: string;
+        };
     };
 };
 
 type Props = {
-    employee: string;
-    employeeLabel: string;
+    person: Person;
     year: number;
     paycheckYear: PaycheckYear | null;
     paychecks: Paycheck[];
@@ -373,7 +385,7 @@ watch(
 // New year modal state
 const showYearModal = ref(false);
 const yearForm = useForm({
-    employee: props.employee,
+    person_id: String(props.person.id),
     year: String(new Date().getFullYear()),
     child1_months: '12',
     child2_months: '12',
@@ -381,7 +393,7 @@ const yearForm = useForm({
 });
 
 function openNewYear() {
-    yearForm.employee = props.employee;
+    yearForm.person_id = String(props.person.id);
     yearForm.year = String(new Date().getFullYear());
     showYearModal.value = true;
 }
@@ -432,7 +444,7 @@ function switchYear(value: AcceptableValue) {
     }
 
     router.get(
-        placeIndex.url(props.employee, { query: { year: String(value) } }),
+        placeIndex.url(props.person.slug, { query: { year: String(value) } }),
         {},
         { preserveState: true },
     );
@@ -450,14 +462,14 @@ const monthRows = computed(() => {
 </script>
 
 <template>
-    <Head :title="`Plače – ${employeeLabel} ${year}`" />
+    <Head :title="`Plače – ${person.name} ${year}`" />
 
     <div class="flex flex-col gap-6 p-4">
         <div
             class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
         >
             <Heading
-                :title="`Plače – ${employeeLabel}`"
+                :title="`Plače – ${person.name}`"
                 description="Pregled in vnos mesečnih plač"
             />
 
@@ -824,7 +836,8 @@ const monthRows = computed(() => {
                                     <p class="text-right text-lg font-semibold">
                                         {{
                                             formatNumber(
-                                                calculation.breakdown
+                                                calculation.projection
+                                                    .breakdown
                                                     .general_relief,
                                             )
                                         }}
@@ -846,7 +859,8 @@ const monthRows = computed(() => {
                                     <p class="text-right text-lg font-semibold">
                                         {{
                                             formatNumber(
-                                                calculation.breakdown
+                                                calculation.projection
+                                                    .breakdown
                                                     .child_relief1,
                                             )
                                         }}
@@ -868,7 +882,8 @@ const monthRows = computed(() => {
                                     <p class="text-right text-lg font-semibold">
                                         {{
                                             formatNumber(
-                                                calculation.breakdown
+                                                calculation.projection
+                                                    .breakdown
                                                     .child_relief2,
                                             )
                                         }}
@@ -890,7 +905,8 @@ const monthRows = computed(() => {
                                     <p class="text-right text-lg font-semibold">
                                         {{
                                             formatNumber(
-                                                calculation.breakdown
+                                                calculation.projection
+                                                    .breakdown
                                                     .child_relief3,
                                             )
                                         }}
@@ -996,10 +1012,15 @@ const monthRows = computed(() => {
         <!-- No paycheck year -->
         <div v-else class="flex flex-col items-center gap-4 py-12">
             <p class="text-muted-foreground">
-                Za {{ employeeLabel }} v letu {{ year }} ni odprtega plačilnega
+                Za {{ person.name }} v letu {{ year }} ni odprtega plačilnega
                 cikla.
             </p>
-            <Button @click="openNewYear">Odpri novo leto</Button>
+            <Button v-if="person.is_active" @click="openNewYear">
+                Odpri novo leto
+            </Button>
+            <p v-else class="text-sm text-muted-foreground">
+                Oseba ni aktivna.
+            </p>
         </div>
     </div>
 

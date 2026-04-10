@@ -36,4 +36,15 @@ class InvestmentSymbolFactory extends Factory
             'price_source' => 'ilirika-manual',
         ]);
     }
+
+    public function crypto(string $symbol = 'BTC'): self
+    {
+        return $this->state(fn (): array => [
+            'type' => InvestmentSymbolType::CRYPTO,
+            'symbol' => $symbol,
+            'isin' => null,
+            'taxable' => false,
+            'price_source' => 'manual',
+        ]);
+    }
 }

@@ -91,7 +91,7 @@ class InvestmentPurchaseService
 
         if ($provider->linked_savings_account_id === null) {
             throw ValidationException::withMessages([
-                'investment_symbol_id' => 'IBKR mora imeti povezan varčevalni račun.',
+                'investment_symbol_id' => sprintf('Ponudnik %s mora imeti povezan varčevalni račun.', $provider->name),
             ]);
         }
 
@@ -109,7 +109,7 @@ class InvestmentPurchaseService
 
         if ($newBalanceInCents < 0) {
             throw ValidationException::withMessages([
-                'quantity' => 'Nakup presega stanje povezanega IBKR računa.',
+                'quantity' => sprintf('Nakup presega stanje povezanega računa ponudnika %s.', $provider->name),
             ]);
         }
 

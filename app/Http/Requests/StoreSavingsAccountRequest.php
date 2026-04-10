@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-use App\Enums\Employee;
 use App\Models\SavingsAccount;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -20,7 +19,7 @@ class StoreSavingsAccountRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'owner' => ['required', Rule::enum(Employee::class)],
+            'person_id' => ['required', 'integer', Rule::exists('people', 'id')],
             'amount' => ['required', 'numeric', 'min:0'],
             'apy' => ['required', 'numeric', 'min:0', 'max:100'],
             'sort_order' => ['required', 'integer', 'min:0'],

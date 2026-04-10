@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StorePaycheckYearRequest;
 use App\Http\Requests\UpdatePaycheckYearRequest;
 use App\Models\PaycheckYear;
+use App\Models\Person;
 use Illuminate\Http\RedirectResponse;
 
 class PaycheckYearController extends Controller
@@ -14,9 +15,10 @@ class PaycheckYearController extends Controller
         $validated = $request->validated();
 
         PaycheckYear::create($validated);
+        $person = Person::query()->findOrFail($validated['person_id']);
 
         return redirect()->route('place.index', [
-            'employee' => $validated['employee'],
+            'person' => $person,
             'year' => $validated['year'],
         ]);
     }
