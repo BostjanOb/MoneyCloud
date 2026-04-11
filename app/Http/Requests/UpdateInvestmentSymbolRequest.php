@@ -35,6 +35,8 @@ class UpdateInvestmentSymbolRequest extends StoreInvestmentSymbolRequest
             ],
             'taxable' => ['required', 'boolean'],
             'price_source' => ['required', 'string', 'max:255'],
+            'coinmarketcap_id' => ['nullable', 'integer', 'min:1'],
+            'yfapi_symbol' => ['nullable', 'string', 'max:50'],
             'current_price' => ['required', 'numeric', 'min:0'],
         ];
     }

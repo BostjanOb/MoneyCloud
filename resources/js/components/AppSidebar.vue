@@ -2,6 +2,7 @@
 import { Link, usePage } from '@inertiajs/vue3';
 import {
     Bitcoin,
+    ChartColumnIncreasing,
     ChartCandlestick,
     LayoutGrid,
     PiggyBank,
@@ -14,6 +15,11 @@ import { index as cryptoDcaIndex } from '@/actions/App/Http/Controllers/CryptoDc
 import { show as investmentProviderShow } from '@/actions/App/Http/Controllers/InvestmentProviderController';
 import { index as investmentProviderSettingsIndex } from '@/actions/App/Http/Controllers/InvestmentProviderSettingsController';
 import { index as investmentSymbolIndex } from '@/actions/App/Http/Controllers/InvestmentSymbolController';
+import {
+    index as statisticsIndex,
+    monthlySummary as statisticsMonthlySummary,
+    yearlyInvested as statisticsYearlyInvested,
+} from '@/actions/App/Http/Controllers/StatisticsController';
 import { index as placeIndex } from '@/actions/App/Http/Controllers/PaycheckController';
 import { index as peopleIndex } from '@/actions/App/Http/Controllers/PersonController';
 import { index as savingsIndex } from '@/actions/App/Http/Controllers/SavingsAccountController';
@@ -87,6 +93,21 @@ const mainNavItems = computed<NavItem[]>(() => {
                 {
                     title: 'DCA nakupi',
                     href: cryptoDcaIndex.url(),
+                },
+            ],
+        },
+        {
+            title: 'Statistika',
+            href: statisticsIndex.url(),
+            icon: ChartColumnIncreasing,
+            children: [
+                {
+                    title: 'Mesečni povzetek',
+                    href: statisticsMonthlySummary.url(),
+                },
+                {
+                    title: 'Letni vložki',
+                    href: statisticsYearlyInvested.url(),
                 },
             ],
         },

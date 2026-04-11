@@ -15,9 +15,15 @@ return new class extends Migration
             $table->string('isin')->nullable();
             $table->boolean('taxable')->default(true);
             $table->string('price_source');
+            $table->unsignedBigInteger('coinmarketcap_id')->nullable();
+            $table->string('yfapi_symbol')->nullable();
             $table->decimal('current_price', 10, 2)->default(0);
+            $table->timestamp('price_synced_at')->nullable();
+
             $table->timestamps();
 
+            $table->index('yfapi_symbol');
+            $table->index('coinmarketcap_id');
             $table->unique(['type', 'symbol']);
             $table->unique(['isin']);
             $table->index(['type', 'symbol']);

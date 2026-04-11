@@ -3,20 +3,23 @@
 use App\Http\Controllers\BonusController;
 use App\Http\Controllers\CryptoBalanceController;
 use App\Http\Controllers\CryptoDcaPurchaseController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvestmentProviderController;
 use App\Http\Controllers\InvestmentProviderSettingsController;
 use App\Http\Controllers\InvestmentPurchaseController;
 use App\Http\Controllers\InvestmentSymbolController;
+use App\Http\Controllers\MonthlyPortfolioSnapshotController;
 use App\Http\Controllers\PaycheckController;
 use App\Http\Controllers\PaycheckYearController;
 use App\Http\Controllers\PersonController;
 use App\Http\Controllers\SavingsAccountController;
 use App\Http\Controllers\SavingsInterestController;
+use App\Http\Controllers\StatisticsController;
 use App\Http\Controllers\TaxSettingController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::inertia('/', 'Dashboard')->name('dashboard');
+    Route::get('/', DashboardController::class)->name('dashboard');
     Route::redirect('dashboard', '/');
 
     Route::get('osebe', [PersonController::class, 'index'])->name('people.index');
@@ -45,6 +48,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/{savingsAccount}/obresti', [SavingsInterestController::class, 'store'])->name('savings.interest.store');
     });
 
+    Route::get('statistika', [StatisticsController::class, 'index'])->name('statistics.index');
+    Route::get(
+        'statistika/mesecni-povzetek',
+        [StatisticsController::class, 'monthlySummary'],
+    )->name('statistics.monthly-summary');
+    Route::get(
+        'statistika/letni-vlozki',
+        [StatisticsController::class, 'yearlyInvested'],
+    )->name('statistics.yearly-invested');
+    Route::post(
+        'statistika/mesecni-povzetek',
+        [MonthlyPortfolioSnapshotController::class, 'store'],
+    )->name('statistics.monthly-snapshots.store');
+    Route::put(
+        'statistika/mesecni-povzetek/{monthlySnapshot}',
+        [MonthlyPortfolioSnapshotController::class, 'update'],
+    )->name('statistics.monthly-snapshots.update');
+
     Route::redirect('kripto', '/kripto/stanja');
     Route::prefix('kripto')->group(function () {
         Route::get('stanja', [CryptoBalanceController::class, 'index'])->name('crypto.balances.index');
@@ -63,6 +84,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('simboli/novo', [InvestmentSymbolController::class, 'create'])->name('investments.symbols.create');
         Route::get('simboli/{investmentSymbol}/uredi', [InvestmentSymbolController::class, 'edit'])->name('investments.symbols.edit');
         Route::post('simboli', [InvestmentSymbolController::class, 'store'])->name('investments.symbols.store');
+        Route::post('simboli/osvezi-cene/{source}', [InvestmentSymbolController::class, 'refreshPrices'])
+            ->whereIn('source', ['coinmarketcap', 'yfapi'])
+            ->name('investments.symbols.refresh-prices');
         Route::put('simboli/{investmentSymbol}', [InvestmentSymbolController::class, 'update'])->name('investments.symbols.update');
         Route::delete('simboli/{investmentSymbol}', [InvestmentSymbolController::class, 'destroy'])->name('investments.symbols.destroy');
 

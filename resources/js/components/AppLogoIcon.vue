@@ -15,15 +15,41 @@ defineProps<Props>();
 <template>
     <svg
         xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 40 42"
+        viewBox="0 0 64 64"
         :class="className"
         v-bind="$attrs"
     >
+        <title>Money Cloud icon</title>
+        <desc>Cloud outline with a euro sign in the center.</desc>
         <path
-            fill="currentColor"
-            fill-rule="evenodd"
-            clip-rule="evenodd"
-            d="M17.2 5.633 8.6.855 0 5.633v26.51l16.2 9 16.2-9v-8.442l7.6-4.223V9.856l-8.6-4.777-8.6 4.777V18.3l-5.6 3.111V5.633ZM38 18.301l-5.6 3.11v-6.157l5.6-3.11V18.3Zm-1.06-7.856-5.54 3.078-5.54-3.079 5.54-3.078 5.54 3.079ZM24.8 18.3v-6.157l5.6 3.111v6.158L24.8 18.3Zm-1 1.732 5.54 3.078-13.14 7.302-5.54-3.078 13.14-7.3v-.002Zm-16.2 7.89 7.6 4.222V38.3L2 30.966V7.92l5.6 3.111v16.892ZM8.6 9.3 3.06 6.222 8.6 3.143l5.54 3.08L8.6 9.3Zm21.8 15.51-13.2 7.334V38.3l13.2-7.334v-6.156ZM9.6 11.034l5.6-3.11v14.6l-5.6 3.11v-14.6Z"
+            d="M17.5 48h29.25C54.62 48 61 41.95 61 34.5c0-6.45-4.78-11.89-11.19-13.1C48.72 13.7 41.98 8 33.73 8c-9.54 0-17.38 7.47-18.56 16.97C8.61 26.08 3.75 31.93 3.75 38.95 3.75 43.97 7.81 48 12.79 48h4.71Z"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="4"
+        />
+        <path
+            d="M41 24.5c-1.63-1.67-4.15-2.62-6.92-2.5-5.59.23-10.08 4.72-10.08 10.5 0 5.79 4.49 10.28 10.08 10.5 2.77.12 5.29-.83 6.92-2.5"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="4"
+        />
+        <path
+            d="M19.5 29.5H38"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-width="4"
+        />
+        <path
+            d="M18.5 35.5H36"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-width="4"
         />
     </svg>
 </template>

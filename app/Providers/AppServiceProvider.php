@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use App\Contracts\InvestmentPriceRefreshService;
+use App\Services\CoinMarketCapInvestmentPriceRefreshService;
+use App\Services\NullInvestmentPriceRefreshService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +18,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(
+            InvestmentPriceRefreshService::class,
+            app()->environment('testing')
+                ? NullInvestmentPriceRefreshService::class
+                : CoinMarketCapInvestmentPriceRefreshService::class,
+        );
     }
 
     /**

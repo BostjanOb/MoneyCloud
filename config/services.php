@@ -35,4 +35,14 @@ return [
         ],
     ],
 
+    'coinmarketcap' => [
+        'key' => env('COINMARKETCAP_API_KEY'),
+        'base_url' => env('COINMARKETCAP_BASE_URL', 'https://pro-api.coinmarketcap.com'),
+    ],
+
+    'yfapi' => [
+        'key' => env('YFAPI_KEY'),
+        'base_url' => env('YFAPI_BASE_URL', 'https://yfapi.net'),
+    ],
+
 ];

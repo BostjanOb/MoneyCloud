@@ -1,0 +1,18 @@
+<svg width="572" height="160" viewBox="0 0 572 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+<title>Money Cloud logo</title>
+<desc>Cloud outline with a euro sign in the center.</desc>
+<defs>
+<linearGradient id="money-cloud-logo-gradient" x1="18" y1="14" x2="118" y2="126" gradientUnits="userSpaceOnUse">
+<stop stop-color="#0F766E"/>
+<stop offset="0.56" stop-color="#10B981"/>
+<stop offset="1" stop-color="#6EE7B7"/>
+</linearGradient>
+</defs>
+<rect x="8" y="8" width="116" height="116" rx="34" fill="url(#money-cloud-logo-gradient)"/>
+<path d="M35 98H95.25C111.405 98 124.5 85.5735 124.5 70.2812C124.5 57.0366 114.62 45.8687 101.387 43.3894C99.1295 27.6048 85.2092 15.9062 68.1608 15.9062C48.4635 15.9062 32.2665 31.2267 29.8196 50.6882C16.2696 52.9717 6.23438 64.9908 6.23438 79.3926C6.23438 89.6934 14.6211 98 24.8945 98H35Z" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M84 49.5C80.6384 46.1406 75.4346 44.2432 69.7048 44.4785C58.1536 44.9492 48.875 54.2266 48.875 66.125C48.875 78.0234 58.1536 87.3008 69.7048 87.7715C75.4346 88.0068 80.6384 86.1094 84 82.75" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M39.5 59.875H78.25" stroke="white" stroke-width="8" stroke-linecap="round"/>
+<path d="M37.5 72.375H74" stroke="white" stroke-width="8" stroke-linecap="round"/>
+<text x="156" y="72" fill="#0F172A" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="46" font-weight="800" letter-spacing="-0.04em">Money Cloud</text>
+<text x="157" y="103" fill="#64748B" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="15" font-weight="700" letter-spacing="0.3em">OSEBNE FINANCE</text>
+</svg>

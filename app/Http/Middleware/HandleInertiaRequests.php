@@ -43,6 +43,10 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            'flash' => [
+                'status' => fn (): ?string => $request->session()->get('status'),
+                'error' => fn (): ?string => $request->session()->get('error'),
+            ],
             'activePeople' => fn (): array => $request->user()
                 ? Person::query()
                     ->where('is_active', true)

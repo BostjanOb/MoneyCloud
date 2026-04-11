@@ -25,7 +25,10 @@ class InvestmentSymbolFactory extends Factory
             'isin' => fake()->boolean() ? Str::upper(fake()->bothify('??##########')) : null,
             'taxable' => fake()->boolean(70),
             'price_source' => fake()->randomElement(['manual', 'ibkr', 'ilirika']),
+            'coinmarketcap_id' => null,
+            'yfapi_symbol' => null,
             'current_price' => fake()->randomFloat(2, 1, 1000),
+            'price_synced_at' => null,
         ];
     }
 
@@ -45,6 +48,7 @@ class InvestmentSymbolFactory extends Factory
             'isin' => null,
             'taxable' => false,
             'price_source' => 'manual',
+            'coinmarketcap_id' => null,
         ]);
     }
 }

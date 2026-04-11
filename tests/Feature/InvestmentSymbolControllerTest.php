@@ -23,6 +23,12 @@ test('authenticated user can view symbols pages', function () {
             ->component('Investicije/Simboli')
             ->has('symbols', 1)
             ->where('symbols.0.symbol', $symbol->symbol)
+            ->where('symbols.0.coinmarketcap_id', null)
+            ->where('symbols.0.price_synced_at', null)
+            ->where('refreshableCryptoCount', 0)
+            ->where('refreshableYfapiCount', 0)
+            ->has('typeOptions', 4)
+            ->where('filters.type', null)
         );
 
     $this->actingAs($user)
@@ -43,6 +49,34 @@ test('authenticated user can view symbols pages', function () {
         );
 });
 
+test('investment symbols page can be filtered by type', function () {
+    $user = User::factory()->create();
+
+    $crypto = InvestmentSymbol::factory()->create([
+        'type' => InvestmentSymbolType::CRYPTO,
+        'symbol' => 'BTC',
+        'coinmarketcap_id' => 1,
+    ]);
+    InvestmentSymbol::factory()->create([
+        'type' => InvestmentSymbolType::ETF,
+        'symbol' => 'VWCE',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('investments.symbols.index', [
+            'type' => InvestmentSymbolType::CRYPTO->value,
+        ]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Investicije/Simboli')
+            ->has('symbols', 1)
+            ->where('symbols.0.symbol', $crypto->symbol)
+            ->where('refreshableCryptoCount', 1)
+            ->where('filters.type', InvestmentSymbolType::CRYPTO->value)
+            ->has('typeOptions', 4)
+        );
+});
+
 test('can store update and delete an investment symbol', function () {
     $user = User::factory()->create();
 
@@ -53,6 +87,7 @@ test('can store update and delete an investment symbol', function () {
             'isin' => null,
             'taxable' => true,
             'price_source' => 'manual',
+            'coinmarketcap_id' => 1,
             'current_price' => '65000.00',
         ])
         ->assertRedirect(route('investments.symbols.index'));
@@ -60,21 +95,25 @@ test('can store update and delete an investment symbol', function () {
     $symbol = InvestmentSymbol::query()->firstOrFail();
 
     expect($symbol->symbol)->toBe('BTC')
-        ->and($symbol->type)->toBe(InvestmentSymbolType::CRYPTO);
+        ->and($symbol->type)->toBe(InvestmentSymbolType::CRYPTO)
+        ->and($symbol->coinmarketcap_id)->toBe(1)
+        ->and($symbol->price_source)->toBe('coinmarketcap');
 
     $this->actingAs($user)
         ->put(route('investments.symbols.update', $symbol), [
-            'type' => InvestmentSymbolType::CRYPTO->value,
+            'type' => InvestmentSymbolType::ETF->value,
             'symbol' => 'BTC',
             'isin' => null,
             'taxable' => false,
             'price_source' => 'manual-refresh',
+            'coinmarketcap_id' => 1027,
             'current_price' => '66000.00',
         ])
         ->assertRedirect(route('investments.symbols.index'));
 
     expect($symbol->fresh()->taxable)->toBeFalse()
         ->and($symbol->fresh()->price_source)->toBe('manual-refresh')
+        ->and($symbol->fresh()->coinmarketcap_id)->toBeNull()
         ->and($symbol->fresh()->current_price)->toBe('66000.00');
 
     $this->actingAs($user)
