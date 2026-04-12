@@ -59,6 +59,7 @@ type SymbolTypeOption = {
 
 type Props = {
     symbols: SymbolRow[];
+    manualPriceRefreshEnabled: boolean;
     refreshableCoinMarketCapCount: number;
     refreshableYfApiCount: number;
     refreshableLjseCount: number;
@@ -184,7 +185,7 @@ function triggerPriceRefresh(source: 'coinmarketcap' | 'yfapi' | 'ljse'): void {
                 description="Centralni šifrant za ETF-je, delnice, kripto in obveznice."
             />
             <div class="flex gap-2">
-                <DropdownMenu>
+                <DropdownMenu v-if="props.manualPriceRefreshEnabled">
                     <DropdownMenuTrigger as-child>
                         <Button
                             variant="outline"

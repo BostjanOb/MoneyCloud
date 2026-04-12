@@ -89,6 +89,36 @@ test('refresh prices route rejects invalid source', function () {
         ->assertNotFound();
 });
 
+test('manual refresh route is blocked when price refresh is disabled', function () {
+    config()->set('investments.allow_price_refresh', false);
+
+    $user = User::factory()->create();
+
+    $mock = Mockery::mock(CoinMarketCapInvestmentPriceRefreshService::class);
+    $mock->shouldReceive('refresh')->never();
+    app()->instance(CoinMarketCapInvestmentPriceRefreshService::class, $mock);
+
+    $this->actingAs($user)
+        ->post(route('investments.symbols.refresh-prices', 'coinmarketcap'))
+        ->assertRedirect(route('investments.symbols.index'))
+        ->assertSessionHas('error', 'Ročno osveževanje cen je trenutno onemogočeno.');
+});
+
+test('symbols index exposes disabled manual refresh state', function () {
+    config()->set('investments.allow_price_refresh', false);
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->get(route('investments.symbols.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Investicije/Simboli')
+            ->where('manualPriceRefreshEnabled', false)
+            ->where('features.manualPriceRefreshEnabled', false)
+        );
+});
+
 test('external source id is required for non manual sources', function () {
     $user = User::factory()->create();
 

@@ -40,6 +40,9 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            'features' => [
+                'manualPriceRefreshEnabled' => config('investments.allow_price_refresh'),
+            ],
             'auth' => [
                 'user' => $request->user(),
             ],

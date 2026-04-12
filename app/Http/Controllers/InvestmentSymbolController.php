@@ -34,6 +34,7 @@ class InvestmentSymbolController extends Controller
                 ->map(fn (InvestmentSymbol $symbol): array => $this->transformSymbol($symbol))
                 ->values()
                 ->all(),
+            'manualPriceRefreshEnabled' => config('investments.allow_price_refresh'),
             'refreshableCoinMarketCapCount' => $this->refreshableCount(InvestmentPriceSource::COINMARKETCAP),
             'refreshableYfApiCount' => $this->refreshableCount(InvestmentPriceSource::YFAPI),
             'refreshableLjseCount' => $this->refreshableCount(InvestmentPriceSource::LJSE),
@@ -79,6 +80,12 @@ class InvestmentSymbolController extends Controller
 
     public function refreshPrices(string $source): RedirectResponse
     {
+        if (! config('investments.allow_price_refresh')) {
+            return redirect()
+                ->route('investments.symbols.index')
+                ->with('error', 'Ročno osveževanje cen je trenutno onemogočeno.');
+        }
+
         $service = match ($source) {
             InvestmentPriceSource::COINMARKETCAP->value => app(CoinMarketCapInvestmentPriceRefreshService::class),
             InvestmentPriceSource::YFAPI->value => app(YfApiInvestmentPriceRefreshService::class),
