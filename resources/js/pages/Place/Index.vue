@@ -836,8 +836,7 @@ const monthRows = computed(() => {
                                     <p class="text-right text-lg font-semibold">
                                         {{
                                             formatNumber(
-                                                calculation.projection
-                                                    .breakdown
+                                                calculation.projection.breakdown
                                                     .general_relief,
                                             )
                                         }}
@@ -859,8 +858,7 @@ const monthRows = computed(() => {
                                     <p class="text-right text-lg font-semibold">
                                         {{
                                             formatNumber(
-                                                calculation.projection
-                                                    .breakdown
+                                                calculation.projection.breakdown
                                                     .child_relief1,
                                             )
                                         }}
@@ -882,8 +880,7 @@ const monthRows = computed(() => {
                                     <p class="text-right text-lg font-semibold">
                                         {{
                                             formatNumber(
-                                                calculation.projection
-                                                    .breakdown
+                                                calculation.projection.breakdown
                                                     .child_relief2,
                                             )
                                         }}
@@ -905,8 +902,7 @@ const monthRows = computed(() => {
                                     <p class="text-right text-lg font-semibold">
                                         {{
                                             formatNumber(
-                                                calculation.projection
-                                                    .breakdown
+                                                calculation.projection.breakdown
                                                     .child_relief3,
                                             )
                                         }}

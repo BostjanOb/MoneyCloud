@@ -14,13 +14,13 @@ import Heading from '@/components/Heading.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -46,8 +46,8 @@ type SymbolRow = {
     isin: string | null;
     taxable: boolean;
     price_source: string;
-    coinmarketcap_id: number | null;
-    yfapi_symbol: string | null;
+    price_source_label: string;
+    external_source_id: string | null;
     current_price: string;
     price_synced_at: string | null;
 };
@@ -59,8 +59,9 @@ type SymbolTypeOption = {
 
 type Props = {
     symbols: SymbolRow[];
-    refreshableCryptoCount: number;
-    refreshableYfapiCount: number;
+    refreshableCoinMarketCapCount: number;
+    refreshableYfApiCount: number;
+    refreshableLjseCount: number;
     typeOptions: SymbolTypeOption[];
     filters: {
         type: string | null;
@@ -138,14 +139,16 @@ function updateTypeFilter(value: AcceptableValue): void {
 }
 
 function deleteSymbol(symbol: SymbolRow): void {
-    if (!confirm(`Ste prepričani, da želite izbrisati simbol ${symbol.symbol}?`)) {
+    if (
+        !confirm(`Ste prepričani, da želite izbrisati simbol ${symbol.symbol}?`)
+    ) {
         return;
     }
 
     router.delete(symbolDestroy.url(symbol.id), { preserveScroll: true });
 }
 
-function triggerPriceRefresh(source: 'coinmarketcap' | 'yfapi'): void {
+function triggerPriceRefresh(source: 'coinmarketcap' | 'yfapi' | 'ljse'): void {
     isRefreshing.value = true;
 
     router.post(
@@ -187,8 +190,9 @@ function triggerPriceRefresh(source: 'coinmarketcap' | 'yfapi'): void {
                             variant="outline"
                             size="sm"
                             :disabled="
-                                (props.refreshableCryptoCount === 0 &&
-                                    props.refreshableYfapiCount === 0) ||
+                                (props.refreshableCoinMarketCapCount === 0 &&
+                                    props.refreshableYfApiCount === 0 &&
+                                    props.refreshableLjseCount === 0) ||
                                 isRefreshing
                             "
                         >
@@ -198,7 +202,7 @@ function triggerPriceRefresh(source: 'coinmarketcap' | 'yfapi'): void {
                     <DropdownMenuContent align="end">
                         <DropdownMenuItem
                             :disabled="
-                                props.refreshableCryptoCount === 0 ||
+                                props.refreshableCoinMarketCapCount === 0 ||
                                 isRefreshing
                             "
                             @click="triggerPriceRefresh('coinmarketcap')"
@@ -207,12 +211,20 @@ function triggerPriceRefresh(source: 'coinmarketcap' | 'yfapi'): void {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                             :disabled="
-                                props.refreshableYfapiCount === 0 ||
+                                props.refreshableYfApiCount === 0 ||
                                 isRefreshing
                             "
                             @click="triggerPriceRefresh('yfapi')"
                         >
                             YF API (delnice, ETF-ji)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            :disabled="
+                                props.refreshableLjseCount === 0 || isRefreshing
+                            "
+                            @click="triggerPriceRefresh('ljse')"
+                        >
+                            LJSE (delnice, obveznice)
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
@@ -279,7 +291,17 @@ function triggerPriceRefresh(source: 'coinmarketcap' | 'yfapi'): void {
                             <TableCell>
                                 {{ symbol.taxable ? 'Da' : 'Ne' }}
                             </TableCell>
-                            <TableCell>{{ symbol.price_source }}</TableCell>
+                            <TableCell>
+                                <div class="flex flex-col">
+                                    <span>{{ symbol.price_source_label }}</span>
+                                    <span
+                                        v-if="symbol.external_source_id"
+                                        class="text-xs text-muted-foreground"
+                                    >
+                                        {{ symbol.external_source_id }}
+                                    </span>
+                                </div>
+                            </TableCell>
                             <TableCell numeric class="text-right">
                                 <div class="flex flex-col items-end">
                                     <span>{{

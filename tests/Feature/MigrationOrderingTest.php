@@ -23,15 +23,15 @@ test('investment migrations create tables before dependent foreign keys', functi
     $providerIndex = $migrationFiles->search('2026_04_09_065254_create_investment_providers_table.php');
     $symbolIndex = $migrationFiles->search('2026_04_09_065255_create_investment_symbols_table.php');
     $purchaseIndex = $migrationFiles->search('2026_04_09_065256_create_investment_purchases_table.php');
-    $seedIndex = $migrationFiles->search('2026_04_09_065257_seed_default_investment_providers.php');
-    $capabilitiesIndex = $migrationFiles->search('2026_04_10_105431_add_capabilities_to_investment_providers_table.php');
-    $seedMigrationContents = file_get_contents(database_path('migrations/2026_04_09_065257_seed_default_investment_providers.php'));
+    $legacySeedMigration = '2026_04_09_065257_seed_default_investment_providers.php';
+    $databaseSeederContents = file_get_contents(database_path('seeders/DatabaseSeeder.php'));
+    $providerSeederContents = file_get_contents(database_path('seeders/InvestmentProviderSeeder.php'));
 
     expect($providerIndex)->toBeLessThan($symbolIndex);
     expect($symbolIndex)->toBeLessThan($purchaseIndex);
-    expect($purchaseIndex)->toBeLessThan($seedIndex);
-    expect($seedIndex)->toBeLessThan($capabilitiesIndex)
-        ->and($seedMigrationContents)->not->toContain('InvestmentProviderSlug');
+    expect($migrationFiles->contains($legacySeedMigration))->toBeFalse()
+        ->and($databaseSeederContents)->toContain('$this->call(InvestmentProviderSeeder::class);')
+        ->and($providerSeederContents)->not->toContain('InvestmentProviderSlug');
 });
 
 test('people migration runs before person references', function () {

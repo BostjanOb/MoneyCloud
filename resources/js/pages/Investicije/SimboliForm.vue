@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, Link, setLayoutProps, useForm, usePage } from '@inertiajs/vue3';
 import type { AcceptableValue } from 'reka-ui';
-import { computed, watchEffect } from 'vue';
+import { computed, watch, watchEffect } from 'vue';
 import { show as providerShow } from '@/actions/App/Http/Controllers/InvestmentProviderController';
 import {
     index as symbolIndex,
@@ -28,6 +28,12 @@ type SymbolTypeOption = {
     label: string;
 };
 
+type PriceSourceOption = {
+    value: string;
+    label: string;
+    supported_types: string[];
+};
+
 type SymbolFormData = {
     id: number;
     type: string;
@@ -36,8 +42,8 @@ type SymbolFormData = {
     isin: string | null;
     taxable: boolean;
     price_source: string;
-    coinmarketcap_id: number | null;
-    yfapi_symbol: string | null;
+    price_source_label: string;
+    external_source_id: string | null;
     current_price: string;
     price_synced_at: string | null;
 };
@@ -45,6 +51,7 @@ type SymbolFormData = {
 type Props = {
     symbol: SymbolFormData | null;
     typeOptions: SymbolTypeOption[];
+    priceSourceOptions: PriceSourceOption[];
 };
 
 const props = defineProps<Props>();
@@ -81,26 +88,86 @@ const form = useForm({
     isin: props.symbol?.isin ?? '',
     taxable: props.symbol?.taxable ?? true,
     price_source: props.symbol?.price_source ?? 'manual',
-    coinmarketcap_id: props.symbol?.coinmarketcap_id
-        ? String(props.symbol.coinmarketcap_id)
-        : '',
-    yfapi_symbol: props.symbol?.yfapi_symbol ?? '',
+    external_source_id: props.symbol?.external_source_id ?? '',
     current_price: props.symbol?.current_price ?? '0',
 });
-const isCryptoType = computed(() => form.type === 'crypto');
-const isNonCryptoType = computed(() => form.type !== 'crypto');
+
+const availablePriceSourceOptions = computed(() =>
+    props.priceSourceOptions.filter((option) =>
+        option.supported_types.includes(form.type),
+    ),
+);
+
+const selectedPriceSource = computed(
+    () =>
+        availablePriceSourceOptions.value.find(
+            (option) => option.value === form.price_source,
+        ) ?? null,
+);
+
+const showsExternalSourceId = computed(() => form.price_source !== 'manual');
+
+const externalSourceFieldMeta = computed(() => {
+    switch (form.price_source) {
+        case 'coinmarketcap':
+            return {
+                label: 'CoinMarketCap ID',
+                placeholder: 'npr. 1027',
+                hint: 'Če ga nastavite, se bo cena za ta kripto simbol samodejno osveževala vsake 3 ure.',
+            };
+        case 'yfapi':
+            return {
+                label: 'YF API simbol',
+                placeholder: 'npr. VWCE.DE',
+                hint: 'Če ga nastavite, se bo cena samodejno osveževala vsake 3 ure prek YF API.',
+            };
+        case 'ljse':
+            return {
+                label: 'LJSE simbol',
+                placeholder: 'npr. RS94',
+                hint: 'Če ga nastavite, se bo cena samodejno osveževala vsake 3 ure prek LJSE.',
+            };
+        default:
+            return null;
+    }
+});
+
+watch(
+    () => form.type,
+    () => {
+        if (
+            !availablePriceSourceOptions.value.some(
+                (option) => option.value === form.price_source,
+            )
+        ) {
+            form.price_source =
+                availablePriceSourceOptions.value[0]?.value ?? 'manual';
+        }
+    },
+);
+
+watch(
+    () => form.price_source,
+    (priceSource, previousPriceSource) => {
+        if (
+            priceSource === 'manual' ||
+            (previousPriceSource !== undefined &&
+                priceSource !== previousPriceSource)
+        ) {
+            form.external_source_id = '';
+        }
+    },
+);
 
 function updateType(value: AcceptableValue): void {
     if (typeof value === 'string') {
         form.type = value;
+    }
+}
 
-        if (value !== 'crypto') {
-            form.coinmarketcap_id = '';
-        }
-
-        if (value === 'crypto') {
-            form.yfapi_symbol = '';
-        }
+function updatePriceSource(value: AcceptableValue): void {
+    if (typeof value === 'string') {
+        form.price_source = value;
     }
 }
 
@@ -108,11 +175,7 @@ function submitSymbol(): void {
     form.transform((data) => ({
         ...data,
         isin: data.isin || null,
-        coinmarketcap_id:
-            data.coinmarketcap_id === ''
-                ? null
-                : Number(data.coinmarketcap_id),
-        yfapi_symbol: data.yfapi_symbol || null,
+        external_source_id: data.external_source_id || null,
     }));
 
     if (props.symbol) {
@@ -152,7 +215,10 @@ function submitSymbol(): void {
             </div>
         </div>
 
-        <form class="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]" @submit.prevent="submitSymbol">
+        <form
+            class="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]"
+            @submit.prevent="submitSymbol"
+        >
             <Card>
                 <CardHeader>
                     <CardTitle>Osnovni podatki</CardTitle>
@@ -194,60 +260,42 @@ function submitSymbol(): void {
 
                     <div class="space-y-1.5">
                         <Label for="symbol-price-source">Vir cene</Label>
-                        <Input
-                            id="symbol-price-source"
-                            v-model="form.price_source"
-                        />
-                        <p
-                            v-if="isCryptoType && form.coinmarketcap_id !== ''"
-                            class="text-xs text-muted-foreground"
+                        <Select
+                            :model-value="form.price_source"
+                            @update:model-value="updatePriceSource"
                         >
-                            Ob shranjevanju bo vir samodejno nastavljen na
-                            CoinMarketCap.
-                        </p>
-                        <p
-                            v-if="isNonCryptoType && form.yfapi_symbol !== ''"
-                            class="text-xs text-muted-foreground"
-                        >
-                            Ob shranjevanju bo vir samodejno nastavljen na
-                            YF API.
-                        </p>
+                            <SelectTrigger id="symbol-price-source">
+                                <SelectValue placeholder="Izberite vir cene" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="option in availablePriceSourceOptions"
+                                    :key="option.value"
+                                    :value="option.value"
+                                >
+                                    {{ option.label }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
                         <InputError :message="form.errors.price_source" />
                     </div>
 
-                    <div v-if="isCryptoType" class="space-y-1.5">
-                        <Label for="symbol-coinmarketcap-id">
-                            CoinMarketCap ID
+                    <div
+                        v-if="showsExternalSourceId && externalSourceFieldMeta"
+                        class="space-y-1.5"
+                    >
+                        <Label for="symbol-external-source-id">
+                            {{ externalSourceFieldMeta.label }}
                         </Label>
                         <Input
-                            id="symbol-coinmarketcap-id"
-                            v-model="form.coinmarketcap_id"
-                            type="number"
-                            min="1"
-                            step="1"
-                            placeholder="npr. 1027"
+                            id="symbol-external-source-id"
+                            v-model="form.external_source_id"
+                            :placeholder="externalSourceFieldMeta.placeholder"
                         />
                         <p class="text-xs text-muted-foreground">
-                            Če ga nastavite, se bo cena za ta kripto simbol
-                            samodejno osveževala vsake 3 ure.
+                            {{ externalSourceFieldMeta.hint }}
                         </p>
-                        <InputError :message="form.errors.coinmarketcap_id" />
-                    </div>
-
-                    <div v-if="isNonCryptoType" class="space-y-1.5">
-                        <Label for="symbol-yfapi-symbol">
-                            YF API simbol
-                        </Label>
-                        <Input
-                            id="symbol-yfapi-symbol"
-                            v-model="form.yfapi_symbol"
-                            placeholder="npr. VWCE.DE"
-                        />
-                        <p class="text-xs text-muted-foreground">
-                            Če ga nastavite, se bo cena samodejno osveževala
-                            vsake 3 ure prek YF API.
-                        </p>
-                        <InputError :message="form.errors.yfapi_symbol" />
+                        <InputError :message="form.errors.external_source_id" />
                     </div>
                 </CardContent>
             </Card>
@@ -267,7 +315,7 @@ function submitSymbol(): void {
                             step="0.01"
                         />
                         <p
-                            v-if="(isCryptoType && form.coinmarketcap_id !== '') || (isNonCryptoType && form.yfapi_symbol !== '')"
+                            v-if="selectedPriceSource?.value !== 'manual'"
                             class="text-xs text-muted-foreground"
                         >
                             Ta vrednost služi kot začetna cena, nato jo sistem

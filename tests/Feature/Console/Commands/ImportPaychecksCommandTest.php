@@ -3,6 +3,7 @@
 use App\Models\Paycheck;
 use App\Models\PaycheckYear;
 use App\Models\Person;
+use Database\Seeders\PersonSeeder;
 use Illuminate\Console\Command;
 
 function createPaycheckImportCsv(string $contents): string
@@ -17,6 +18,10 @@ function createPaycheckImportCsv(string $contents): string
 
     return $path;
 }
+
+beforeEach(function () {
+    $this->seed(PersonSeeder::class);
+});
 
 test('imports paychecks across years and creates missing paycheck years', function () {
     $path = createPaycheckImportCsv(<<<'CSV'

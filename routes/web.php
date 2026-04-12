@@ -85,7 +85,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('simboli/{investmentSymbol}/uredi', [InvestmentSymbolController::class, 'edit'])->name('investments.symbols.edit');
         Route::post('simboli', [InvestmentSymbolController::class, 'store'])->name('investments.symbols.store');
         Route::post('simboli/osvezi-cene/{source}', [InvestmentSymbolController::class, 'refreshPrices'])
-            ->whereIn('source', ['coinmarketcap', 'yfapi'])
+            ->whereIn('source', ['coinmarketcap', 'yfapi', 'ljse'])
             ->name('investments.symbols.refresh-prices');
         Route::put('simboli/{investmentSymbol}', [InvestmentSymbolController::class, 'update'])->name('investments.symbols.update');
         Route::delete('simboli/{investmentSymbol}', [InvestmentSymbolController::class, 'destroy'])->name('investments.symbols.destroy');

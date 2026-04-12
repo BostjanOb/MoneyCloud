@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\InvestmentPriceSource;
 use App\Models\InvestmentSymbol;
 use App\Services\CoinMarketCapInvestmentPriceRefreshService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -9,20 +10,23 @@ use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
-test('it refreshes all crypto symbols with a configured coinmarketcap id', function () {
+test('it refreshes all crypto symbols with a configured external source id', function () {
     Config::set('services.coinmarketcap.key', 'test-key');
     Config::set('services.coinmarketcap.base_url', 'https://pro-api.coinmarketcap.com');
 
     $cro = InvestmentSymbol::factory()->crypto('CRO')->create([
-        'coinmarketcap_id' => 3635,
+        'price_source' => InvestmentPriceSource::COINMARKETCAP->value,
+        'external_source_id' => '3635',
         'current_price' => '0.05',
     ]);
     $eth = InvestmentSymbol::factory()->crypto('ETH')->create([
-        'coinmarketcap_id' => 1027,
+        'price_source' => InvestmentPriceSource::COINMARKETCAP->value,
+        'external_source_id' => '1027',
         'current_price' => '1900.00',
     ]);
     $btc = InvestmentSymbol::factory()->crypto('BTC')->create([
-        'coinmarketcap_id' => null,
+        'price_source' => InvestmentPriceSource::MANUAL->value,
+        'external_source_id' => null,
         'current_price' => '50000.00',
     ]);
 
@@ -68,7 +72,7 @@ test('it refreshes all crypto symbols with a configured coinmarketcap id', funct
     ]);
 
     expect($cro->fresh()->current_price)->toBe('0.06')
-        ->and($cro->fresh()->price_source)->toBe('coinmarketcap')
+        ->and($cro->fresh()->price_source)->toBe(InvestmentPriceSource::COINMARKETCAP->value)
         ->and($cro->fresh()->price_synced_at?->toIso8601String())->toBe('2026-04-11T20:01:04+00:00')
         ->and($eth->fresh()->current_price)->toBe('1974.24')
         ->and($btc->fresh()->current_price)->toBe('50000.00');
@@ -89,11 +93,13 @@ test('it skips symbols that are missing from the coinmarketcap response', functi
     Config::set('services.coinmarketcap.base_url', 'https://pro-api.coinmarketcap.com');
 
     $cro = InvestmentSymbol::factory()->crypto('CRO')->create([
-        'coinmarketcap_id' => 3635,
+        'price_source' => InvestmentPriceSource::COINMARKETCAP->value,
+        'external_source_id' => '3635',
         'current_price' => '0.05',
     ]);
     $eth = InvestmentSymbol::factory()->crypto('ETH')->create([
-        'coinmarketcap_id' => 1027,
+        'price_source' => InvestmentPriceSource::COINMARKETCAP->value,
+        'external_source_id' => '1027',
         'current_price' => '1900.00',
     ]);
 
@@ -136,7 +142,8 @@ test('it throws when the coinmarketcap api key is missing', function () {
     Config::set('services.coinmarketcap.key', null);
 
     InvestmentSymbol::factory()->crypto('ETH')->create([
-        'coinmarketcap_id' => 1027,
+        'price_source' => InvestmentPriceSource::COINMARKETCAP->value,
+        'external_source_id' => '1027',
     ]);
 
     expect(fn () => (new CoinMarketCapInvestmentPriceRefreshService)->refresh())
@@ -148,7 +155,8 @@ test('it throws when coinmarketcap returns an error response', function () {
     Config::set('services.coinmarketcap.base_url', 'https://pro-api.coinmarketcap.com');
 
     InvestmentSymbol::factory()->crypto('ETH')->create([
-        'coinmarketcap_id' => 1027,
+        'price_source' => InvestmentPriceSource::COINMARKETCAP->value,
+        'external_source_id' => '1027',
     ]);
 
     Http::fake([

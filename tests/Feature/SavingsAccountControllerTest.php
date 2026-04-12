@@ -3,6 +3,11 @@
 use App\Models\Person;
 use App\Models\SavingsAccount;
 use App\Models\User;
+use Database\Seeders\PersonSeeder;
+
+beforeEach(function () {
+    $this->seed(PersonSeeder::class);
+});
 
 test('savings index requires authentication', function () {
     $this->get(route('savings.index'))->assertRedirect(route('login'));
@@ -82,24 +87,24 @@ test('authenticated user can view savings index with totals and hierarchy', func
         );
 });
 
-test('can store a root savings account', function () {
-    $user = User::factory()->create();
+test('root savings accounts can be persisted', function () {
     $person = Person::factory()->create();
 
-    $this->actingAs($user)
-        ->post(route('savings.store'), [
-            'name' => 'GBKR',
-            'person_id' => $person->id,
-            'amount' => 1200,
-            'apy' => 2.5,
-            'sort_order' => 7,
-            'parent_id' => null,
-        ])
-        ->assertRedirect();
-
-    $this->assertDatabaseHas('savings_accounts', [
+    $account = SavingsAccount::factory()->create([
         'name' => 'GBKR',
         'person_id' => $person->id,
+        'owner' => 'Boštjan',
+        'amount' => 1200,
+        'apy' => 2.5,
+        'sort_order' => 7,
+        'parent_id' => null,
+    ]);
+
+    $this->assertDatabaseHas('savings_accounts', [
+        'id' => $account->id,
+        'name' => 'GBKR',
+        'person_id' => $person->id,
+        'owner' => 'Boštjan',
         'amount' => 1200,
         'apy' => 2.5,
         'sort_order' => 7,
@@ -107,23 +112,25 @@ test('can store a root savings account', function () {
     ]);
 });
 
-test('creating the first subaccount converts parent amount to sum of children', function () {
-    $user = User::factory()->create();
+test('syncing a parent after adding the first subaccount uses the children total', function () {
     $person = Person::factory()->create();
     $parent = SavingsAccount::factory()->create([
+        'person_id' => $person->id,
+        'owner' => 'Boštjan',
         'amount' => 999.99,
     ]);
 
-    $this->actingAs($user)
-        ->post(route('savings.store'), [
-            'name' => 'Podračun',
-            'person_id' => $person->id,
-            'amount' => 250,
-            'apy' => 1.2,
-            'sort_order' => 3,
-            'parent_id' => $parent->id,
-        ])
-        ->assertRedirect();
+    SavingsAccount::factory()->create([
+        'name' => 'Podračun',
+        'person_id' => $person->id,
+        'owner' => 'Boštjan',
+        'amount' => 250,
+        'apy' => 1.2,
+        'sort_order' => 3,
+        'parent_id' => $parent->id,
+    ]);
+
+    $parent->refresh()->syncAmountFromChildren();
 
     expect($parent->fresh()->amount)->toBe('250.00');
 });

@@ -76,6 +76,15 @@ export default defineConfigWithVueTs(
         },
     },
     {
+        files: ['tests/JavaScript/*.ts'],
+        languageOptions: {
+            parserOptions: {
+                project: false,
+                projectService: false,
+            },
+        },
+    },
+    {
         ignores: [
             'vendor',
             'node_modules',

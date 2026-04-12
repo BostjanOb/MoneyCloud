@@ -3,6 +3,11 @@
 use App\Models\PaycheckYear;
 use App\Models\Person;
 use App\Models\User;
+use Database\Seeders\PersonSeeder;
+
+beforeEach(function () {
+    $this->seed(PersonSeeder::class);
+});
 
 test('can create a new paycheck year', function () {
     $user = User::factory()->create();

@@ -13,7 +13,7 @@ import AppLogoIcon from '@/components/AppLogoIcon.vue';
             >Money Cloud</span
         >
         <span
-            class="mt-1 truncate text-[0.65rem] font-semibold uppercase tracking-[0.26em] text-muted-foreground"
+            class="mt-1 truncate text-[0.65rem] font-semibold tracking-[0.26em] text-muted-foreground uppercase"
             >osebne finance</span
         >
     </div>

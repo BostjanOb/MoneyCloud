@@ -3,14 +3,14 @@ import { Head, setLayoutProps, useForm } from '@inertiajs/vue3';
 import type { AcceptableValue } from 'reka-ui';
 import { computed, ref } from 'vue';
 import {
+    show as providerShow,
+    update as providerUpdate,
+} from '@/actions/App/Http/Controllers/InvestmentProviderController';
+import {
     destroy as purchaseDestroy,
     store as purchaseStore,
     update as purchaseUpdate,
 } from '@/actions/App/Http/Controllers/InvestmentPurchaseController';
-import {
-    show as providerShow,
-    update as providerUpdate,
-} from '@/actions/App/Http/Controllers/InvestmentProviderController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
@@ -40,7 +40,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { cn, formatSlovenianNumber } from '@/lib/utils';
+import { formatSlovenianNumber } from '@/lib/utils';
 
 type Provider = {
     id: number;
@@ -261,7 +261,9 @@ function openCreatePurchase(): void {
     editingPurchase.value = null;
     resetPurchaseForm();
     purchaseForm.investment_symbol_id =
-        props.symbolOptions[0] !== undefined ? String(props.symbolOptions[0].id) : '';
+        props.symbolOptions[0] !== undefined
+            ? String(props.symbolOptions[0].id)
+            : '';
     showPurchaseModal.value = true;
 }
 
@@ -390,9 +392,15 @@ function deletePurchase(purchase: Purchase): void {
                         Povezan račun:
                         {{ provider.linked_savings_account_name }}
                         <span
-                            v-if="provider.linked_savings_account_balance !== null"
+                            v-if="
+                                provider.linked_savings_account_balance !== null
+                            "
                         >
-                            ({{ formatMoney(provider.linked_savings_account_balance) }})
+                            ({{
+                                formatMoney(
+                                    provider.linked_savings_account_balance,
+                                )
+                            }})
                         </span>
                     </p>
                 </div>
@@ -412,7 +420,9 @@ function deletePurchase(purchase: Purchase): void {
                     </Button>
                     <Button
                         size="sm"
-                        :disabled="!canCreatePurchase || symbolOptions.length === 0"
+                        :disabled="
+                            !canCreatePurchase || symbolOptions.length === 0
+                        "
                         @click="openCreatePurchase"
                     >
                         Dodaj nakup
@@ -472,18 +482,33 @@ function deletePurchase(purchase: Purchase): void {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Simbol</TableHead>
-                            <TableHead numeric class="text-right">Nakup</TableHead>
-                            <TableHead numeric class="text-right">Količina</TableHead>
-                            <TableHead numeric class="text-right">Donos</TableHead>
-                            <TableHead numeric class="text-right">Trenutno</TableHead>
-                            <TableHead numeric class="text-right">P/L</TableHead>
+                            <TableHead numeric class="text-right"
+                                >Nakup</TableHead
+                            >
+                            <TableHead numeric class="text-right"
+                                >Količina</TableHead
+                            >
+                            <TableHead numeric class="text-right"
+                                >Donos</TableHead
+                            >
+                            <TableHead numeric class="text-right"
+                                >Trenutno</TableHead
+                            >
+                            <TableHead numeric class="text-right"
+                                >P/L</TableHead
+                            >
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        <TableRow v-for="row in symbolSummary" :key="row.symbol">
+                        <TableRow
+                            v-for="row in symbolSummary"
+                            :key="row.symbol"
+                        >
                             <TableCell>
                                 <div class="flex flex-col gap-1">
-                                    <span class="font-medium">{{ row.symbol }}</span>
+                                    <span class="font-medium">{{
+                                        row.symbol
+                                    }}</span>
                                     <span class="text-xs text-muted-foreground">
                                         {{ row.type_label }}
                                     </span>
@@ -505,7 +530,7 @@ function deletePurchase(purchase: Purchase): void {
                             <TableCell numeric class="text-right">
                                 {{ formatMoney(row.current_value) }}
                             </TableCell>
-                        
+
                             <TableCell
                                 numeric
                                 class="text-right"
@@ -557,8 +582,13 @@ function deletePurchase(purchase: Purchase): void {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        <TableRow v-for="purchase in purchases" :key="purchase.id">
-                            <TableCell>{{ formatDateTime(purchase.purchased_at) }}</TableCell>
+                        <TableRow
+                            v-for="purchase in purchases"
+                            :key="purchase.id"
+                        >
+                            <TableCell>{{
+                                formatDateTime(purchase.purchased_at)
+                            }}</TableCell>
                             <TableCell>
                                 <div class="flex flex-col gap-1">
                                     <span class="font-medium">
@@ -584,9 +614,13 @@ function deletePurchase(purchase: Purchase): void {
                             <TableCell
                                 numeric
                                 class="text-right"
-                                :class="valueTone(purchase.unit_diff_percentage)"
+                                :class="
+                                    valueTone(purchase.unit_diff_percentage)
+                                "
                             >
-                                {{ formatPercent(purchase.unit_diff_percentage) }}
+                                {{
+                                    formatPercent(purchase.unit_diff_percentage)
+                                }}
                             </TableCell>
                             <TableCell
                                 numeric
@@ -598,7 +632,9 @@ function deletePurchase(purchase: Purchase): void {
                             <TableCell
                                 numeric
                                 class="text-right"
-                                :class="valueTone(purchase.profit_loss_after_tax)"
+                                :class="
+                                    valueTone(purchase.profit_loss_after_tax)
+                                "
                             >
                                 {{
                                     formatSignedMoney(
@@ -653,7 +689,10 @@ function deletePurchase(purchase: Purchase): void {
                 </DialogDescription>
             </DialogHeader>
 
-            <form class="grid gap-4 md:grid-cols-2" @submit.prevent="submitPurchase">
+            <form
+                class="grid gap-4 md:grid-cols-2"
+                @submit.prevent="submitPurchase"
+            >
                 <div class="space-y-1.5 md:col-span-2">
                     <Label for="purchase-symbol">Simbol</Label>
                     <Select
@@ -673,7 +712,9 @@ function deletePurchase(purchase: Purchase): void {
                             </SelectItem>
                         </SelectContent>
                     </Select>
-                    <InputError :message="purchaseForm.errors.investment_symbol_id" />
+                    <InputError
+                        :message="purchaseForm.errors.investment_symbol_id"
+                    />
                 </div>
 
                 <div class="space-y-1.5">
@@ -742,17 +783,23 @@ function deletePurchase(purchase: Purchase): void {
                             v-model="purchaseForm.coupon_date"
                             type="date"
                         />
-                        <InputError :message="purchaseForm.errors.coupon_date" />
+                        <InputError
+                            :message="purchaseForm.errors.coupon_date"
+                        />
                     </div>
 
                     <div class="space-y-1.5 md:col-span-2">
-                        <Label for="purchase-expiry-date">Datum zapadlosti</Label>
+                        <Label for="purchase-expiry-date"
+                            >Datum zapadlosti</Label
+                        >
                         <Input
                             id="purchase-expiry-date"
                             v-model="purchaseForm.expiry_date"
                             type="date"
                         />
-                        <InputError :message="purchaseForm.errors.expiry_date" />
+                        <InputError
+                            :message="purchaseForm.errors.expiry_date"
+                        />
                     </div>
                 </template>
 
@@ -805,9 +852,14 @@ function deletePurchase(purchase: Purchase): void {
                 </DialogDescription>
             </DialogHeader>
 
-            <form class="grid gap-4" @submit.prevent="submitLinkedSavingsAccount">
+            <form
+                class="grid gap-4"
+                @submit.prevent="submitLinkedSavingsAccount"
+            >
                 <div class="space-y-1.5">
-                    <Label for="provider-savings-account">Varčevalni račun</Label>
+                    <Label for="provider-savings-account"
+                        >Varčevalni račun</Label
+                    >
                     <Select
                         :model-value="savingsForm.linked_savings_account_id"
                         @update:model-value="updateLinkedSavingsAccount"
@@ -824,11 +876,15 @@ function deletePurchase(purchase: Purchase): void {
                                 :key="option.id"
                                 :value="String(option.id)"
                             >
-                                {{ option.label }} ({{ formatMoney(option.amount) }})
+                                {{ option.label }} ({{
+                                    formatMoney(option.amount)
+                                }})
                             </SelectItem>
                         </SelectContent>
                     </Select>
-                    <InputError :message="savingsForm.errors.linked_savings_account_id" />
+                    <InputError
+                        :message="savingsForm.errors.linked_savings_account_id"
+                    />
                 </div>
 
                 <DialogFooter>

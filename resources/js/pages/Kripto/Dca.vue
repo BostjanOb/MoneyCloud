@@ -114,7 +114,9 @@ setLayoutProps({
 const showPurchaseModal = ref(false);
 const editingPurchase = ref<DcaPurchase | null>(null);
 const activeSymbolId = ref(
-    props.symbolGroups[0] !== undefined ? String(props.symbolGroups[0].symbol.id) : '',
+    props.symbolGroups[0] !== undefined
+        ? String(props.symbolGroups[0].symbol.id)
+        : '',
 );
 
 const purchaseForm = useForm({
@@ -224,7 +226,9 @@ function openCreatePurchase(symbolId?: number): void {
 function openEditPurchase(purchase: DcaPurchase): void {
     editingPurchase.value = purchase;
     purchaseForm.clearErrors();
-    purchaseForm.investment_provider_id = String(purchase.investment_provider_id);
+    purchaseForm.investment_provider_id = String(
+        purchase.investment_provider_id,
+    );
     purchaseForm.investment_symbol_id = String(purchase.investment_symbol_id);
     purchaseForm.purchased_at = toDatetimeLocalInput(purchase.purchased_at);
     purchaseForm.quantity = purchase.quantity;
@@ -304,7 +308,11 @@ function submitPurchase(): void {
 }
 
 function deletePurchase(purchase: DcaPurchase): void {
-    if (!confirm(`Ste prepričani, da želite izbrisati DCA nakup ${purchase.symbol.symbol}?`)) {
+    if (
+        !confirm(
+            `Ste prepričani, da želite izbrisati DCA nakup ${purchase.symbol.symbol}?`,
+        )
+    ) {
         return;
     }
 
@@ -316,7 +324,9 @@ function deletePurchase(purchase: DcaPurchase): void {
     <Head title="Kripto - DCA nakupi" />
 
     <div class="flex flex-col gap-6 p-4">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div
+            class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
+        >
             <Heading
                 title="DCA nakupi"
                 description="Nakupi so razdeljeni po kripto simbolih."
@@ -328,7 +338,8 @@ function deletePurchase(purchase: DcaPurchase): void {
                 <Button
                     size="sm"
                     :disabled="
-                        providerOptions.length === 0 || symbolOptions.length === 0
+                        providerOptions.length === 0 ||
+                        symbolOptions.length === 0
                     "
                     @click="openCreatePurchase(activeGroup?.symbol.id)"
                 >
@@ -337,7 +348,11 @@ function deletePurchase(purchase: DcaPurchase): void {
             </div>
         </div>
 
-        <Tabs v-if="symbolGroups.length > 0" v-model="activeSymbolId" class="gap-4">
+        <Tabs
+            v-if="symbolGroups.length > 0"
+            v-model="activeSymbolId"
+            class="gap-4"
+        >
             <div class="overflow-x-auto">
                 <TabsList>
                     <TabsTrigger
@@ -420,7 +435,9 @@ function deletePurchase(purchase: DcaPurchase): void {
                 </div>
 
                 <Card>
-                    <CardHeader class="flex flex-row items-center justify-between gap-4">
+                    <CardHeader
+                        class="flex flex-row items-center justify-between gap-4"
+                    >
                         <CardTitle>{{ group.symbol.symbol }} nakupi</CardTitle>
                         <Button
                             size="sm"
@@ -451,7 +468,9 @@ function deletePurchase(purchase: DcaPurchase): void {
                                     <TableHead numeric class="text-right">
                                         Skupaj
                                     </TableHead>
-                                    <TableHead class="text-right">Akcije</TableHead>
+                                    <TableHead class="text-right"
+                                        >Akcije</TableHead
+                                    >
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -460,7 +479,11 @@ function deletePurchase(purchase: DcaPurchase): void {
                                     :key="purchase.id"
                                 >
                                     <TableCell>
-                                        {{ formatDateTime(purchase.purchased_at) }}
+                                        {{
+                                            formatDateTime(
+                                                purchase.purchased_at,
+                                            )
+                                        }}
                                     </TableCell>
                                     <TableCell class="font-medium">
                                         {{ purchase.provider.name }}
@@ -469,10 +492,14 @@ function deletePurchase(purchase: DcaPurchase): void {
                                         {{ formatQuantity(purchase.quantity) }}
                                     </TableCell>
                                     <TableCell numeric class="text-right">
-                                        {{ formatMoney(purchase.price_per_unit) }}
+                                        {{
+                                            formatMoney(purchase.price_per_unit)
+                                        }}
                                     </TableCell>
                                     <TableCell numeric class="text-right">
-                                        {{ formatMoney(purchase.purchase_value) }}
+                                        {{
+                                            formatMoney(purchase.purchase_value)
+                                        }}
                                     </TableCell>
                                     <TableCell numeric class="text-right">
                                         {{ formatMoney(purchase.fee) }}
@@ -485,7 +512,9 @@ function deletePurchase(purchase: DcaPurchase): void {
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                @click="openEditPurchase(purchase)"
+                                                @click="
+                                                    openEditPurchase(purchase)
+                                                "
                                             >
                                                 Uredi
                                             </Button>
@@ -493,7 +522,9 @@ function deletePurchase(purchase: DcaPurchase): void {
                                                 variant="ghost"
                                                 size="sm"
                                                 class="text-destructive"
-                                                @click="deletePurchase(purchase)"
+                                                @click="
+                                                    deletePurchase(purchase)
+                                                "
                                             >
                                                 Briši
                                             </Button>
@@ -515,8 +546,8 @@ function deletePurchase(purchase: DcaPurchase): void {
 
         <Card v-else>
             <CardContent class="py-8 text-center text-sm text-muted-foreground">
-                Ni še DCA nakupov. Dodajte prvi nakup in po želji količino
-                takoj prištejte v kripto stanje.
+                Ni še DCA nakupov. Dodajte prvi nakup in po želji količino takoj
+                prištejte v kripto stanje.
             </CardContent>
         </Card>
     </div>
@@ -535,7 +566,10 @@ function deletePurchase(purchase: DcaPurchase): void {
                 </DialogDescription>
             </DialogHeader>
 
-            <form class="grid gap-4 md:grid-cols-2" @submit.prevent="submitPurchase">
+            <form
+                class="grid gap-4 md:grid-cols-2"
+                @submit.prevent="submitPurchase"
+            >
                 <div class="space-y-1.5">
                     <Label for="dca-provider">Platforma</Label>
                     <Select
@@ -555,7 +589,9 @@ function deletePurchase(purchase: DcaPurchase): void {
                             </SelectItem>
                         </SelectContent>
                     </Select>
-                    <InputError :message="purchaseForm.errors.investment_provider_id" />
+                    <InputError
+                        :message="purchaseForm.errors.investment_provider_id"
+                    />
                 </div>
 
                 <div class="space-y-1.5">
@@ -577,7 +613,9 @@ function deletePurchase(purchase: DcaPurchase): void {
                             </SelectItem>
                         </SelectContent>
                     </Select>
-                    <InputError :message="purchaseForm.errors.investment_symbol_id" />
+                    <InputError
+                        :message="purchaseForm.errors.investment_symbol_id"
+                    />
                 </div>
 
                 <div class="space-y-1.5">
@@ -627,7 +665,10 @@ function deletePurchase(purchase: DcaPurchase): void {
                 </div>
 
                 <div v-if="!editingPurchase" class="space-y-1.5 md:col-span-2">
-                    <Label for="dca-add-to-balance" class="flex items-center gap-3">
+                    <Label
+                        for="dca-add-to-balance"
+                        class="flex items-center gap-3"
+                    >
                         <Checkbox
                             id="dca-add-to-balance"
                             :model-value="purchaseForm.add_to_balance"

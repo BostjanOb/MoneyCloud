@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\InvestmentPriceSource;
 use App\Enums\InvestmentSymbolType;
 use App\Http\Requests\StoreInvestmentSymbolRequest;
 use App\Http\Requests\UpdateInvestmentSymbolRequest;
 use App\Models\InvestmentSymbol;
 use App\Services\CoinMarketCapInvestmentPriceRefreshService;
+use App\Services\LjseInvestmentPriceRefreshService;
 use App\Services\YfApiInvestmentPriceRefreshService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,13 +34,9 @@ class InvestmentSymbolController extends Controller
                 ->map(fn (InvestmentSymbol $symbol): array => $this->transformSymbol($symbol))
                 ->values()
                 ->all(),
-            'refreshableCryptoCount' => InvestmentSymbol::query()
-                ->where('type', InvestmentSymbolType::CRYPTO->value)
-                ->whereNotNull('coinmarketcap_id')
-                ->count(),
-            'refreshableYfapiCount' => InvestmentSymbol::query()
-                ->whereNotNull('yfapi_symbol')
-                ->count(),
+            'refreshableCoinMarketCapCount' => $this->refreshableCount(InvestmentPriceSource::COINMARKETCAP),
+            'refreshableYfApiCount' => $this->refreshableCount(InvestmentPriceSource::YFAPI),
+            'refreshableLjseCount' => $this->refreshableCount(InvestmentPriceSource::LJSE),
             'typeOptions' => $this->typeOptions(),
             'filters' => [
                 'type' => $selectedType?->value,
@@ -82,8 +80,9 @@ class InvestmentSymbolController extends Controller
     public function refreshPrices(string $source): RedirectResponse
     {
         $service = match ($source) {
-            'coinmarketcap' => app(CoinMarketCapInvestmentPriceRefreshService::class),
-            'yfapi' => app(YfApiInvestmentPriceRefreshService::class),
+            InvestmentPriceSource::COINMARKETCAP->value => app(CoinMarketCapInvestmentPriceRefreshService::class),
+            InvestmentPriceSource::YFAPI->value => app(YfApiInvestmentPriceRefreshService::class),
+            InvestmentPriceSource::LJSE->value => app(LjseInvestmentPriceRefreshService::class),
         };
 
         try {
@@ -104,6 +103,7 @@ class InvestmentSymbolController extends Controller
         return Inertia::render('Investicije/SimboliForm', [
             'symbol' => $investmentSymbol ? $this->transformSymbol($investmentSymbol) : null,
             'typeOptions' => $this->typeOptions(),
+            'priceSourceOptions' => $this->priceSourceOptions(),
         ]);
     }
 
@@ -119,9 +119,28 @@ class InvestmentSymbolController extends Controller
             ->all();
     }
 
+    /** @return array<int, array{value: string, label: string, supported_types: list<string>}> */
+    private function priceSourceOptions(): array
+    {
+        return collect(InvestmentPriceSource::cases())
+            ->map(fn (InvestmentPriceSource $source): array => [
+                'value' => $source->value,
+                'label' => $source->label(),
+                'supported_types' => collect(InvestmentSymbolType::cases())
+                    ->filter(fn (InvestmentSymbolType $type): bool => $source->supportsType($type))
+                    ->map(fn (InvestmentSymbolType $type): string => $type->value)
+                    ->values()
+                    ->all(),
+            ])
+            ->values()
+            ->all();
+    }
+
     /** @return array<string, mixed> */
     private function transformSymbol(InvestmentSymbol $symbol): array
     {
+        $priceSource = InvestmentPriceSource::tryFrom($symbol->price_source);
+
         return [
             'id' => $symbol->id,
             'type' => $symbol->type->value,
@@ -130,8 +149,8 @@ class InvestmentSymbolController extends Controller
             'isin' => $symbol->isin,
             'taxable' => $symbol->taxable,
             'price_source' => $symbol->price_source,
-            'coinmarketcap_id' => $symbol->coinmarketcap_id,
-            'yfapi_symbol' => $symbol->yfapi_symbol,
+            'price_source_label' => $priceSource?->label() ?? $symbol->price_source,
+            'external_source_id' => $symbol->external_source_id,
             'current_price' => $symbol->current_price,
             'price_synced_at' => $symbol->price_synced_at?->toIso8601String(),
         ];
@@ -163,5 +182,13 @@ class InvestmentSymbolController extends Controller
         }
 
         return $message.' Neuspešni simboli: '.implode(', ', $result['failed_symbols']).'.';
+    }
+
+    private function refreshableCount(InvestmentPriceSource $source): int
+    {
+        return InvestmentSymbol::query()
+            ->where('price_source', $source->value)
+            ->whereNotNull('external_source_id')
+            ->count();
     }
 }

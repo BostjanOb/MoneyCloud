@@ -12,21 +12,17 @@ return new class extends Migration
             $table->id();
             $table->string('type');
             $table->string('symbol');
-            $table->string('isin')->nullable();
+            $table->string('isin')->nullable()->unique();
             $table->boolean('taxable')->default(true);
             $table->string('price_source');
-            $table->unsignedBigInteger('coinmarketcap_id')->nullable();
-            $table->string('yfapi_symbol')->nullable();
+            $table->string('external_source_id')->nullable()->index();
+
             $table->decimal('current_price', 10, 2)->default(0);
             $table->timestamp('price_synced_at')->nullable();
 
             $table->timestamps();
 
-            $table->index('yfapi_symbol');
-            $table->index('coinmarketcap_id');
             $table->unique(['type', 'symbol']);
-            $table->unique(['isin']);
-            $table->index(['type', 'symbol']);
         });
     }
 

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Contracts\InvestmentPriceRefreshService;
+use App\Enums\InvestmentPriceSource;
 use App\Enums\InvestmentSymbolType;
 use App\Models\InvestmentSymbol;
 use Carbon\CarbonImmutable;
@@ -41,7 +42,7 @@ class CoinMarketCapInvestmentPriceRefreshService implements InvestmentPriceRefre
         $failedSymbols = [];
 
         foreach ($symbols as $symbol) {
-            $quotePayload = $quotesById->get($symbol->coinmarketcap_id);
+            $quotePayload = $quotesById->get((string) $symbol->external_source_id);
 
             if (! is_array($quotePayload)) {
                 $failedSymbols[] = $symbol->symbol;
@@ -60,7 +61,7 @@ class CoinMarketCapInvestmentPriceRefreshService implements InvestmentPriceRefre
 
             $symbol->forceFill([
                 'current_price' => round((float) $eurQuote['price'], 2),
-                'price_source' => 'coinmarketcap',
+                'price_source' => InvestmentPriceSource::COINMARKETCAP->value,
                 'price_synced_at' => $this->resolveSyncedAt($quotePayload, $eurQuote),
             ])->save();
 
@@ -81,14 +82,15 @@ class CoinMarketCapInvestmentPriceRefreshService implements InvestmentPriceRefre
     {
         return InvestmentSymbol::query()
             ->where('type', InvestmentSymbolType::CRYPTO->value)
-            ->whereNotNull('coinmarketcap_id')
+            ->where('price_source', InvestmentPriceSource::COINMARKETCAP->value)
+            ->whereNotNull('external_source_id')
             ->orderBy('symbol')
             ->get();
     }
 
     /**
      * @param  Collection<int, InvestmentSymbol>  $symbols
-     * @return Collection<int, array<string, mixed>>
+     * @return Collection<string, array<string, mixed>>
      */
     private function fetchQuotes(Collection $symbols): Collection
     {
@@ -109,7 +111,7 @@ class CoinMarketCapInvestmentPriceRefreshService implements InvestmentPriceRefre
                 ->timeout(10)
                 ->retry([200, 500, 1000], throw: false)
                 ->get($baseUrl.'/v3/cryptocurrency/quotes/latest', [
-                    'id' => $symbols->pluck('coinmarketcap_id')->implode(','),
+                    'id' => $symbols->pluck('external_source_id')->implode(','),
                     'convert' => 'EUR',
                 ]);
         } catch (ConnectionException $exception) {
@@ -134,7 +136,7 @@ class CoinMarketCapInvestmentPriceRefreshService implements InvestmentPriceRefre
 
         return collect($data)
             ->filter(fn (mixed $item): bool => is_array($item) && isset($item['id']))
-            ->mapWithKeys(fn (array $item): array => [(int) $item['id'] => $item]);
+            ->mapWithKeys(fn (array $item): array => [(string) $item['id'] => $item]);
     }
 
     /**

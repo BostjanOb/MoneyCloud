@@ -2,16 +2,14 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\InvestmentPriceSource;
 use App\Enums\InvestmentSymbolType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreInvestmentSymbolRequest extends FormRequest
 {
-    private const COINMARKETCAP_PRICE_SOURCE = 'coinmarketcap';
-
-    private const YFAPI_PRICE_SOURCE = 'yfapi';
-
     public function authorize(): bool
     {
         return true;
@@ -22,48 +20,111 @@ class StoreInvestmentSymbolRequest extends FormRequest
     {
         return [
             'type' => ['required', Rule::enum(InvestmentSymbolType::class)],
-            'symbol' => [
-                'required',
-                'string',
-                'max:50',
-                Rule::unique('investment_symbols', 'symbol')->where(
-                    fn ($query) => $query->where('type', $this->input('type')),
-                ),
-            ],
-            'isin' => ['nullable', 'string', 'max:50', 'unique:investment_symbols,isin'],
+            'symbol' => $this->symbolRules(),
+            'isin' => $this->isinRules(),
             'taxable' => ['required', 'boolean'],
-            'price_source' => ['required', 'string', 'max:255'],
-            'coinmarketcap_id' => ['nullable', 'integer', 'min:1'],
-            'yfapi_symbol' => ['nullable', 'string', 'max:50'],
+            'price_source' => ['required', Rule::enum(InvestmentPriceSource::class)],
+            'external_source_id' => ['nullable', 'string', 'max:255'],
             'current_price' => ['required', 'numeric', 'min:0'],
+        ];
+    }
+
+    /** @return array<int, mixed> */
+    public function after(): array
+    {
+        return [
+            function (Validator $validator): void {
+                $type = $this->selectedType();
+                $priceSource = $this->selectedPriceSource();
+                $externalSourceId = $this->normalizedExternalSourceId();
+
+                if (! $type instanceof InvestmentSymbolType || ! $priceSource instanceof InvestmentPriceSource) {
+                    return;
+                }
+
+                if (! $priceSource->supportsType($type)) {
+                    $validator->errors()->add('price_source', 'Izbrani vir cene ni na voljo za ta tip simbola.');
+
+                    return;
+                }
+
+                if ($priceSource === InvestmentPriceSource::MANUAL) {
+                    return;
+                }
+
+                if ($externalSourceId === null) {
+                    $validator->errors()->add('external_source_id', 'Zunanji ID je obvezen za izbrani vir cene.');
+
+                    return;
+                }
+
+                if (
+                    $priceSource === InvestmentPriceSource::COINMARKETCAP
+                    && ! ctype_digit($externalSourceId)
+                ) {
+                    $validator->errors()->add('external_source_id', 'CoinMarketCap ID mora biti številka.');
+                }
+            },
         ];
     }
 
     protected function prepareForValidation(): void
     {
-        $type = (string) $this->input('type');
-
-        $coinmarketcapId = $type === InvestmentSymbolType::CRYPTO->value && $this->filled('coinmarketcap_id')
-            ? $this->integer('coinmarketcap_id')
-            : null;
-
-        $yfapiSymbol = $type !== InvestmentSymbolType::CRYPTO->value && $this->filled('yfapi_symbol')
-            ? mb_strtoupper(trim((string) $this->input('yfapi_symbol')))
-            : null;
-
-        $priceSource = match (true) {
-            $coinmarketcapId !== null => self::COINMARKETCAP_PRICE_SOURCE,
-            $yfapiSymbol !== null => self::YFAPI_PRICE_SOURCE,
-            default => (string) $this->input('price_source'),
-        };
+        $priceSource = $this->selectedPriceSource();
 
         $this->merge([
-            'symbol' => mb_strtoupper((string) $this->input('symbol')),
-            'isin' => $this->filled('isin') ? mb_strtoupper((string) $this->input('isin')) : null,
+            'symbol' => mb_strtoupper(trim((string) $this->input('symbol'))),
+            'isin' => $this->filled('isin') ? mb_strtoupper(trim((string) $this->input('isin'))) : null,
             'taxable' => $this->boolean('taxable'),
-            'price_source' => $priceSource,
-            'coinmarketcap_id' => $coinmarketcapId,
-            'yfapi_symbol' => $yfapiSymbol,
+            'price_source' => $priceSource?->value ?? mb_strtolower(trim((string) $this->input('price_source'))),
+            'external_source_id' => $this->normalizedExternalSourceId($priceSource),
         ]);
+    }
+
+    /** @return array<int, mixed> */
+    protected function symbolRules(): array
+    {
+        return [
+            'required',
+            'string',
+            'max:50',
+            Rule::unique('investment_symbols', 'symbol')->where(
+                fn ($query) => $query->where('type', $this->input('type')),
+            ),
+        ];
+    }
+
+    /** @return array<int, mixed> */
+    protected function isinRules(): array
+    {
+        return ['nullable', 'string', 'max:50', 'unique:investment_symbols,isin'];
+    }
+
+    protected function selectedType(): ?InvestmentSymbolType
+    {
+        return InvestmentSymbolType::tryFrom((string) $this->input('type'));
+    }
+
+    protected function selectedPriceSource(): ?InvestmentPriceSource
+    {
+        return InvestmentPriceSource::tryFrom(
+            mb_strtolower(trim((string) $this->input('price_source')))
+        );
+    }
+
+    protected function normalizedExternalSourceId(?InvestmentPriceSource $priceSource = null): ?string
+    {
+        $priceSource ??= $this->selectedPriceSource();
+
+        if (! $this->filled('external_source_id') || $priceSource === InvestmentPriceSource::MANUAL) {
+            return null;
+        }
+
+        $externalSourceId = trim((string) $this->input('external_source_id'));
+
+        return match ($priceSource) {
+            InvestmentPriceSource::YFAPI, InvestmentPriceSource::LJSE => mb_strtoupper($externalSourceId),
+            default => $externalSourceId,
+        };
     }
 }

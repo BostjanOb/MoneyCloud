@@ -82,20 +82,27 @@ function formatQuantity(value: string | number): string {
                     v-if="props.rows.length === 0"
                     class="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground"
                 >
-                    Ko bodo dodani nakupi, se bo tukaj prikazal letni pregled vložkov.
+                    Ko bodo dodani nakupi, se bo tukaj prikazal letni pregled
+                    vložkov.
                 </div>
 
                 <div v-else class="space-y-4">
                     <div class="flex flex-wrap gap-4">
                         <Card class="min-w-56 flex-1">
                             <CardHeader class="pb-2">
-                                <CardTitle class="text-sm text-muted-foreground">
+                                <CardTitle
+                                    class="text-sm text-muted-foreground"
+                                >
                                     Skupaj vloženo
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <p class="text-2xl font-semibold">
-                                    {{ formatMoney(props.totals.grand_total_amount) }}
+                                    {{
+                                        formatMoney(
+                                            props.totals.grand_total_amount,
+                                        )
+                                    }}
                                 </p>
                             </CardContent>
                         </Card>
@@ -123,7 +130,9 @@ function formatQuantity(value: string | number): string {
                                     class="border-r px-3 py-2 text-center font-semibold whitespace-nowrap"
                                 >
                                     <div>{{ symbol.symbol }}</div>
-                                    <div class="mt-1 text-xs font-normal text-muted-foreground">
+                                    <div
+                                        class="mt-1 text-xs font-normal text-muted-foreground"
+                                    >
                                         {{ symbol.type_label }}
                                     </div>
                                 </th>
@@ -133,10 +142,14 @@ function formatQuantity(value: string | number): string {
                                     v-for="symbol in props.symbols"
                                     :key="`${symbol.id}-headers`"
                                 >
-                                    <th class="border-r bg-muted/20 px-3 py-2 text-right font-medium whitespace-nowrap">
+                                    <th
+                                        class="border-r bg-muted/20 px-3 py-2 text-right font-medium whitespace-nowrap"
+                                    >
                                         Znesek
                                     </th>
-                                    <th class="border-r bg-muted/20 px-3 py-2 text-right font-medium whitespace-nowrap">
+                                    <th
+                                        class="border-r bg-muted/20 px-3 py-2 text-right font-medium whitespace-nowrap"
+                                    >
                                         Količina
                                     </th>
                                 </template>
@@ -148,42 +161,84 @@ function formatQuantity(value: string | number): string {
                                 :key="row.year"
                                 class="border-b transition-colors hover:bg-muted/50"
                             >
-                                <td class="border-r px-3 py-2 font-semibold whitespace-nowrap">
+                                <td
+                                    class="border-r px-3 py-2 font-semibold whitespace-nowrap"
+                                >
                                     {{ row.year }}
                                 </td>
-                                <td class="border-r px-3 py-2 text-right whitespace-nowrap">
+                                <td
+                                    class="border-r px-3 py-2 text-right whitespace-nowrap"
+                                >
                                     {{ formatMoney(row.total_amount) }}
                                 </td>
                                 <template
                                     v-for="symbol in props.symbols"
                                     :key="`${row.year}-${symbol.id}`"
                                 >
-                                    <td class="border-r px-3 py-2 text-right whitespace-nowrap">
-                                        {{ formatMoney(row.symbols[String(symbol.id)].amount) }}
+                                    <td
+                                        class="border-r px-3 py-2 text-right whitespace-nowrap"
+                                    >
+                                        {{
+                                            formatMoney(
+                                                row.symbols[String(symbol.id)]
+                                                    .amount,
+                                            )
+                                        }}
                                     </td>
-                                    <td class="border-r px-3 py-2 text-right whitespace-nowrap">
-                                        {{ formatQuantity(row.symbols[String(symbol.id)].quantity) }}
+                                    <td
+                                        class="border-r px-3 py-2 text-right whitespace-nowrap"
+                                    >
+                                        {{
+                                            formatQuantity(
+                                                row.symbols[String(symbol.id)]
+                                                    .quantity,
+                                            )
+                                        }}
                                     </td>
                                 </template>
                             </tr>
                         </tbody>
                         <tfoot>
                             <tr class="border-t bg-muted/50 font-medium">
-                                <td class="border-r px-3 py-2 font-bold whitespace-nowrap">
+                                <td
+                                    class="border-r px-3 py-2 font-bold whitespace-nowrap"
+                                >
                                     SKUPAJ
                                 </td>
-                                <td class="border-r px-3 py-2 text-right font-bold whitespace-nowrap">
-                                    {{ formatMoney(props.totals.grand_total_amount) }}
+                                <td
+                                    class="border-r px-3 py-2 text-right font-bold whitespace-nowrap"
+                                >
+                                    {{
+                                        formatMoney(
+                                            props.totals.grand_total_amount,
+                                        )
+                                    }}
                                 </td>
                                 <template
                                     v-for="symbol in props.symbols"
                                     :key="`${symbol.id}-total`"
                                 >
-                                    <td class="border-r px-3 py-2 text-right font-bold whitespace-nowrap">
-                                        {{ formatMoney(props.totals.symbols[String(symbol.id)].amount) }}
+                                    <td
+                                        class="border-r px-3 py-2 text-right font-bold whitespace-nowrap"
+                                    >
+                                        {{
+                                            formatMoney(
+                                                props.totals.symbols[
+                                                    String(symbol.id)
+                                                ].amount,
+                                            )
+                                        }}
                                     </td>
-                                    <td class="border-r px-3 py-2 text-right font-bold whitespace-nowrap">
-                                        {{ formatQuantity(props.totals.symbols[String(symbol.id)].quantity) }}
+                                    <td
+                                        class="border-r px-3 py-2 text-right font-bold whitespace-nowrap"
+                                    >
+                                        {{
+                                            formatQuantity(
+                                                props.totals.symbols[
+                                                    String(symbol.id)
+                                                ].quantity,
+                                            )
+                                        }}
                                     </td>
                                 </template>
                             </tr>

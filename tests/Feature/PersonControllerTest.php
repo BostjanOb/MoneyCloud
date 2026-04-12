@@ -4,6 +4,11 @@ use App\Models\PaycheckYear;
 use App\Models\Person;
 use App\Models\SavingsAccount;
 use App\Models\User;
+use Database\Seeders\PersonSeeder;
+
+beforeEach(function () {
+    $this->seed(PersonSeeder::class);
+});
 
 test('people index requires authentication', function () {
     $this->get(route('people.index'))

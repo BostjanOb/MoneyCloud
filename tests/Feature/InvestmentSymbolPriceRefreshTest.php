@@ -1,9 +1,11 @@
 <?php
 
+use App\Enums\InvestmentPriceSource;
 use App\Enums\InvestmentSymbolType;
 use App\Models\InvestmentSymbol;
 use App\Models\User;
 use App\Services\CoinMarketCapInvestmentPriceRefreshService;
+use App\Services\LjseInvestmentPriceRefreshService;
 use App\Services\YfApiInvestmentPriceRefreshService;
 
 test('manual coinmarketcap refresh route triggers crypto price refresh and flashes the result', function () {
@@ -40,11 +42,29 @@ test('manual yfapi refresh route triggers stock price refresh and flashes the re
         ->assertSessionHas('status', 'Osveženih 3 simbolov, preskočenih 0.');
 });
 
+test('manual ljse refresh route triggers ljse price refresh and flashes the result', function () {
+    $user = User::factory()->create();
+
+    $mock = Mockery::mock(LjseInvestmentPriceRefreshService::class);
+    $mock->shouldReceive('refresh')->once()->andReturn([
+        'updated_count' => 2,
+        'skipped_count' => 1,
+        'failed_symbols' => ['RS96'],
+    ]);
+    app()->instance(LjseInvestmentPriceRefreshService::class, $mock);
+
+    $this->actingAs($user)
+        ->post(route('investments.symbols.refresh-prices', 'ljse'))
+        ->assertRedirect(route('investments.symbols.index'))
+        ->assertSessionHas('status', 'Osveženih 2 simbolov, preskočenih 1. Neuspešni simboli: RS96.');
+});
+
 test('manual refresh route flashes an error when refresh fails', function () {
     $user = User::factory()->create();
     $symbol = InvestmentSymbol::factory()->crypto('ETH')->create([
         'current_price' => '1900.00',
-        'coinmarketcap_id' => 1027,
+        'price_source' => InvestmentPriceSource::COINMARKETCAP->value,
+        'external_source_id' => '1027',
     ]);
 
     $mock = Mockery::mock(CoinMarketCapInvestmentPriceRefreshService::class);
@@ -69,43 +89,7 @@ test('refresh prices route rejects invalid source', function () {
         ->assertNotFound();
 });
 
-test('non crypto symbols ignore coinmarketcap id on store and update', function () {
-    $user = User::factory()->create();
-
-    $this->actingAs($user)
-        ->post(route('investments.symbols.store'), [
-            'type' => InvestmentSymbolType::STOCK->value,
-            'symbol' => 'AAPL',
-            'isin' => null,
-            'taxable' => true,
-            'price_source' => 'manual',
-            'coinmarketcap_id' => 1027,
-            'current_price' => '200.00',
-        ])
-        ->assertRedirect(route('investments.symbols.index'));
-
-    $symbol = InvestmentSymbol::query()->firstOrFail();
-
-    expect($symbol->coinmarketcap_id)->toBeNull()
-        ->and($symbol->price_source)->toBe('manual');
-
-    $this->actingAs($user)
-        ->put(route('investments.symbols.update', $symbol), [
-            'type' => InvestmentSymbolType::ETF->value,
-            'symbol' => 'AAPL',
-            'isin' => null,
-            'taxable' => false,
-            'price_source' => 'manual-refresh',
-            'coinmarketcap_id' => 9999,
-            'current_price' => '210.00',
-        ])
-        ->assertRedirect(route('investments.symbols.index'));
-
-    expect($symbol->fresh()->coinmarketcap_id)->toBeNull()
-        ->and($symbol->fresh()->price_source)->toBe('manual-refresh');
-});
-
-test('yfapi_symbol auto-sets price source to yfapi for non-crypto symbols', function () {
+test('external source id is required for non manual sources', function () {
     $user = User::factory()->create();
 
     $this->actingAs($user)
@@ -114,20 +98,27 @@ test('yfapi_symbol auto-sets price source to yfapi for non-crypto symbols', func
             'symbol' => 'VWCE',
             'isin' => null,
             'taxable' => true,
-            'price_source' => 'manual',
-            'yfapi_symbol' => 'vwce.de',
+            'price_source' => InvestmentPriceSource::YFAPI->value,
+            'external_source_id' => null,
             'current_price' => '148.00',
         ])
-        ->assertRedirect(route('investments.symbols.index'));
-
-    $symbol = InvestmentSymbol::query()->firstOrFail();
-
-    expect($symbol->yfapi_symbol)->toBe('VWCE.DE')
-        ->and($symbol->price_source)->toBe('yfapi');
+        ->assertSessionHasErrors('external_source_id');
 });
 
-test('crypto symbols ignore yfapi_symbol on store', function () {
+test('symbols reject incompatible price sources', function () {
     $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('investments.symbols.store'), [
+            'type' => InvestmentSymbolType::STOCK->value,
+            'symbol' => 'AAPL',
+            'isin' => null,
+            'taxable' => true,
+            'price_source' => InvestmentPriceSource::COINMARKETCAP->value,
+            'external_source_id' => '1027',
+            'current_price' => '200.00',
+        ])
+        ->assertSessionHasErrors('price_source');
 
     $this->actingAs($user)
         ->post(route('investments.symbols.store'), [
@@ -135,16 +126,60 @@ test('crypto symbols ignore yfapi_symbol on store', function () {
             'symbol' => 'ETH',
             'isin' => null,
             'taxable' => false,
-            'price_source' => 'manual',
-            'coinmarketcap_id' => 1027,
-            'yfapi_symbol' => 'ETH-USD',
+            'price_source' => InvestmentPriceSource::YFAPI->value,
+            'external_source_id' => 'ETH-USD',
             'current_price' => '3000.00',
+        ])
+        ->assertSessionHasErrors('price_source');
+});
+
+test('yfapi and ljse sources uppercase external source ids on store', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('investments.symbols.store'), [
+            'type' => InvestmentSymbolType::ETF->value,
+            'symbol' => 'VWCE',
+            'isin' => null,
+            'taxable' => true,
+            'price_source' => InvestmentPriceSource::YFAPI->value,
+            'external_source_id' => 'vwce.de',
+            'current_price' => '148.00',
         ])
         ->assertRedirect(route('investments.symbols.index'));
 
-    $symbol = InvestmentSymbol::query()->firstOrFail();
+    $this->actingAs($user)
+        ->post(route('investments.symbols.store'), [
+            'type' => InvestmentSymbolType::BOND->value,
+            'symbol' => 'RS94',
+            'isin' => null,
+            'taxable' => true,
+            'price_source' => InvestmentPriceSource::LJSE->value,
+            'external_source_id' => 'rs94',
+            'current_price' => '1005.00',
+        ])
+        ->assertRedirect(route('investments.symbols.index'));
 
-    expect($symbol->yfapi_symbol)->toBeNull()
-        ->and($symbol->coinmarketcap_id)->toBe(1027)
-        ->and($symbol->price_source)->toBe('coinmarketcap');
+    $symbols = InvestmentSymbol::query()->orderBy('symbol')->get();
+
+    expect($symbols[0]->external_source_id)->toBe('RS94')
+        ->and($symbols[1]->external_source_id)->toBe('VWCE.DE');
+});
+
+test('manual source clears external source id on store', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('investments.symbols.store'), [
+            'type' => InvestmentSymbolType::STOCK->value,
+            'symbol' => 'KRKG',
+            'isin' => null,
+            'taxable' => true,
+            'price_source' => InvestmentPriceSource::MANUAL->value,
+            'external_source_id' => 'KRKG',
+            'current_price' => '239.50',
+        ])
+        ->assertRedirect(route('investments.symbols.index'));
+
+    expect(InvestmentSymbol::query()->firstOrFail()->external_source_id)->toBeNull();
 });

@@ -200,7 +200,11 @@ function submitBalance(): void {
 }
 
 function deleteBalance(row: BalanceRow): void {
-    if (!confirm(`Ste prepričani, da želite izbrisati ročno stanje ${row.symbol}?`)) {
+    if (
+        !confirm(
+            `Ste prepričani, da želite izbrisati ročno stanje ${row.symbol}?`,
+        )
+    ) {
         return;
     }
 
@@ -212,7 +216,9 @@ function deleteBalance(row: BalanceRow): void {
     <Head title="Kripto - Stanja" />
 
     <div class="flex flex-col gap-6 p-4">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div
+            class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
+        >
             <Heading
                 title="Kripto stanja"
                 description="Trenutne količine kripta po platformah."
@@ -224,7 +230,8 @@ function deleteBalance(row: BalanceRow): void {
                 <Button
                     size="sm"
                     :disabled="
-                        providerOptions.length === 0 || symbolOptions.length === 0
+                        providerOptions.length === 0 ||
+                        symbolOptions.length === 0
                     "
                     @click="openCreateBalance()"
                 >
@@ -257,14 +264,25 @@ function deleteBalance(row: BalanceRow): void {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Simbol</TableHead>
-                            <TableHead numeric class="text-right">Količina</TableHead>
-                            <TableHead numeric class="text-right">Cena</TableHead>
-                            <TableHead numeric class="text-right">Vrednost</TableHead>
-                            <TableHead numeric class="text-right">Platforme</TableHead>
+                            <TableHead numeric class="text-right"
+                                >Količina</TableHead
+                            >
+                            <TableHead numeric class="text-right"
+                                >Cena</TableHead
+                            >
+                            <TableHead numeric class="text-right"
+                                >Vrednost</TableHead
+                            >
+                            <TableHead numeric class="text-right"
+                                >Platforme</TableHead
+                            >
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        <TableRow v-for="row in symbolSummary" :key="row.symbol">
+                        <TableRow
+                            v-for="row in symbolSummary"
+                            :key="row.symbol"
+                        >
                             <TableCell class="font-medium">
                                 {{ row.symbol }}
                             </TableCell>
@@ -299,14 +317,23 @@ function deleteBalance(row: BalanceRow): void {
                         <TableRow>
                             <TableHead>Platforma</TableHead>
                             <TableHead>Simbol</TableHead>
-                            <TableHead numeric class="text-right">Količina</TableHead>
-                            <TableHead numeric class="text-right">Cena</TableHead>
-                            <TableHead numeric class="text-right">Vrednost</TableHead>
+                            <TableHead numeric class="text-right"
+                                >Količina</TableHead
+                            >
+                            <TableHead numeric class="text-right"
+                                >Cena</TableHead
+                            >
+                            <TableHead numeric class="text-right"
+                                >Vrednost</TableHead
+                            >
                             <TableHead class="text-right">Akcije</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        <TableRow v-for="row in balanceRows" :key="`${row.provider_id}:${row.symbol_id}`">
+                        <TableRow
+                            v-for="row in balanceRows"
+                            :key="`${row.provider_id}:${row.symbol_id}`"
+                        >
                             <TableCell class="font-medium">
                                 {{ row.provider_name }}
                             </TableCell>
@@ -387,7 +414,9 @@ function deleteBalance(row: BalanceRow): void {
                             </SelectItem>
                         </SelectContent>
                     </Select>
-                    <InputError :message="balanceForm.errors.investment_provider_id" />
+                    <InputError
+                        :message="balanceForm.errors.investment_provider_id"
+                    />
                 </div>
 
                 <div class="space-y-1.5">
@@ -409,7 +438,9 @@ function deleteBalance(row: BalanceRow): void {
                             </SelectItem>
                         </SelectContent>
                     </Select>
-                    <InputError :message="balanceForm.errors.investment_symbol_id" />
+                    <InputError
+                        :message="balanceForm.errors.investment_symbol_id"
+                    />
                 </div>
 
                 <div class="space-y-1.5">

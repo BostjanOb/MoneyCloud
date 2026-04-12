@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['type', 'symbol', 'isin', 'taxable', 'price_source', 'coinmarketcap_id', 'yfapi_symbol', 'current_price', 'price_synced_at'])]
+#[Fillable(['type', 'symbol', 'isin', 'taxable', 'price_source', 'external_source_id', 'current_price', 'price_synced_at'])]
 class InvestmentSymbol extends Model
 {
     /** @use HasFactory<InvestmentSymbolFactory> */
@@ -20,7 +20,6 @@ class InvestmentSymbol extends Model
         return [
             'type' => InvestmentSymbolType::class,
             'taxable' => 'boolean',
-            'coinmarketcap_id' => 'integer',
             'current_price' => 'decimal:2',
             'price_synced_at' => 'immutable_datetime',
         ];

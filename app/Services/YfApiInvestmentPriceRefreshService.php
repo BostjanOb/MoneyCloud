@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Contracts\InvestmentPriceRefreshService;
+use App\Enums\InvestmentPriceSource;
+use App\Enums\InvestmentSymbolType;
 use App\Models\InvestmentSymbol;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\ConnectionException;
@@ -44,7 +46,7 @@ class YfApiInvestmentPriceRefreshService implements InvestmentPriceRefreshServic
             $quotesBySymbol = $this->fetchQuotes($batch);
 
             foreach ($batch as $symbol) {
-                $quote = $quotesBySymbol->get($symbol->yfapi_symbol);
+                $quote = $quotesBySymbol->get((string) $symbol->external_source_id);
 
                 if (! is_array($quote) || ! is_numeric($quote['regularMarketPrice'] ?? null)) {
                     $failedSymbols[] = $symbol->symbol;
@@ -54,7 +56,7 @@ class YfApiInvestmentPriceRefreshService implements InvestmentPriceRefreshServic
 
                 $symbol->forceFill([
                     'current_price' => round((float) $quote['regularMarketPrice'], 2),
-                    'price_source' => 'yfapi',
+                    'price_source' => InvestmentPriceSource::YFAPI->value,
                     'price_synced_at' => $this->resolveSyncedAt($quote),
                 ])->save();
 
@@ -75,7 +77,12 @@ class YfApiInvestmentPriceRefreshService implements InvestmentPriceRefreshServic
     private function symbolsToRefresh(): Collection
     {
         return InvestmentSymbol::query()
-            ->whereNotNull('yfapi_symbol')
+            ->where('price_source', InvestmentPriceSource::YFAPI->value)
+            ->whereIn('type', [
+                InvestmentSymbolType::STOCK->value,
+                InvestmentSymbolType::ETF->value,
+            ])
+            ->whereNotNull('external_source_id')
             ->orderBy('symbol')
             ->get();
     }
@@ -103,7 +110,7 @@ class YfApiInvestmentPriceRefreshService implements InvestmentPriceRefreshServic
                 ->timeout(10)
                 ->retry([200, 500, 1000], throw: false)
                 ->get($baseUrl.'/v6/finance/quote', [
-                    'symbols' => $symbols->pluck('yfapi_symbol')->implode(','),
+                    'symbols' => $symbols->pluck('external_source_id')->implode(','),
                 ]);
         } catch (ConnectionException $exception) {
             throw new RuntimeException('Povezava do YF API ni uspela.', previous: $exception);
