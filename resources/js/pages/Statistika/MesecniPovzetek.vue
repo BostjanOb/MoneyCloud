@@ -25,6 +25,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table } from '@/components/ui/table';
+import { sortMonthlyHistoryRows } from '@/lib/monthlySummary';
 import { formatSlovenianNumber } from '@/lib/utils';
 
 type MonthlyRow = {
@@ -110,6 +111,8 @@ const latestCards = computed(() => [
     { label: 'Delnice', value: latestSnapshot.value.stock_amount },
     { label: 'Skupaj', value: latestSnapshot.value.total_amount },
 ]);
+
+const historyRows = computed(() => sortMonthlyHistoryRows(props.rows));
 
 const chartDimensions = {
     width: 900,
@@ -527,7 +530,7 @@ function submitSnapshot(): void {
                     </thead>
                     <tbody>
                         <tr
-                            v-for="row in props.rows"
+                            v-for="row in historyRows"
                             :key="row.id"
                             class="border-b transition-colors hover:bg-muted/50"
                         >

@@ -1,16 +1,24 @@
 <?php
 
 use App\Enums\InvestmentSymbolType;
+use App\Models\Bonus;
 use App\Models\InvestmentPurchase;
 use App\Models\InvestmentSymbol;
 use App\Models\MonthlyPortfolioSnapshot;
+use App\Models\Paycheck;
+use App\Models\PaycheckYear;
+use App\Models\Person;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 
 test('statistics page requires authentication', function () {
     $this->get(route('statistics.monthly-summary'))
         ->assertRedirect(route('login'));
 
     $this->get(route('statistics.yearly-invested'))
+        ->assertRedirect(route('login'));
+
+    $this->get(route('statistics.paycheck-growth'))
         ->assertRedirect(route('login'));
 });
 
@@ -115,4 +123,212 @@ test('authenticated user can view yearly invested page', function () {
             ->where("rows.1.symbols.{$vwce->id}.amount", '5000.00')
             ->where('totals.grand_total_amount', '5500.00')
         );
+});
+
+test('authenticated user can view paycheck growth page', function () {
+    CarbonImmutable::setTestNow(CarbonImmutable::create(2026, 4, 13, 12, 0, 0, 'Europe/Ljubljana'));
+
+    $user = User::factory()->create();
+    $ana = Person::factory()->create([
+        'slug' => 'ana',
+        'name' => 'Ana',
+        'sort_order' => 1,
+        'is_active' => true,
+    ]);
+    $bor = Person::factory()->create([
+        'slug' => 'bor',
+        'name' => 'Bor',
+        'sort_order' => 2,
+        'is_active' => true,
+    ]);
+    Person::factory()->create([
+        'slug' => 'neaktivna',
+        'name' => 'Neaktivna',
+        'sort_order' => 3,
+        'is_active' => false,
+    ]);
+
+    $ana2024 = PaycheckYear::factory()->create(['person_id' => $ana->id, 'year' => 2024]);
+    $bor2024 = PaycheckYear::factory()->create(['person_id' => $bor->id, 'year' => 2024]);
+    $ana2025 = PaycheckYear::factory()->create(['person_id' => $ana->id, 'year' => 2025]);
+    $bor2025 = PaycheckYear::factory()->create(['person_id' => $bor->id, 'year' => 2025]);
+    $ana2026 = PaycheckYear::factory()->create(['person_id' => $ana->id, 'year' => 2026]);
+
+    foreach (range(1, 12) as $month) {
+        Paycheck::factory()->create([
+            'paycheck_year_id' => $ana2024->id,
+            'month' => $month,
+            'net' => '2000.00',
+            'gross' => '3000.00',
+        ]);
+        Paycheck::factory()->create([
+            'paycheck_year_id' => $bor2024->id,
+            'month' => $month,
+            'net' => '1500.00',
+            'gross' => '2000.00',
+        ]);
+        Paycheck::factory()->create([
+            'paycheck_year_id' => $ana2025->id,
+            'month' => $month,
+            'net' => '2100.00',
+            'gross' => '3200.00',
+        ]);
+        Paycheck::factory()->create([
+            'paycheck_year_id' => $bor2025->id,
+            'month' => $month,
+            'net' => '1600.00',
+            'gross' => '2100.00',
+        ]);
+    }
+
+    foreach (range(1, 3) as $month) {
+        Paycheck::factory()->create([
+            'paycheck_year_id' => $ana2026->id,
+            'month' => $month,
+            'net' => '2200.00',
+            'gross' => '3300.00',
+        ]);
+    }
+
+    Bonus::factory()->create([
+        'paycheck_year_id' => $ana2024->id,
+        'amount' => '1000.00',
+        'taxable' => true,
+        'paid_tax' => '250.00',
+    ]);
+    Bonus::factory()->create([
+        'paycheck_year_id' => $ana2024->id,
+        'amount' => '500.00',
+        'taxable' => false,
+        'paid_tax' => '0.00',
+    ]);
+    Bonus::factory()->create([
+        'paycheck_year_id' => $ana2025->id,
+        'amount' => '1200.00',
+        'taxable' => true,
+        'paid_tax' => '300.00',
+    ]);
+    Bonus::factory()->create([
+        'paycheck_year_id' => $bor2025->id,
+        'amount' => '400.00',
+        'taxable' => false,
+        'paid_tax' => '0.00',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('statistics.paycheck-growth'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Statistika/RastPlac')
+            ->has('filters', 3)
+            ->where('filters.0.value', 'all')
+            ->where('selectedPerson', 'all')
+            ->where('includeBonusesDefault', false)
+            ->has('rows', 3)
+            ->where('rows.0.year', 2024)
+            ->where('rows.0.net', '42000.00')
+            ->where('rows.0.gross', '60000.00')
+            ->where('rows.0.bonuses_gross', '1500.00')
+            ->where('rows.0.bonuses_net', '1250.00')
+            ->where('rows.0.recorded_through_month', 12)
+            ->where('rows.1.gross_with_bonuses', '65200.00')
+            ->where('rows.1.net_with_bonuses', '45700.00')
+            ->where('rows.2.is_partial', true)
+            ->where('rows.2.recorded_through_month', 3)
+            ->has('chartSeries', 4)
+            ->where('summary.latest_year', 2026)
+            ->where('summary.previous_year', 2025)
+            ->where('summary.net_change_amount', '-4500.00')
+            ->where('summary.gross_change_amount', '-6000.00')
+        );
+
+    CarbonImmutable::setTestNow();
+});
+
+test('paycheck growth page can be filtered by person and invalid person falls back to all', function () {
+    CarbonImmutable::setTestNow(CarbonImmutable::create(2026, 4, 13, 12, 0, 0, 'Europe/Ljubljana'));
+
+    $user = User::factory()->create();
+    $ana = Person::factory()->create([
+        'slug' => 'ana',
+        'name' => 'Ana',
+        'sort_order' => 1,
+        'is_active' => true,
+    ]);
+    $bor = Person::factory()->create([
+        'slug' => 'bor',
+        'name' => 'Bor',
+        'sort_order' => 2,
+        'is_active' => true,
+    ]);
+
+    $ana2025 = PaycheckYear::factory()->create(['person_id' => $ana->id, 'year' => 2025]);
+    $bor2025 = PaycheckYear::factory()->create(['person_id' => $bor->id, 'year' => 2025]);
+    $ana2026 = PaycheckYear::factory()->create(['person_id' => $ana->id, 'year' => 2026]);
+
+    foreach (range(1, 12) as $month) {
+        Paycheck::factory()->create([
+            'paycheck_year_id' => $ana2025->id,
+            'month' => $month,
+            'net' => '1000.00',
+            'gross' => '1500.00',
+        ]);
+        Paycheck::factory()->create([
+            'paycheck_year_id' => $bor2025->id,
+            'month' => $month,
+            'net' => '500.00',
+            'gross' => '700.00',
+        ]);
+    }
+
+    foreach (range(1, 2) as $month) {
+        Paycheck::factory()->create([
+            'paycheck_year_id' => $ana2026->id,
+            'month' => $month,
+            'net' => '1100.00',
+            'gross' => '1600.00',
+        ]);
+    }
+
+    Bonus::factory()->create([
+        'paycheck_year_id' => $ana2025->id,
+        'amount' => '600.00',
+        'taxable' => true,
+        'paid_tax' => '100.00',
+    ]);
+    Bonus::factory()->create([
+        'paycheck_year_id' => $bor2025->id,
+        'amount' => '200.00',
+        'taxable' => false,
+        'paid_tax' => '0.00',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('statistics.paycheck-growth', ['person' => $ana->slug]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Statistika/RastPlac')
+            ->where('selectedPerson', 'ana')
+            ->has('rows', 2)
+            ->where('rows.0.gross', '18000.00')
+            ->where('rows.0.net', '12000.00')
+            ->where('rows.0.bonuses_gross', '600.00')
+            ->where('rows.0.bonuses_net', '500.00')
+            ->where('rows.1.is_partial', true)
+            ->where('summary.net_change_amount', '200.00')
+            ->where('summary.gross_change_amount', '200.00')
+        );
+
+    $this->actingAs($user)
+        ->get(route('statistics.paycheck-growth', ['person' => 'neobstojec']))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Statistika/RastPlac')
+            ->where('selectedPerson', 'all')
+            ->where('rows.0.gross', '26400.00')
+            ->where('rows.0.bonuses_gross', '800.00')
+            ->where('rows.0.bonuses_net', '700.00')
+        );
+
+    CarbonImmutable::setTestNow();
 });

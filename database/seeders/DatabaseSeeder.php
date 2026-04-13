@@ -15,9 +15,6 @@ class DatabaseSeeder extends Seeder
             'email' => 'bostjan@muha.cc',
         ]);
 
-        $this->call(PersonSeeder::class);
         $this->call(TaxSettingSeeder::class);
-        $this->call(InvestmentProviderSeeder::class);
-        $this->call(CryptoSymbolSeeder::class);
     }
 }

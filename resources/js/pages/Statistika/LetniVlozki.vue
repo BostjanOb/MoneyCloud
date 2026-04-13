@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, setLayoutProps } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import {
     index as statisticsIndex,
     yearlyInvested as statisticsYearlyInvested,
@@ -7,6 +8,7 @@ import {
 import Heading from '@/components/Heading.vue';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table } from '@/components/ui/table';
+import { sortYearlyInvestmentRows } from '@/lib/yearlyInvested';
 import { formatSlovenianNumber } from '@/lib/utils';
 
 type YearlySymbol = {
@@ -38,6 +40,8 @@ type Props = {
 };
 
 const props = defineProps<Props>();
+
+const yearlyRows = computed(() => sortYearlyInvestmentRows(props.rows));
 
 setLayoutProps({
     breadcrumbs: [
@@ -157,7 +161,7 @@ function formatQuantity(value: string | number): string {
                         </thead>
                         <tbody>
                             <tr
-                                v-for="row in props.rows"
+                                v-for="row in yearlyRows"
                                 :key="row.year"
                                 class="border-b transition-colors hover:bg-muted/50"
                             >

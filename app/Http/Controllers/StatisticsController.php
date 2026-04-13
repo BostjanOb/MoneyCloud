@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\MonthlyPortfolioSnapshotService;
+use App\Services\PaycheckGrowthStatisticsService;
 use App\Services\YearlyInvestmentStatisticsService;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -28,6 +29,14 @@ class StatisticsController extends Controller
     ): Response {
         return Inertia::render('Statistika/LetniVlozki', [
             ...$yearlyInvestmentStatisticsService->pageData(),
+        ]);
+    }
+
+    public function paycheckGrowth(
+        PaycheckGrowthStatisticsService $paycheckGrowthStatisticsService,
+    ): Response {
+        return Inertia::render('Statistika/RastPlac', [
+            ...$paycheckGrowthStatisticsService->pageData(),
         ]);
     }
 }

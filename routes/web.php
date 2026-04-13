@@ -57,6 +57,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         'statistika/letni-vlozki',
         [StatisticsController::class, 'yearlyInvested'],
     )->name('statistics.yearly-invested');
+    Route::get(
+        'statistika/rast-plac',
+        [StatisticsController::class, 'paycheckGrowth'],
+    )->name('statistics.paycheck-growth');
     Route::post(
         'statistika/mesecni-povzetek',
         [MonthlyPortfolioSnapshotController::class, 'store'],

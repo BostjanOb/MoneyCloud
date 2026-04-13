@@ -21,6 +21,7 @@ import { index as savingsIndex } from '@/actions/App/Http/Controllers/SavingsAcc
 import {
     index as statisticsIndex,
     monthlySummary as statisticsMonthlySummary,
+    paycheckGrowth as statisticsPaycheckGrowth,
     yearlyInvested as statisticsYearlyInvested,
 } from '@/actions/App/Http/Controllers/StatisticsController';
 import { index as nastavitveIndex } from '@/actions/App/Http/Controllers/TaxSettingController';
@@ -108,6 +109,10 @@ const mainNavItems = computed<NavItem[]>(() => {
                 {
                     title: 'Letni vložki',
                     href: statisticsYearlyInvested.url(),
+                },
+                {
+                    title: 'Rast plač',
+                    href: statisticsPaycheckGrowth.url(),
                 },
             ],
         },
