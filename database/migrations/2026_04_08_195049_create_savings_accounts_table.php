@@ -13,7 +13,6 @@ return new class extends Migration
             $table->foreignId('parent_id')->nullable()->constrained('savings_accounts')->cascadeOnDelete();
             $table->foreignId('person_id')->constrained();
             $table->string('name');
-            $table->string('owner');
             $table->decimal('amount', 12, 2)->default(0);
             $table->decimal('apy', 5, 2)->default(0);
             $table->integer('sort_order')->default(0);
