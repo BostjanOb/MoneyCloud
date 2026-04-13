@@ -8,8 +8,8 @@ import {
 import Heading from '@/components/Heading.vue';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table } from '@/components/ui/table';
-import { sortYearlyInvestmentRows } from '@/lib/yearlyInvested';
 import { formatSlovenianNumber } from '@/lib/utils';
+import { sortYearlyInvestmentRows } from '@/lib/yearlyInvested';
 
 type YearlySymbol = {
     id: number;

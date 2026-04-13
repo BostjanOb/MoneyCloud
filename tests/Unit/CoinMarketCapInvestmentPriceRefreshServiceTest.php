@@ -73,7 +73,7 @@ test('it refreshes all crypto symbols with a configured external source id', fun
 
     expect($cro->fresh()->current_price)->toBe('0.06')
         ->and($cro->fresh()->price_source)->toBe(InvestmentPriceSource::COINMARKETCAP->value)
-        ->and($cro->fresh()->price_synced_at?->toIso8601String())->toBe('2026-04-11T20:01:04+00:00')
+        ->and($cro->fresh()->price_synced_at?->toIso8601String())->toBe('2026-04-11T20:01:04+02:00')
         ->and($eth->fresh()->current_price)->toBe('1974.24')
         ->and($btc->fresh()->current_price)->toBe('50000.00');
 

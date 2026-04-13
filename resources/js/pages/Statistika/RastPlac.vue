@@ -19,14 +19,15 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Table } from '@/components/ui/table';
-import { formatSlovenianNumber } from '@/lib/utils';
 import {
     buildPaycheckGrowthSummary,
-    displayedPaycheckGrowthSeries,
-    type PaycheckGrowthRow,
-    type PaycheckGrowthSeries,
-    type PaycheckGrowthSummary,
+    displayedPaycheckGrowthSeries
+    
+    
+    
 } from '@/lib/paycheckGrowth';
+import type {PaycheckGrowthRow, PaycheckGrowthSeries, PaycheckGrowthSummary} from '@/lib/paycheckGrowth';
+import { formatSlovenianNumber } from '@/lib/utils';
 
 type PersonFilter = {
     label: string;

@@ -65,7 +65,7 @@ test('it updates stock and bond prices from ljse', function () {
     ]);
 
     expect($stock->fresh()->current_price)->toBe('239.50')
-        ->and($stock->fresh()->price_synced_at?->toIso8601String())->toBe('2026-04-10T00:00:00+00:00')
+        ->and($stock->fresh()->price_synced_at?->toIso8601String())->toBe('2026-04-10T00:00:00+02:00')
         ->and($bond->fresh()->current_price)->toBe('1005.00')
         ->and($bond->fresh()->price_source)->toBe(InvestmentPriceSource::LJSE->value);
 });
