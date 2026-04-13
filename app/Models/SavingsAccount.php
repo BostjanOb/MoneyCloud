@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['parent_id', 'person_id', 'name', 'owner', 'amount', 'apy', 'sort_order'])]
+#[Fillable(['parent_id', 'person_id', 'name', 'amount', 'apy', 'sort_order'])]
 class SavingsAccount extends Model
 {
     /** @use HasFactory<SavingsAccountFactory> */

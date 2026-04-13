@@ -93,7 +93,6 @@ test('root savings accounts can be persisted', function () {
     $account = SavingsAccount::factory()->create([
         'name' => 'GBKR',
         'person_id' => $person->id,
-        'owner' => 'Boštjan',
         'amount' => 1200,
         'apy' => 2.5,
         'sort_order' => 7,
@@ -104,7 +103,6 @@ test('root savings accounts can be persisted', function () {
         'id' => $account->id,
         'name' => 'GBKR',
         'person_id' => $person->id,
-        'owner' => 'Boštjan',
         'amount' => 1200,
         'apy' => 2.5,
         'sort_order' => 7,
@@ -116,14 +114,12 @@ test('syncing a parent after adding the first subaccount uses the children total
     $person = Person::factory()->create();
     $parent = SavingsAccount::factory()->create([
         'person_id' => $person->id,
-        'owner' => 'Boštjan',
         'amount' => 999.99,
     ]);
 
     SavingsAccount::factory()->create([
         'name' => 'Podračun',
         'person_id' => $person->id,
-        'owner' => 'Boštjan',
         'amount' => 250,
         'apy' => 1.2,
         'sort_order' => 3,

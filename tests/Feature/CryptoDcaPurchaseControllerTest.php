@@ -78,7 +78,6 @@ test('crypto dca page returns empty groups before first purchase', function () {
 test('can store update and delete a crypto dca purchase without debiting savings or touching balances', function () {
     $user = User::factory()->create();
     $linkedAccount = SavingsAccount::factory()->create([
-        'owner' => 'bostjan',
         'amount' => '1000.00',
     ]);
     $provider = InvestmentProvider::factory()->crypto()->create([

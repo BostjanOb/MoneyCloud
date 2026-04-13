@@ -103,7 +103,6 @@ class DemoSeeder extends Seeder
                 'name' => 'N26 Savings',
             ],
             [
-                'owner' => 'Maja Kranjc',
                 'amount' => '7420.00',
                 'apy' => '2.10',
                 'sort_order' => 1,
@@ -117,7 +116,6 @@ class DemoSeeder extends Seeder
                 'name' => 'Revolut Instant savings',
             ],
             [
-                'owner' => 'Maja Kranjc',
                 'amount' => '0.00',
                 'apy' => '2.55',
                 'sort_order' => 2,
@@ -129,19 +127,16 @@ class DemoSeeder extends Seeder
         foreach ([
             [
                 'name' => 'Otrok 1 - Eva',
-                'owner' => 'Eva Kranjc',
                 'amount' => '1280.00',
                 'sort_order' => 1,
             ],
             [
                 'name' => 'Otrok 2 - Miha',
-                'owner' => 'Miha Kranjc',
                 'amount' => '940.00',
                 'sort_order' => 2,
             ],
             [
                 'name' => 'Otrok 3 - Neža',
-                'owner' => 'Neža Kranjc',
                 'amount' => '1435.00',
                 'sort_order' => 3,
             ],
@@ -153,7 +148,6 @@ class DemoSeeder extends Seeder
                     'name' => $attributes['name'],
                 ],
                 [
-                    'owner' => $attributes['owner'],
                     'amount' => $attributes['amount'],
                     'apy' => '2.55',
                     'sort_order' => $attributes['sort_order'],
@@ -171,7 +165,6 @@ class DemoSeeder extends Seeder
                 'name' => 'TradeRepublic',
             ],
             [
-                'owner' => 'Luka Zupan',
                 'amount' => '3180.00',
                 'apy' => '2.75',
                 'sort_order' => 1,

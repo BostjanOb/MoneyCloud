@@ -157,7 +157,6 @@ test('provider linked savings account requirement is database driven', function 
         'supported_symbol_types' => [InvestmentSymbolType::ETF->value],
     ]);
     $linkedAccount = SavingsAccount::factory()->create([
-        'owner' => 'bostjan',
         'amount' => '1000.00',
     ]);
     $symbol = InvestmentSymbol::factory()->create([
@@ -190,7 +189,6 @@ test('provider linked savings account requirement is database driven', function 
 test('creating an ibkr purchase decreases the linked savings balance', function () {
     $user = User::factory()->create();
     $linkedAccount = SavingsAccount::factory()->create([
-        'owner' => 'bostjan',
         'amount' => '1000.00',
     ]);
     $provider = InvestmentProvider::query()->firstWhere('slug', 'ibkr');
@@ -222,7 +220,6 @@ test('creating an ibkr purchase decreases the linked savings balance', function 
 test('updating an ibkr purchase adjusts the linked savings balance by the delta', function () {
     $user = User::factory()->create();
     $linkedAccount = SavingsAccount::factory()->create([
-        'owner' => 'bostjan',
         'amount' => '1000.00',
     ]);
     $provider = InvestmentProvider::query()->firstWhere('slug', 'ibkr');
@@ -262,7 +259,6 @@ test('updating an ibkr purchase adjusts the linked savings balance by the delta'
 test('deleting an ibkr purchase refunds the linked savings balance', function () {
     $user = User::factory()->create();
     $linkedAccount = SavingsAccount::factory()->create([
-        'owner' => 'bostjan',
         'amount' => '1000.00',
     ]);
     $provider = InvestmentProvider::query()->firstWhere('slug', 'ibkr');
@@ -297,7 +293,6 @@ test('deleting an ibkr purchase refunds the linked savings balance', function ()
 test('ibkr purchase cannot exceed linked savings balance', function () {
     $user = User::factory()->create();
     $linkedAccount = SavingsAccount::factory()->create([
-        'owner' => 'bostjan',
         'amount' => '100.00',
     ]);
     $provider = InvestmentProvider::query()->firstWhere('slug', 'ibkr');

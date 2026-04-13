@@ -17,7 +17,6 @@ class SavingsAccountFactory extends Factory
             'parent_id' => null,
             'person_id' => Person::factory(),
             'name' => fake()->words(2, true),
-            'owner' => fake()->name(),
             'amount' => fake()->randomFloat(2, 0, 50000),
             'apy' => fake()->randomFloat(2, 0, 8),
             'sort_order' => 0,

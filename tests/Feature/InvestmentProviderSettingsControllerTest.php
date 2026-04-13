@@ -40,12 +40,10 @@ test('authenticated user can view the investment provider settings pages', funct
     $provider = InvestmentProvider::query()->firstWhere('slug', 'ibkr');
     $parentAccount = SavingsAccount::factory()->create([
         'name' => 'Banka',
-        'owner' => 'bostjan',
     ]);
     $leafAccount = SavingsAccount::factory()->create([
         'parent_id' => $parentAccount->id,
         'name' => 'Rezerva',
-        'owner' => 'bostjan',
     ]);
 
     $this->actingAs($user)
@@ -83,9 +81,7 @@ test('authenticated user can view the investment provider settings pages', funct
 
 test('can store an investment provider from settings', function () {
     $user = User::factory()->create();
-    $linkedAccount = SavingsAccount::factory()->create([
-        'owner' => 'bostjan',
-    ]);
+    $linkedAccount = SavingsAccount::factory()->create();
 
     $this->actingAs($user)
         ->post(route('investments.providers.store'), investmentProviderPayload([
@@ -112,9 +108,7 @@ test('can store an investment provider from settings', function () {
 
 test('can update an investment provider from settings', function () {
     $user = User::factory()->create();
-    $linkedAccount = SavingsAccount::factory()->create([
-        'owner' => 'bostjan',
-    ]);
+    $linkedAccount = SavingsAccount::factory()->create();
     $provider = InvestmentProvider::query()->firstWhere('slug', 'ilirika');
 
     $provider->update([
@@ -147,12 +141,9 @@ test('can update an investment provider from settings', function () {
 
 test('investment provider settings reject non leaf linked savings accounts', function () {
     $user = User::factory()->create();
-    $parentAccount = SavingsAccount::factory()->create([
-        'owner' => 'bostjan',
-    ]);
+    $parentAccount = SavingsAccount::factory()->create();
     SavingsAccount::factory()->create([
         'parent_id' => $parentAccount->id,
-        'owner' => 'bostjan',
     ]);
 
     $this->actingAs($user)
