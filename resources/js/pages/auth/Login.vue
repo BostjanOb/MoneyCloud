@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Form, Head } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import InputError from '@/components/InputError.vue';
 import PasswordInput from '@/components/PasswordInput.vue';
 import TextLink from '@/components/TextLink.vue';
@@ -13,25 +14,39 @@ import { request } from '@/routes/password';
 
 defineOptions({
     layout: {
-        title: 'Log in to your account',
-        description: 'Enter your email and password below to log in',
+        title: 'Prijava v račun',
+        description: 'Za prijavo vnesite e-poštni naslov in geslo',
     },
 });
 
-defineProps<{
+const props = defineProps<{
     status?: string;
     canResetPassword: boolean;
+    csrfToken: string;
 }>();
+
+const localizedStatus = computed(() => {
+    if (!props.status) {
+        return undefined;
+    }
+
+    return (
+        {
+            'Your password has been reset.':
+                'Vaše geslo je bilo uspešno ponastavljeno.',
+        }[props.status] ?? props.status
+    );
+});
 </script>
 
 <template>
-    <Head title="Log in" />
+    <Head title="Prijava" />
 
     <div
-        v-if="status"
+        v-if="localizedStatus"
         class="mb-4 text-center text-sm font-medium text-green-600"
     >
-        {{ status }}
+        {{ localizedStatus }}
     </div>
 
     <Form
@@ -40,9 +55,11 @@ defineProps<{
         v-slot="{ errors, processing }"
         class="flex flex-col gap-6"
     >
+        <input type="hidden" name="_token" :value="csrfToken" />
+
         <div class="grid gap-6">
             <div class="grid gap-2">
-                <Label for="email">Email address</Label>
+                <Label for="email">E-poštni naslov</Label>
                 <Input
                     id="email"
                     type="email"
@@ -58,14 +75,14 @@ defineProps<{
 
             <div class="grid gap-2">
                 <div class="flex items-center justify-between">
-                    <Label for="password">Password</Label>
+                    <Label for="password">Geslo</Label>
                     <TextLink
                         v-if="canResetPassword"
                         :href="request()"
                         class="text-sm"
                         :tabindex="5"
                     >
-                        Forgot password?
+                        Ste pozabili geslo?
                     </TextLink>
                 </div>
                 <PasswordInput
@@ -74,7 +91,7 @@ defineProps<{
                     required
                     :tabindex="2"
                     autocomplete="current-password"
-                    placeholder="Password"
+                    placeholder="Geslo"
                 />
                 <InputError :message="errors.password" />
             </div>
@@ -82,7 +99,7 @@ defineProps<{
             <div class="flex items-center justify-between">
                 <Label for="remember" class="flex items-center space-x-3">
                     <Checkbox id="remember" name="remember" :tabindex="3" />
-                    <span>Remember me</span>
+                    <span>Zapomni si me</span>
                 </Label>
             </div>
 
@@ -94,7 +111,7 @@ defineProps<{
                 data-test="login-button"
             >
                 <Spinner v-if="processing" />
-                Log in
+                Prijava
             </Button>
         </div>
     </Form>

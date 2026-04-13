@@ -11,8 +11,8 @@ import { update } from '@/routes/password';
 
 defineOptions({
     layout: {
-        title: 'Reset password',
-        description: 'Please enter your new password below',
+        title: 'Ponastavitev gesla',
+        description: 'Spodaj vnesite novo geslo',
     },
 });
 
@@ -25,7 +25,7 @@ const inputEmail = ref(props.email);
 </script>
 
 <template>
-    <Head title="Reset password" />
+    <Head title="Ponastavitev gesla" />
 
     <Form
         v-bind="update.form()"
@@ -49,26 +49,26 @@ const inputEmail = ref(props.email);
             </div>
 
             <div class="grid gap-2">
-                <Label for="password">Password</Label>
+                <Label for="password">Geslo</Label>
                 <PasswordInput
                     id="password"
                     name="password"
                     autocomplete="new-password"
                     class="mt-1 block w-full"
                     autofocus
-                    placeholder="Password"
+                    placeholder="Geslo"
                 />
                 <InputError :message="errors.password" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="password_confirmation"> Confirm password </Label>
+                <Label for="password_confirmation">Potrdite geslo</Label>
                 <PasswordInput
                     id="password_confirmation"
                     name="password_confirmation"
                     autocomplete="new-password"
                     class="mt-1 block w-full"
-                    placeholder="Confirm password"
+                    placeholder="Potrdite geslo"
                 />
                 <InputError :message="errors.password_confirmation" />
             </div>
@@ -80,7 +80,7 @@ const inputEmail = ref(props.email);
                 data-test="reset-password-button"
             >
                 <Spinner v-if="processing" />
-                Reset password
+                Ponastavi geslo
             </Button>
         </div>
     </Form>

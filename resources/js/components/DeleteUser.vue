@@ -25,22 +25,22 @@ const passwordInput = useTemplateRef('passwordInput');
     <div class="space-y-6">
         <Heading
             variant="small"
-            title="Delete account"
-            description="Delete your account and all of its resources"
+            title="Izbriši račun"
+            description="Izbrišite račun in vse povezane podatke"
         />
         <div
             class="space-y-4 rounded-lg border border-red-100 bg-red-50 p-4 dark:border-red-200/10 dark:bg-red-700/10"
         >
             <div class="relative space-y-0.5 text-red-600 dark:text-red-100">
-                <p class="font-medium">Warning</p>
+                <p class="font-medium">Opozorilo</p>
                 <p class="text-sm">
-                    Please proceed with caution, this cannot be undone.
+                    Nadaljujte previdno, tega dejanja ni mogoče razveljaviti.
                 </p>
             </div>
             <Dialog>
                 <DialogTrigger as-child>
                     <Button variant="destructive" data-test="delete-user-button"
-                        >Delete account</Button
+                        >Izbriši račun</Button
                     >
                 </DialogTrigger>
                 <DialogContent>
@@ -56,27 +56,23 @@ const passwordInput = useTemplateRef('passwordInput');
                     >
                         <DialogHeader class="space-y-3">
                             <DialogTitle
-                                >Are you sure you want to delete your
-                                account?</DialogTitle
+                                >Ali ste prepričani, da želite izbrisati svoj
+                                račun?</DialogTitle
                             >
                             <DialogDescription>
-                                Once your account is deleted, all of its
-                                resources and data will also be permanently
-                                deleted. Please enter your password to confirm
-                                you would like to permanently delete your
-                                account.
+                                Ko bo vaš račun izbrisan, bodo trajno
+                                odstranjeni tudi vsi povezani podatki. Za
+                                potrditev trajnega izbrisa vnesite svoje geslo.
                             </DialogDescription>
                         </DialogHeader>
 
                         <div class="grid gap-2">
-                            <Label for="password" class="sr-only"
-                                >Password</Label
-                            >
+                            <Label for="password" class="sr-only">Geslo</Label>
                             <PasswordInput
                                 id="password"
                                 name="password"
                                 ref="passwordInput"
-                                placeholder="Password"
+                                placeholder="Geslo"
                             />
                             <InputError :message="errors.password" />
                         </div>
@@ -92,7 +88,7 @@ const passwordInput = useTemplateRef('passwordInput');
                                         }
                                     "
                                 >
-                                    Cancel
+                                    Prekliči
                                 </Button>
                             </DialogClose>
 
@@ -102,7 +98,7 @@ const passwordInput = useTemplateRef('passwordInput');
                                 :disabled="processing"
                                 data-test="confirm-delete-user-button"
                             >
-                                Delete account
+                                Izbriši račun
                             </Button>
                         </DialogFooter>
                     </Form>

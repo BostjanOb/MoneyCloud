@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\InvestmentSymbolType;
+use App\Enums\InvestmentTransactionType;
 use App\Models\CryptoBalance;
 use App\Models\InvestmentProvider;
 use App\Models\InvestmentPurchase;
@@ -102,14 +103,24 @@ class CryptoPortfolioService
             ->map(function (InvestmentSymbol $symbol) use ($purchases): array {
                 $symbolPurchases = $purchases->get($symbol->id, collect());
                 $totalQuantity = (float) $symbolPurchases->sum(
-                    fn (InvestmentPurchase $purchase): float => (float) $purchase->quantity,
+                    fn (InvestmentPurchase $purchase): float => $purchase->signedQuantity(),
                 );
-                $purchaseValueInCents = $symbolPurchases->sum(
-                    fn (InvestmentPurchase $purchase): int => $this->purchaseValueInCents($purchase),
+                $grossBuysInCents = $symbolPurchases->sum(
+                    fn (InvestmentPurchase $purchase): int => $purchase->transactionType() === InvestmentTransactionType::Buy
+                        ? $this->purchaseValueInCents($purchase)
+                        : 0,
+                );
+                $grossSellsInCents = $symbolPurchases->sum(
+                    fn (InvestmentPurchase $purchase): int => $purchase->transactionType() === InvestmentTransactionType::Sell
+                        ? $this->purchaseValueInCents($purchase)
+                        : 0,
                 );
                 $feeInCents = $symbolPurchases->sum(
                     fn (InvestmentPurchase $purchase): int => $this->toCents($purchase->fee),
                 );
+                $buyAmountInCents = $grossBuysInCents - $grossSellsInCents;
+                $currentValueInCents = $this->quantityValueInCents($totalQuantity, $symbol->current_price);
+                $profitLossAmountInCents = $currentValueInCents - $buyAmountInCents - $feeInCents;
 
                 return [
                     'symbol' => [
@@ -119,16 +130,22 @@ class CryptoPortfolioService
                     ],
                     'summary' => [
                         'quantity' => $this->formatQuantity($totalQuantity),
-                        'purchase_value' => $this->fromCents($purchaseValueInCents),
-                        'fees' => $this->fromCents($feeInCents),
-                        'total_cost' => $this->fromCents($purchaseValueInCents + $feeInCents),
-                        'current_value' => $this->fromCents(
-                            $this->quantityValueInCents($totalQuantity, $symbol->current_price),
+                        'buy_amount' => $this->fromCents($buyAmountInCents),
+                        'current_value' => $this->fromCents($currentValueInCents),
+                        'profit_loss_amount' => $this->fromCents($profitLossAmountInCents),
+                        'profit_loss_percentage' => $this->formatPercentage(
+                            $buyAmountInCents === 0
+                                ? 0
+                                : ($profitLossAmountInCents / $buyAmountInCents) * 100,
                         ),
                         'purchase_count' => $symbolPurchases->count(),
                     ],
                     'purchases' => $symbolPurchases
-                        ->sortByDesc('purchased_at')
+                        ->sortByDesc(fn (InvestmentPurchase $purchase): string => sprintf(
+                            '%s-%010d',
+                            $purchase->purchased_at?->format('YmdHis.u') ?? '',
+                            $purchase->id,
+                        ))
                         ->values()
                         ->map(fn (InvestmentPurchase $purchase): array => $this->transformDcaPurchase($purchase))
                         ->all(),
@@ -182,17 +199,24 @@ class CryptoPortfolioService
     {
         $purchaseValueInCents = $this->purchaseValueInCents($purchase);
         $feeInCents = $this->toCents($purchase->fee);
+        $transactionType = $purchase->transactionType();
 
         return [
             'id' => $purchase->id,
             'investment_provider_id' => $purchase->investment_provider_id,
             'investment_symbol_id' => $purchase->investment_symbol_id,
             'purchased_at' => $purchase->purchased_at?->toISOString(),
+            'transaction_type' => $transactionType->value,
+            'transaction_type_label' => $transactionType->label(),
             'quantity' => $purchase->quantity,
             'price_per_unit' => $purchase->price_per_unit,
             'fee' => $purchase->fee,
-            'purchase_value' => $this->fromCents($purchaseValueInCents),
-            'total_cost' => $this->fromCents($purchaseValueInCents + $feeInCents),
+            'trade_value' => $this->fromCents($purchaseValueInCents),
+            'net_amount' => $this->fromCents(
+                $transactionType === InvestmentTransactionType::Buy
+                    ? $purchaseValueInCents + $feeInCents
+                    : $purchaseValueInCents - $feeInCents,
+            ),
             'provider' => [
                 'id' => $purchase->provider->id,
                 'slug' => $purchase->provider->slug,
@@ -244,5 +268,10 @@ class CryptoPortfolioService
     private function formatQuantity(float $quantity): string
     {
         return number_format($quantity, 8, '.', '');
+    }
+
+    private function formatPercentage(float|int $percentage): string
+    {
+        return number_format((float) $percentage, 2, '.', '');
     }
 }

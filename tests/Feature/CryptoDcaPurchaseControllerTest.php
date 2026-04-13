@@ -32,9 +32,19 @@ test('crypto dca page returns symbol split data', function () {
     InvestmentPurchase::factory()->create([
         'investment_provider_id' => $provider->id,
         'investment_symbol_id' => $btc->id,
+        'purchased_at' => '2026-04-10 09:00:00',
         'quantity' => '0.10000000',
         'price_per_unit' => '40000.00',
         'fee' => '5.00',
+    ]);
+    InvestmentPurchase::factory()->create([
+        'investment_provider_id' => $provider->id,
+        'investment_symbol_id' => $btc->id,
+        'purchased_at' => '2026-04-11 09:00:00',
+        'transaction_type' => 'sell',
+        'quantity' => '0.04000000',
+        'price_per_unit' => '50000.00',
+        'fee' => '4.00',
     ]);
 
     $this->actingAs($user)
@@ -44,11 +54,12 @@ test('crypto dca page returns symbol split data', function () {
             ->component('Kripto/Dca')
             ->has('symbolGroups', 1)
             ->where('symbolGroups.0.symbol.symbol', 'BTC')
-            ->where('symbolGroups.0.summary.quantity', '0.10000000')
-            ->where('symbolGroups.0.summary.purchase_value', '4000.00')
-            ->where('symbolGroups.0.summary.fees', '5.00')
-            ->where('symbolGroups.0.summary.total_cost', '4005.00')
-            ->where('symbolGroups.0.summary.current_value', '5000.00')
+            ->where('symbolGroups.0.summary.quantity', '0.06000000')
+            ->where('symbolGroups.0.summary.buy_amount', '2000.00')
+            ->where('symbolGroups.0.summary.current_value', '3000.00')
+            ->where('symbolGroups.0.summary.profit_loss_amount', '991.00')
+            ->where('symbolGroups.0.summary.profit_loss_percentage', '49.55')
+            ->where('symbolGroups.0.purchases.0.transaction_type', 'sell')
             ->has('symbolOptions', 2)
             ->where('symbolOptions.1.symbol', $eth->symbol)
         );
@@ -102,7 +113,8 @@ test('can store update and delete a crypto dca purchase without debiting savings
     $purchase = InvestmentPurchase::query()->firstOrFail();
 
     expect($linkedAccount->fresh()->amount)->toBe('1000.00')
-        ->and($purchase->quantity)->toBe('0.10000000');
+        ->and($purchase->quantity)->toBe('0.10000000')
+        ->and($purchase->transaction_type->value)->toBe('buy');
     expect(CryptoBalance::query()->count())->toBe(0);
 
     $this->actingAs($user)
@@ -180,6 +192,88 @@ test('creating a crypto dca purchase can increment an existing balance', functio
         ->assertRedirect();
 
     expect(CryptoBalance::query()->firstOrFail()->manual_quantity)->toBe('2.00000000');
+});
+
+test('creating a crypto sell can subtract quantity from a selected balance provider', function () {
+    $user = User::factory()->create();
+    $provider = InvestmentProvider::factory()->crypto()->create();
+    $symbol = InvestmentSymbol::factory()->crypto('ETH')->create();
+
+    InvestmentPurchase::factory()->create([
+        'investment_provider_id' => $provider->id,
+        'investment_symbol_id' => $symbol->id,
+        'quantity' => '2.00000000',
+        'price_per_unit' => '2500.00',
+        'fee' => '5.00',
+    ]);
+
+    CryptoBalance::factory()->create([
+        'investment_provider_id' => $provider->id,
+        'investment_symbol_id' => $symbol->id,
+        'manual_quantity' => '1.50000000',
+    ]);
+
+    $this->actingAs($user)
+        ->post(route('crypto.dca.store'), [
+            'investment_provider_id' => $provider->id,
+            'investment_symbol_id' => $symbol->id,
+            'purchased_at' => now()->toDateTimeString(),
+            'transaction_type' => 'sell',
+            'quantity' => '0.75000000',
+            'price_per_unit' => '3000.00',
+            'fee' => '3.00',
+            'add_to_balance' => true,
+            'balance_provider_id' => $provider->id,
+        ])
+        ->assertRedirect();
+
+    expect(InvestmentPurchase::query()->latest('id')->firstOrFail()->transaction_type->value)->toBe('sell')
+        ->and(CryptoBalance::query()->firstOrFail()->manual_quantity)->toBe('0.75000000');
+});
+
+test('creating a crypto sell rejects overselling the dca position or manual balance', function () {
+    $user = User::factory()->create();
+    $provider = InvestmentProvider::factory()->crypto()->create();
+    $symbol = InvestmentSymbol::factory()->crypto('BTC')->create();
+
+    InvestmentPurchase::factory()->create([
+        'investment_provider_id' => $provider->id,
+        'investment_symbol_id' => $symbol->id,
+        'quantity' => '1.00000000',
+        'price_per_unit' => '40000.00',
+        'fee' => '5.00',
+    ]);
+
+    CryptoBalance::factory()->create([
+        'investment_provider_id' => $provider->id,
+        'investment_symbol_id' => $symbol->id,
+        'manual_quantity' => '0.40000000',
+    ]);
+
+    $basePayload = [
+        'investment_provider_id' => $provider->id,
+        'investment_symbol_id' => $symbol->id,
+        'purchased_at' => now()->toDateTimeString(),
+        'transaction_type' => 'sell',
+        'price_per_unit' => '50000.00',
+        'fee' => '2.00',
+    ];
+
+    $this->actingAs($user)
+        ->post(route('crypto.dca.store'), [
+            ...$basePayload,
+            'quantity' => '1.50000000',
+        ])
+        ->assertSessionHasErrors('quantity');
+
+    $this->actingAs($user)
+        ->post(route('crypto.dca.store'), [
+            ...$basePayload,
+            'quantity' => '0.50000000',
+            'add_to_balance' => true,
+            'balance_provider_id' => $provider->id,
+        ])
+        ->assertSessionHasErrors('quantity');
 });
 
 test('adding a crypto dca purchase to balance validates the balance provider', function () {

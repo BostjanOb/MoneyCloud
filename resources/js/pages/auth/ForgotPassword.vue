@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Form, Head } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import InputError from '@/components/InputError.vue';
 import TextLink from '@/components/TextLink.vue';
 import { Button } from '@/components/ui/button';
@@ -11,30 +12,44 @@ import { email } from '@/routes/password';
 
 defineOptions({
     layout: {
-        title: 'Forgot password',
-        description: 'Enter your email to receive a password reset link',
+        title: 'Pozabljeno geslo',
+        description:
+            'Vnesite e-poštni naslov za prejem povezave za ponastavitev gesla',
     },
 });
 
-defineProps<{
+const props = defineProps<{
     status?: string;
 }>();
+
+const localizedStatus = computed(() => {
+    if (!props.status) {
+        return undefined;
+    }
+
+    return (
+        {
+            'We have emailed your password reset link.':
+                'Povezavo za ponastavitev gesla smo poslali na vaš e-poštni naslov.',
+        }[props.status] ?? props.status
+    );
+});
 </script>
 
 <template>
-    <Head title="Forgot password" />
+    <Head title="Pozabljeno geslo" />
 
     <div
-        v-if="status"
+        v-if="localizedStatus"
         class="mb-4 text-center text-sm font-medium text-green-600"
     >
-        {{ status }}
+        {{ localizedStatus }}
     </div>
 
     <div class="space-y-6">
         <Form v-bind="email.form()" v-slot="{ errors, processing }">
             <div class="grid gap-2">
-                <Label for="email">Email address</Label>
+                <Label for="email">E-poštni naslov</Label>
                 <Input
                     id="email"
                     type="email"
@@ -53,14 +68,14 @@ defineProps<{
                     data-test="email-password-reset-link-button"
                 >
                     <Spinner v-if="processing" />
-                    Email password reset link
+                    Pošlji povezavo za ponastavitev gesla
                 </Button>
             </div>
         </Form>
 
         <div class="space-x-1 text-center text-sm text-muted-foreground">
-            <span>Or, return to</span>
-            <TextLink :href="login()">log in</TextLink>
+            <span>Ali pa se vrnite na</span>
+            <TextLink :href="login()">prijavo</TextLink>
         </div>
     </div>
 </template>

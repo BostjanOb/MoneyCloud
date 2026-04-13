@@ -225,7 +225,7 @@ function deleteBalance(row: BalanceRow): void {
             />
             <div class="flex flex-wrap gap-2">
                 <Button as-child variant="outline" size="sm">
-                    <Link :href="dcaIndex.url()">DCA nakupi</Link>
+                    <Link :href="dcaIndex.url()">DCA transakcije</Link>
                 </Button>
                 <Button
                     size="sm"

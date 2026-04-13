@@ -8,7 +8,7 @@ import {
     PiggyBank,
     Settings,
     Wallet,
-} from 'lucide-vue-next';
+} from '@lucide/vue';
 import { computed } from 'vue';
 import { index as cryptoBalanceIndex } from '@/actions/App/Http/Controllers/CryptoBalanceController';
 import { index as cryptoDcaIndex } from '@/actions/App/Http/Controllers/CryptoDcaPurchaseController';
@@ -92,7 +92,7 @@ const mainNavItems = computed<NavItem[]>(() => {
                     href: cryptoBalanceIndex.url(),
                 },
                 {
-                    title: 'DCA nakupi',
+                    title: 'DCA transakcije',
                     href: cryptoDcaIndex.url(),
                 },
             ],

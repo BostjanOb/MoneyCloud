@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Form } from '@inertiajs/vue3';
-import { Eye, EyeOff, LockKeyhole, RefreshCw } from 'lucide-vue-next';
+import { Eye, EyeOff, LockKeyhole, RefreshCw } from '@lucide/vue';
 import { nextTick, onMounted, ref, useTemplateRef } from 'vue';
 import AlertError from '@/components/AlertError.vue';
 import { Button } from '@/components/ui/button';
@@ -42,11 +42,11 @@ onMounted(async () => {
     <Card class="w-full">
         <CardHeader>
             <CardTitle class="flex gap-3">
-                <LockKeyhole class="size-4" />2FA recovery codes
+                <LockKeyhole class="size-4" />Obnovitvene kode za 2FA
             </CardTitle>
             <CardDescription>
-                Recovery codes let you regain access if you lose your 2FA
-                device. Store them in a secure password manager.
+                Obnovitvene kode vam omogočajo ponovni dostop, če izgubite 2FA
+                napravo. Shranite jih v varen upravljalnik gesel.
             </CardDescription>
         </CardHeader>
         <CardContent>
@@ -58,8 +58,8 @@ onMounted(async () => {
                         :is="isRecoveryCodesVisible ? EyeOff : Eye"
                         class="size-4"
                     />
-                    {{ isRecoveryCodesVisible ? 'Hide' : 'View' }} recovery
-                    codes
+                    {{ isRecoveryCodesVisible ? 'Skrij' : 'Prikaži' }}
+                    obnovitvene kode
                 </Button>
 
                 <Form
@@ -75,7 +75,7 @@ onMounted(async () => {
                         type="submit"
                         :disabled="processing"
                     >
-                        <RefreshCw /> Regenerate codes
+                        <RefreshCw /> Ustvari nove kode
                     </Button>
                 </Form>
             </div>
@@ -111,10 +111,10 @@ onMounted(async () => {
                         </div>
                     </div>
                     <p class="text-xs text-muted-foreground select-none">
-                        Each recovery code can be used once to access your
-                        account and will be removed after use. If you need more,
-                        click
-                        <span class="font-bold">Regenerate codes</span> above.
+                        Vsako obnovitveno kodo lahko za dostop do računa
+                        uporabite enkrat, nato pa se odstrani. Če potrebujete
+                        nove, zgoraj kliknite
+                        <span class="font-bold">Ustvari nove kode</span>.
                     </p>
                 </div>
             </div>

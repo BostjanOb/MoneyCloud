@@ -59,8 +59,9 @@ class YearlyInvestmentStatisticsService
         foreach ($purchases as $purchase) {
             $year = $purchase->purchased_at->year;
             $symbolKey = (string) $purchase->investment_symbol_id;
-            $amountInCents = $this->quantityValueInCents($purchase->quantity, $purchase->price_per_unit);
-            $quantity = (float) $purchase->quantity;
+            $amountInCents = $this->quantityValueInCents($purchase->quantity, $purchase->price_per_unit)
+                * $purchase->transactionType()->multiplier();
+            $quantity = $purchase->signedQuantity();
 
             $rowMap[$year]['symbols'][$symbolKey]['amount'] = MonthlyPortfolioSnapshot::fromCents(
                 MonthlyPortfolioSnapshot::toCents($rowMap[$year]['symbols'][$symbolKey]['amount']) + $amountInCents,

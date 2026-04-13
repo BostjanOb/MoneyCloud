@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\InvestmentTransactionType;
 use App\Models\InvestmentProvider;
 use App\Models\InvestmentPurchase;
 use Carbon\CarbonInterface;
@@ -27,14 +28,16 @@ class InvestmentPortfolioService
 
         $asOf ??= now();
 
-        $priceInCents = $this->quantityValueInCents(
+        $direction = $purchase->transactionType()->multiplier();
+        $grossValueInCents = $this->quantityValueInCents(
             $purchase->quantity,
             $purchase->price_per_unit,
         );
+        $priceInCents = $grossValueInCents * $direction;
         $currentValueInCents = $this->quantityValueInCents(
             $purchase->quantity,
             $purchase->symbol->current_price,
-        );
+        ) * $direction;
         $feeInCents = $this->toCents($purchase->fee);
         $capitalGainInCents = $currentValueInCents - $priceInCents;
         $profitLossInCents = $capitalGainInCents - $feeInCents;
@@ -129,7 +132,7 @@ class InvestmentPortfolioService
                         $carry['current_value'] += $this->toCents($metrics['current_value']);
                         $carry['total_invested'] += $this->toCents($metrics['price']);
                         $carry['profit_loss'] += $this->toCents($metrics['profit_loss']);
-                        $carry['quantity'] += (float) $purchase->quantity;
+                        $carry['quantity'] += $purchase->signedQuantity();
 
                         return $carry;
                     },
@@ -174,6 +177,8 @@ class InvestmentPortfolioService
                 'id' => $purchase->id,
                 'investment_symbol_id' => $purchase->investment_symbol_id,
                 'purchased_at' => $purchase->purchased_at?->toISOString(),
+                'transaction_type' => $purchase->transactionType()->value,
+                'transaction_type_label' => $purchase->transactionType()->label(),
                 'quantity' => $purchase->quantity,
                 'price_per_unit' => $purchase->price_per_unit,
                 'fee' => $purchase->fee,
@@ -212,7 +217,11 @@ class InvestmentPortfolioService
         int $currentValueInCents,
         CarbonInterface $asOf,
     ): int {
-        if (! $purchase->symbol->taxable || $capitalGainInCents <= 0) {
+        if (
+            $purchase->transactionType() === InvestmentTransactionType::Sell
+            || ! $purchase->symbol->taxable
+            || $capitalGainInCents <= 0
+        ) {
             return 0;
         }
 

@@ -222,3 +222,48 @@ test('dashboard uses live totals, compares against last snapshot, and skips inco
             )
         );
 });
+
+test('dashboard investment summary uses signed crypto sell totals', function () {
+    $user = User::factory()->create();
+    $provider = InvestmentProvider::factory()->crypto('nexo', 'Nexo')->create();
+    $btc = InvestmentSymbol::factory()->crypto('BTC')->create([
+        'current_price' => '25000.00',
+    ]);
+
+    InvestmentPurchase::factory()->create([
+        'investment_provider_id' => $provider->id,
+        'investment_symbol_id' => $btc->id,
+        'quantity' => '0.04000000',
+        'price_per_unit' => '20000.00',
+        'fee' => '5.00',
+    ]);
+    InvestmentPurchase::factory()->create([
+        'investment_provider_id' => $provider->id,
+        'investment_symbol_id' => $btc->id,
+        'transaction_type' => 'sell',
+        'quantity' => '0.01000000',
+        'price_per_unit' => '30000.00',
+        'fee' => '3.00',
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard'));
+
+    $response
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Dashboard')
+            ->loadDeferredProps(['investments'], fn (Assert $reload) => $reload
+                ->has('investments')
+                ->where('investments.summary.total_invested', '500.00')
+                ->where('investments.summary.current_value', '750.00')
+                ->where('investments.summary.profit_loss', '242.00')
+                ->where('investments.summary.profit_loss_after_tax', '242.00')
+                ->has('investments.top_positions', 1)
+                ->where('investments.top_positions.0.symbol', 'BTC')
+                ->where('investments.top_positions.0.quantity', '0.03000000')
+                ->where('investments.top_positions.0.total_invested', '500.00')
+                ->where('investments.top_positions.0.current_value', '750.00')
+                ->where('investments.top_positions.0.profit_loss', '242.00')
+            )
+        );
+});

@@ -13,6 +13,7 @@ test('login screen can be rendered', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('auth/Login')
             ->where('canResetPassword', Features::enabled(Features::resetPasswords()))
+            ->where('csrfToken', fn (string $csrfToken): bool => $csrfToken !== '')
             ->missing('canRegister'),
         );
 });

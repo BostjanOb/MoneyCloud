@@ -98,6 +98,14 @@ test('it groups dca totals by symbol', function () {
     ]);
     InvestmentPurchase::factory()->create([
         'investment_provider_id' => $provider->id,
+        'investment_symbol_id' => $btc->id,
+        'transaction_type' => 'sell',
+        'quantity' => '0.02500000',
+        'price_per_unit' => '48000.00',
+        'fee' => '4.00',
+    ]);
+    InvestmentPurchase::factory()->create([
+        'investment_provider_id' => $provider->id,
         'investment_symbol_id' => $eth->id,
         'quantity' => '2.00000000',
         'price_per_unit' => '2000.00',
@@ -108,11 +116,15 @@ test('it groups dca totals by symbol', function () {
 
     expect($groups)->toHaveCount(2)
         ->and($groups[0]['symbol']['symbol'])->toBe('BTC')
-        ->and($groups[0]['summary']['quantity'])->toBe('0.10000000')
-        ->and($groups[0]['summary']['total_cost'])->toBe('4005.00')
-        ->and($groups[0]['summary']['current_value'])->toBe('5000.00')
+        ->and($groups[0]['summary']['quantity'])->toBe('0.07500000')
+        ->and($groups[0]['summary']['buy_amount'])->toBe('2800.00')
+        ->and($groups[0]['summary']['current_value'])->toBe('3750.00')
+        ->and($groups[0]['summary']['profit_loss_amount'])->toBe('941.00')
+        ->and($groups[0]['summary']['profit_loss_percentage'])->toBe('33.61')
         ->and($groups[1]['symbol']['symbol'])->toBe('ETH')
         ->and($groups[1]['summary']['quantity'])->toBe('2.00000000')
-        ->and($groups[1]['summary']['total_cost'])->toBe('4003.00')
-        ->and($groups[1]['summary']['current_value'])->toBe('6000.00');
+        ->and($groups[1]['summary']['buy_amount'])->toBe('4000.00')
+        ->and($groups[1]['summary']['current_value'])->toBe('6000.00')
+        ->and($groups[1]['summary']['profit_loss_amount'])->toBe('1997.00')
+        ->and($groups[1]['summary']['profit_loss_percentage'])->toBe('49.93');
 });

@@ -60,11 +60,13 @@ type DcaPurchase = {
     investment_provider_id: number;
     investment_symbol_id: number;
     purchased_at: string;
+    transaction_type: 'buy' | 'sell';
+    transaction_type_label: string;
     quantity: string;
     price_per_unit: string;
     fee: string;
-    purchase_value: string;
-    total_cost: string;
+    trade_value: string;
+    net_amount: string;
     provider: ProviderOption;
     symbol: {
         id: number;
@@ -81,10 +83,10 @@ type SymbolGroup = {
     };
     summary: {
         quantity: string;
-        purchase_value: string;
-        fees: string;
-        total_cost: string;
+        buy_amount: string;
         current_value: string;
+        profit_loss_amount: string;
+        profit_loss_percentage: string;
         purchase_count: number;
     };
     purchases: DcaPurchase[];
@@ -105,7 +107,7 @@ setLayoutProps({
             href: balancesIndex.url(),
         },
         {
-            title: 'DCA nakupi',
+            title: 'DCA transakcije',
             href: dcaIndex.url(),
         },
     ],
@@ -123,6 +125,7 @@ const purchaseForm = useForm({
     investment_provider_id: '',
     investment_symbol_id: '',
     purchased_at: localNowForInput(),
+    transaction_type: 'buy' as 'buy' | 'sell',
     quantity: '',
     price_per_unit: '',
     fee: '0',
@@ -142,7 +145,11 @@ const selectedSymbol = computed(() =>
     ),
 );
 
-const totalPreview = computed(() => {
+const isSellTransaction = computed(
+    () => purchaseForm.transaction_type === 'sell',
+);
+
+const netAmountPreview = computed(() => {
     const quantity = Number(purchaseForm.quantity);
     const price = Number(purchaseForm.price_per_unit);
     const fee = Number(purchaseForm.fee);
@@ -151,7 +158,11 @@ const totalPreview = computed(() => {
         return '0.00';
     }
 
-    return (quantity * price + fee).toFixed(2);
+    const grossValue = quantity * price;
+
+    return (
+        grossValue + (isSellTransaction.value ? -fee : fee)
+    ).toFixed(2);
 });
 
 function localNowForInput(): string {
@@ -177,6 +188,13 @@ function formatMoney(value: string | number): string {
     return `${formatSlovenianNumber(value)} €`;
 }
 
+function formatSignedMoney(value: string | number): string {
+    const amount = Number(value);
+    const prefix = amount > 0 ? '+' : '';
+
+    return `${prefix}${formatSlovenianNumber(amount)} €`;
+}
+
 function formatQuantity(value: string | number): string {
     return new Intl.NumberFormat('sl-SI', {
         minimumFractionDigits: 0,
@@ -189,6 +207,27 @@ function formatDateTime(value: string): string {
         dateStyle: 'short',
         timeStyle: 'short',
     }).format(new Date(value));
+}
+
+function formatPercent(value: string | number): string {
+    const amount = Number(value);
+    const prefix = amount > 0 ? '+' : '';
+
+    return `${prefix}${formatSlovenianNumber(amount)} %`;
+}
+
+function valueTone(value: string | number): string {
+    const amount = Number(value);
+
+    if (amount > 0) {
+        return 'text-emerald-600 dark:text-emerald-400';
+    }
+
+    if (amount < 0) {
+        return 'text-destructive';
+    }
+
+    return 'text-foreground';
 }
 
 function resetPurchaseForm(symbolId?: number): void {
@@ -204,6 +243,7 @@ function resetPurchaseForm(symbolId?: number): void {
                   ? String(props.symbolOptions[0].id)
                   : ''),
         purchased_at: localNowForInput(),
+        transaction_type: 'buy',
         quantity: '',
         price_per_unit: '',
         fee: '0',
@@ -231,6 +271,7 @@ function openEditPurchase(purchase: DcaPurchase): void {
     );
     purchaseForm.investment_symbol_id = String(purchase.investment_symbol_id);
     purchaseForm.purchased_at = toDatetimeLocalInput(purchase.purchased_at);
+    purchaseForm.transaction_type = purchase.transaction_type;
     purchaseForm.quantity = purchase.quantity;
     purchaseForm.price_per_unit = purchase.price_per_unit;
     purchaseForm.fee = purchase.fee;
@@ -261,6 +302,18 @@ function updateSymbol(value: AcceptableValue): void {
     }
 }
 
+function updateTransactionType(value: AcceptableValue): void {
+    if (value === 'buy' || value === 'sell') {
+        purchaseForm.transaction_type = value;
+    }
+}
+
+function updateBalanceProvider(value: AcceptableValue): void {
+    if (typeof value === 'string') {
+        purchaseForm.balance_provider_id = value;
+    }
+}
+
 function updateAddToBalance(value: boolean | 'indeterminate'): void {
     purchaseForm.add_to_balance = value === true;
 
@@ -274,6 +327,7 @@ function submitPurchase(): void {
         investment_provider_id: Number(data.investment_provider_id),
         investment_symbol_id: Number(data.investment_symbol_id),
         purchased_at: data.purchased_at,
+        transaction_type: data.transaction_type,
         quantity: data.quantity,
         price_per_unit: data.price_per_unit,
         fee: data.fee,
@@ -310,7 +364,7 @@ function submitPurchase(): void {
 function deletePurchase(purchase: DcaPurchase): void {
     if (
         !confirm(
-            `Ste prepričani, da želite izbrisati DCA nakup ${purchase.symbol.symbol}?`,
+            `Ste prepričani, da želite izbrisati DCA transakcijo ${purchase.symbol.symbol}?`,
         )
     ) {
         return;
@@ -321,15 +375,15 @@ function deletePurchase(purchase: DcaPurchase): void {
 </script>
 
 <template>
-    <Head title="Kripto - DCA nakupi" />
+    <Head title="Kripto - DCA transakcije" />
 
     <div class="flex flex-col gap-6 p-4">
         <div
             class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
         >
             <Heading
-                title="DCA nakupi"
-                description="Nakupi so razdeljeni po kripto simbolih."
+                title="DCA transakcije"
+                description="Nakupi in prodaje so razdeljeni po kripto simbolih."
             />
             <div class="flex flex-wrap gap-2">
                 <Button as-child variant="outline" size="sm">
@@ -343,7 +397,7 @@ function deletePurchase(purchase: DcaPurchase): void {
                     "
                     @click="openCreatePurchase(activeGroup?.symbol.id)"
                 >
-                    Dodaj DCA nakup
+                    Dodaj transakcijo
                 </Button>
             </div>
         </div>
@@ -387,36 +441,12 @@ function deletePurchase(purchase: DcaPurchase): void {
                     <Card>
                         <CardHeader class="pb-2">
                             <CardTitle class="text-sm text-muted-foreground">
-                                Nakupna vrednost
+                                Vložek
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <p class="text-2xl font-semibold">
-                                {{ formatMoney(group.summary.purchase_value) }}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader class="pb-2">
-                            <CardTitle class="text-sm text-muted-foreground">
-                                Provizije
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p class="text-2xl font-semibold">
-                                {{ formatMoney(group.summary.fees) }}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader class="pb-2">
-                            <CardTitle class="text-sm text-muted-foreground">
-                                Skupaj vloženo
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p class="text-2xl font-semibold">
-                                {{ formatMoney(group.summary.total_cost) }}
+                                {{ formatMoney(group.summary.buy_amount) }}
                             </p>
                         </CardContent>
                     </Card>
@@ -432,13 +462,59 @@ function deletePurchase(purchase: DcaPurchase): void {
                             </p>
                         </CardContent>
                     </Card>
+                    <Card>
+                        <CardHeader class="pb-2">
+                            <CardTitle class="text-sm text-muted-foreground">
+                                P/L v %
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p
+                                :class="[
+                                    'text-2xl font-semibold',
+                                    valueTone(
+                                        group.summary.profit_loss_percentage,
+                                    ),
+                                ]"
+                            >
+                                {{
+                                    formatPercent(
+                                        group.summary.profit_loss_percentage,
+                                    )
+                                }}
+                            </p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader class="pb-2">
+                            <CardTitle class="text-sm text-muted-foreground">
+                                P/L v EUR
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p
+                                :class="[
+                                    'text-2xl font-semibold',
+                                    valueTone(group.summary.profit_loss_amount),
+                                ]"
+                            >
+                                {{
+                                    formatSignedMoney(
+                                        group.summary.profit_loss_amount,
+                                    )
+                                }}
+                            </p>
+                        </CardContent>
+                    </Card>
                 </div>
 
                 <Card>
                     <CardHeader
                         class="flex flex-row items-center justify-between gap-4"
                     >
-                        <CardTitle>{{ group.symbol.symbol }} nakupi</CardTitle>
+                        <CardTitle>
+                            {{ group.symbol.symbol }} transakcije
+                        </CardTitle>
                         <Button
                             size="sm"
                             :disabled="providerOptions.length === 0"
@@ -452,6 +528,7 @@ function deletePurchase(purchase: DcaPurchase): void {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Datum</TableHead>
+                                    <TableHead>Tip</TableHead>
                                     <TableHead>Platforma</TableHead>
                                     <TableHead numeric class="text-right">
                                         Količina
@@ -460,13 +537,13 @@ function deletePurchase(purchase: DcaPurchase): void {
                                         Cena/enoto
                                     </TableHead>
                                     <TableHead numeric class="text-right">
-                                        Nakup
+                                        Znesek
                                     </TableHead>
                                     <TableHead numeric class="text-right">
                                         Provizija
                                     </TableHead>
                                     <TableHead numeric class="text-right">
-                                        Skupaj
+                                        Neto
                                     </TableHead>
                                     <TableHead class="text-right"
                                         >Akcije</TableHead
@@ -485,6 +562,9 @@ function deletePurchase(purchase: DcaPurchase): void {
                                             )
                                         }}
                                     </TableCell>
+                                    <TableCell>
+                                        {{ purchase.transaction_type_label }}
+                                    </TableCell>
                                     <TableCell class="font-medium">
                                         {{ purchase.provider.name }}
                                     </TableCell>
@@ -498,14 +578,14 @@ function deletePurchase(purchase: DcaPurchase): void {
                                     </TableCell>
                                     <TableCell numeric class="text-right">
                                         {{
-                                            formatMoney(purchase.purchase_value)
+                                            formatMoney(purchase.trade_value)
                                         }}
                                     </TableCell>
                                     <TableCell numeric class="text-right">
                                         {{ formatMoney(purchase.fee) }}
                                     </TableCell>
                                     <TableCell numeric class="text-right">
-                                        {{ formatMoney(purchase.total_cost) }}
+                                        {{ formatMoney(purchase.net_amount) }}
                                     </TableCell>
                                     <TableCell class="text-right">
                                         <div class="flex justify-end gap-1">
@@ -537,7 +617,7 @@ function deletePurchase(purchase: DcaPurchase): void {
                             v-else
                             class="py-8 text-center text-sm text-muted-foreground"
                         >
-                            Ni še DCA nakupov za {{ group.symbol.symbol }}.
+                            Ni še DCA transakcij za {{ group.symbol.symbol }}.
                         </p>
                     </CardContent>
                 </Card>
@@ -546,8 +626,8 @@ function deletePurchase(purchase: DcaPurchase): void {
 
         <Card v-else>
             <CardContent class="py-8 text-center text-sm text-muted-foreground">
-                Ni še DCA nakupov. Dodajte prvi nakup in po želji količino takoj
-                prištejte v kripto stanje.
+                Ni še DCA transakcij. Dodajte prvi nakup ali prodajo in po
+                želji hkrati uskladite tudi kripto stanje.
             </CardContent>
         </Card>
     </div>
@@ -557,12 +637,14 @@ function deletePurchase(purchase: DcaPurchase): void {
             <DialogHeader>
                 <DialogTitle>
                     {{
-                        editingPurchase ? 'Uredi DCA nakup' : 'Dodaj DCA nakup'
+                        editingPurchase
+                            ? 'Uredi DCA transakcijo'
+                            : 'Dodaj DCA transakcijo'
                     }}
                 </DialogTitle>
                 <DialogDescription>
-                    Vnesite podrobnosti nakupa. Količino lahko ob dodajanju
-                    prištejete tudi v kripto stanje.
+                    Vnesite podrobnosti nakupa ali prodaje. Ob dodajanju lahko
+                    količino uskladite tudi s kripto stanjem.
                 </DialogDescription>
             </DialogHeader>
 
@@ -615,6 +697,25 @@ function deletePurchase(purchase: DcaPurchase): void {
                     </Select>
                     <InputError
                         :message="purchaseForm.errors.investment_symbol_id"
+                    />
+                </div>
+
+                <div class="space-y-1.5">
+                    <Label for="dca-transaction-type">Tip transakcije</Label>
+                    <Select
+                        :model-value="purchaseForm.transaction_type"
+                        @update:model-value="updateTransactionType"
+                    >
+                        <SelectTrigger id="dca-transaction-type">
+                            <SelectValue placeholder="Izberite tip" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="buy">Nakup</SelectItem>
+                            <SelectItem value="sell">Prodaja</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <InputError
+                        :message="purchaseForm.errors.transaction_type"
                     />
                 </div>
 
@@ -674,18 +775,53 @@ function deletePurchase(purchase: DcaPurchase): void {
                             :model-value="purchaseForm.add_to_balance"
                             @update:model-value="updateAddToBalance"
                         />
-                        <span>Dodaj količino v stanje</span>
+                        <span>
+                            {{
+                                isSellTransaction
+                                    ? 'Odštej količino od stanja'
+                                    : 'Dodaj količino v stanje'
+                            }}
+                        </span>
                     </Label>
                     <InputError :message="purchaseForm.errors.add_to_balance" />
+                </div>
+
+                <div
+                    v-if="!editingPurchase && purchaseForm.add_to_balance"
+                    class="space-y-1.5 md:col-span-2"
+                >
+                    <Label for="dca-balance-provider">
+                        Platforma za stanje
+                    </Label>
+                    <Select
+                        :model-value="purchaseForm.balance_provider_id"
+                        @update:model-value="updateBalanceProvider"
+                    >
+                        <SelectTrigger id="dca-balance-provider">
+                            <SelectValue placeholder="Izberite platformo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem
+                                v-for="provider in providerOptions"
+                                :key="provider.id"
+                                :value="String(provider.id)"
+                            >
+                                {{ provider.name }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <InputError
+                        :message="purchaseForm.errors.balance_provider_id"
+                    />
                 </div>
 
                 <div
                     class="rounded-lg border border-dashed border-border bg-muted/30 p-3 text-sm md:col-span-2"
                 >
                     <p>
-                        Skupaj:
+                        Neto:
                         <span class="font-medium">
-                            {{ formatMoney(totalPreview) }}
+                            {{ formatMoney(netAmountPreview) }}
                         </span>
                     </p>
                     <p v-if="selectedSymbol" class="text-muted-foreground">

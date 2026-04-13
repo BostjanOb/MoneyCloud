@@ -70,6 +70,37 @@ test('it skips tax for non taxable symbols and losses', function () {
         ->and($metrics['tax_liability'])->toBe('0.00');
 });
 
+test('it returns signed metrics for sell transactions', function () {
+    $service = new InvestmentPortfolioService;
+    $symbol = new InvestmentSymbol([
+        'type' => InvestmentSymbolType::CRYPTO,
+        'symbol' => 'ETH',
+        'taxable' => false,
+        'price_source' => InvestmentPriceSource::MANUAL->value,
+        'current_price' => '2500.00',
+    ]);
+    $purchase = new InvestmentPurchase([
+        'transaction_type' => 'sell',
+        'quantity' => '0.50000000',
+        'price_per_unit' => '3000.00',
+        'fee' => '6.00',
+        'purchased_at' => CarbonImmutable::parse('2026-04-01 10:00:00'),
+    ]);
+    $purchase->setRelation('symbol', $symbol);
+
+    $metrics = $service->calculateMetrics($purchase);
+
+    expect($metrics)
+        ->toMatchArray([
+            'price' => '-1500.00',
+            'current_value' => '-1250.00',
+            'unit_diff_percentage' => '-16.67',
+            'profit_loss' => '244.00',
+            'profit_loss_after_tax' => '244.00',
+            'tax_liability' => '0.00',
+        ]);
+});
+
 test('it uses normalized ljse bond prices as eur unit prices', function () {
     $service = new InvestmentPortfolioService;
     $symbol = new InvestmentSymbol([

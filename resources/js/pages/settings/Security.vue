@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Form, Head } from '@inertiajs/vue3';
-import { ShieldCheck } from 'lucide-vue-next';
+import { ShieldCheck } from '@lucide/vue';
 import { onUnmounted, ref } from 'vue';
 import SecurityController from '@/actions/App/Http/Controllers/Settings/SecurityController';
 import Heading from '@/components/Heading.vue';
@@ -30,7 +30,7 @@ defineOptions({
     layout: {
         breadcrumbs: [
             {
-                title: 'Security settings',
+                title: 'Varnost',
                 href: edit(),
             },
         ],
@@ -44,15 +44,15 @@ onUnmounted(() => clearTwoFactorAuthData());
 </script>
 
 <template>
-    <Head title="Security settings" />
+    <Head title="Varnost" />
 
-    <h1 class="sr-only">Security settings</h1>
+    <h1 class="sr-only">Varnost</h1>
 
     <div class="space-y-6">
         <Heading
             variant="small"
-            title="Update password"
-            description="Ensure your account is using a long, random password to stay secure"
+            title="Posodobitev gesla"
+            description="Za večjo varnost uporabljajte dolgo in naključno geslo"
         />
 
         <Form
@@ -70,37 +70,37 @@ onUnmounted(() => clearTwoFactorAuthData());
             v-slot="{ errors, processing, recentlySuccessful }"
         >
             <div class="grid gap-2">
-                <Label for="current_password">Current password</Label>
+                <Label for="current_password">Trenutno geslo</Label>
                 <PasswordInput
                     id="current_password"
                     name="current_password"
                     class="mt-1 block w-full"
                     autocomplete="current-password"
-                    placeholder="Current password"
+                    placeholder="Trenutno geslo"
                 />
                 <InputError :message="errors.current_password" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="password">New password</Label>
+                <Label for="password">Novo geslo</Label>
                 <PasswordInput
                     id="password"
                     name="password"
                     class="mt-1 block w-full"
                     autocomplete="new-password"
-                    placeholder="New password"
+                    placeholder="Novo geslo"
                 />
                 <InputError :message="errors.password" />
             </div>
 
             <div class="grid gap-2">
-                <Label for="password_confirmation">Confirm password</Label>
+                <Label for="password_confirmation">Potrdite geslo</Label>
                 <PasswordInput
                     id="password_confirmation"
                     name="password_confirmation"
                     class="mt-1 block w-full"
                     autocomplete="new-password"
-                    placeholder="Confirm password"
+                    placeholder="Potrdite geslo"
                 />
                 <InputError :message="errors.password_confirmation" />
             </div>
@@ -110,7 +110,7 @@ onUnmounted(() => clearTwoFactorAuthData());
                     :disabled="processing"
                     data-test="update-password-button"
                 >
-                    Save password
+                    Shrani geslo
                 </Button>
 
                 <Transition
@@ -123,7 +123,7 @@ onUnmounted(() => clearTwoFactorAuthData());
                         v-show="recentlySuccessful"
                         class="text-sm text-neutral-600"
                     >
-                        Saved.
+                        Shranjeno.
                     </p>
                 </Transition>
             </div>
@@ -133,8 +133,8 @@ onUnmounted(() => clearTwoFactorAuthData());
     <div v-if="canManageTwoFactor" class="space-y-6">
         <Heading
             variant="small"
-            title="Two-factor authentication"
-            description="Manage your two-factor authentication settings"
+            title="Dvofaktorska avtentikacija"
+            description="Upravljajte nastavitve dvofaktorske avtentikacije"
         />
 
         <div
@@ -142,14 +142,14 @@ onUnmounted(() => clearTwoFactorAuthData());
             class="flex flex-col items-start justify-start space-y-4"
         >
             <p class="text-sm text-muted-foreground">
-                When you enable two-factor authentication, you will be prompted
-                for a secure pin during login. This pin can be retrieved from a
-                TOTP-supported application on your phone.
+                Ko omogočite dvofaktorsko avtentikacijo, boste ob prijavi
+                pozvani k vnosu varnostne kode. Kodo pridobite v aplikaciji za
+                TOTP na svojem telefonu.
             </p>
 
             <div>
                 <Button v-if="hasSetupData" @click="showSetupModal = true">
-                    <ShieldCheck />Continue setup
+                    <ShieldCheck />Nadaljuj nastavitev
                 </Button>
                 <Form
                     v-else
@@ -158,7 +158,7 @@ onUnmounted(() => clearTwoFactorAuthData());
                     #default="{ processing }"
                 >
                     <Button type="submit" :disabled="processing">
-                        Enable 2FA
+                        Omogoči 2FA
                     </Button>
                 </Form>
             </div>
@@ -166,9 +166,8 @@ onUnmounted(() => clearTwoFactorAuthData());
 
         <div v-else class="flex flex-col items-start justify-start space-y-4">
             <p class="text-sm text-muted-foreground">
-                You will be prompted for a secure, random pin during login,
-                which you can retrieve from the TOTP-supported application on
-                your phone.
+                Ob prijavi boste pozvani k vnosu varnostne kode, ki jo pridobite
+                v TOTP aplikaciji na telefonu.
             </p>
 
             <div class="relative inline">
@@ -178,7 +177,7 @@ onUnmounted(() => clearTwoFactorAuthData());
                         type="submit"
                         :disabled="processing"
                     >
-                        Disable 2FA
+                        Onemogoči 2FA
                     </Button>
                 </Form>
             </div>

@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\InvestmentTransactionType;
 use App\Models\InvestmentProvider;
 use App\Models\InvestmentPurchase;
 use App\Models\InvestmentSymbol;
@@ -23,6 +24,7 @@ class InvestmentPurchaseFactory extends Factory
             'investment_provider_id' => InvestmentProvider::factory(),
             'investment_symbol_id' => InvestmentSymbol::factory(),
             'purchased_at' => fake()->dateTimeBetween('-5 years', 'now'),
+            'transaction_type' => InvestmentTransactionType::Buy,
             'quantity' => fake()->randomFloat(8, 0.1, 25),
             'price_per_unit' => fake()->randomFloat(2, 1, 1000),
             'fee' => fake()->randomFloat(2, 0, 25),

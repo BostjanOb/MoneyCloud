@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Form } from '@inertiajs/vue3';
 import { useClipboard } from '@vueuse/core';
-import { Check, Copy, ScanLine } from 'lucide-vue-next';
+import { Check, Copy, ScanLine } from '@lucide/vue';
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue';
 import AlertError from '@/components/AlertError.vue';
 import InputError from '@/components/InputError.vue';
@@ -46,26 +46,27 @@ const pinInputContainerRef = useTemplateRef('pinInputContainerRef');
 const modalConfig = computed<TwoFactorConfigContent>(() => {
     if (props.twoFactorEnabled) {
         return {
-            title: 'Two-factor authentication enabled',
+            title: 'Dvofaktorska avtentikacija je omogočena',
             description:
-                'Two-factor authentication is now enabled. Scan the QR code or enter the setup key in your authenticator app.',
-            buttonText: 'Close',
+                'Dvofaktorska avtentikacija je zdaj omogočena. Skenirajte QR kodo ali v aplikacijo za preverjanje pristnosti vnesite nastavitveni ključ.',
+            buttonText: 'Zapri',
         };
     }
 
     if (showVerificationStep.value) {
         return {
-            title: 'Verify authentication code',
-            description: 'Enter the 6-digit code from your authenticator app',
-            buttonText: 'Continue',
+            title: 'Potrdite avtentikacijsko kodo',
+            description:
+                'Vnesite 6-mestno kodo iz aplikacije za preverjanje pristnosti',
+            buttonText: 'Nadaljuj',
         };
     }
 
     return {
-        title: 'Enable two-factor authentication',
+        title: 'Omogočite dvofaktorsko avtentikacijo',
         description:
-            'To finish enabling two-factor authentication, scan the QR code or enter the setup key in your authenticator app',
-        buttonText: 'Continue',
+            'Za dokončanje nastavitve skenirajte QR kodo ali vnesite nastavitveni ključ v aplikacijo za preverjanje pristnosti',
+        buttonText: 'Nadaljuj',
     };
 });
 
@@ -197,7 +198,7 @@ watch(
                                 class="absolute inset-0 top-1/2 h-px w-full bg-border"
                             />
                             <span class="relative bg-card px-2 py-1"
-                                >or, enter the code manually</span
+                                >ali pa kodo vnesite ročno</span
                             >
                         </div>
 
@@ -278,14 +279,14 @@ watch(
                                     @click="showVerificationStep = false"
                                     :disabled="processing"
                                 >
-                                    Back
+                                    Nazaj
                                 </Button>
                                 <Button
                                     type="submit"
                                     class="w-auto flex-1"
                                     :disabled="processing || code.length < 6"
                                 >
-                                    Confirm
+                                    Potrdi
                                 </Button>
                             </div>
                         </div>

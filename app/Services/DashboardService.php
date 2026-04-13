@@ -161,7 +161,7 @@ class DashboardService
                 foreach ($symbolPurchases as $purchase) {
                     $metrics = $this->investmentPortfolioService->calculateMetrics($purchase);
 
-                    $position['quantity'] += (float) $purchase->quantity;
+                    $position['quantity'] += $purchase->signedQuantity();
                     $position['total_invested'] += $this->toCents($metrics['price']);
                     $position['current_value'] += $this->toCents($metrics['current_value']);
                     $position['profit_loss'] += $this->toCents($metrics['profit_loss']);

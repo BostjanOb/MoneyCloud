@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\InvestmentTransactionType;
 use App\Models\CryptoBalance;
 use App\Models\InvestmentPurchase;
 use Illuminate\Support\Facades\DB;
@@ -20,10 +21,11 @@ class CryptoDcaPurchaseService
             $purchase = InvestmentPurchase::query()->create($purchaseAttributes);
 
             if ($addToBalance && $balanceProviderId !== null) {
-                $this->addQuantityToBalance(
+                $this->adjustBalanceQuantity(
                     $balanceProviderId,
                     (int) $purchaseAttributes['investment_symbol_id'],
                     (string) $purchaseAttributes['quantity'],
+                    InvestmentTransactionType::from((string) $purchaseAttributes['transaction_type']),
                 );
             }
 
@@ -31,8 +33,12 @@ class CryptoDcaPurchaseService
         });
     }
 
-    private function addQuantityToBalance(int $providerId, int $symbolId, string $quantity): void
-    {
+    private function adjustBalanceQuantity(
+        int $providerId,
+        int $symbolId,
+        string $quantity,
+        InvestmentTransactionType $transactionType,
+    ): void {
         $balance = CryptoBalance::query()
             ->where('investment_provider_id', $providerId)
             ->where('investment_symbol_id', $symbolId)
@@ -40,8 +46,12 @@ class CryptoDcaPurchaseService
             ->first();
 
         if ($balance instanceof CryptoBalance) {
+            $newQuantity = $transactionType === InvestmentTransactionType::Buy
+                ? $this->addQuantities($balance->manual_quantity, $quantity)
+                : $this->subtractQuantities($balance->manual_quantity, $quantity);
+
             $balance->update([
-                'manual_quantity' => $this->addQuantities($balance->manual_quantity, $quantity),
+                'manual_quantity' => $newQuantity,
             ]);
 
             return;
@@ -50,13 +60,20 @@ class CryptoDcaPurchaseService
         CryptoBalance::query()->create([
             'investment_provider_id' => $providerId,
             'investment_symbol_id' => $symbolId,
-            'manual_quantity' => $this->formatQuantity($quantity),
+            'manual_quantity' => $transactionType === InvestmentTransactionType::Buy
+                ? $this->formatQuantity($quantity)
+                : $this->formatQuantity(0),
         ]);
     }
 
     private function addQuantities(string|int|float $left, string|int|float $right): string
     {
         return $this->formatQuantity(((float) $left) + ((float) $right));
+    }
+
+    private function subtractQuantities(string|int|float $left, string|int|float $right): string
+    {
+        return $this->formatQuantity(max(((float) $left) - ((float) $right), 0));
     }
 
     private function formatQuantity(string|int|float $quantity): string

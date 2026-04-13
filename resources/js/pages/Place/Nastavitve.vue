@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ChevronRight } from 'lucide-vue-next';
+import { ChevronRight } from '@lucide/vue';
 import { ref } from 'vue';
 import { index as placeIndex } from '@/actions/App/Http/Controllers/PaycheckController';
 import {
