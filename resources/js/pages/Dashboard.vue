@@ -1,10 +1,24 @@
 <script setup lang="ts">
+import { VisAxis, VisLine, VisScatter, VisXYContainer } from '@unovis/vue';
 import { Deferred, Head, Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import Heading from '@/components/Heading.vue';
+import type { ChartConfig } from '@/components/ui/chart';
+import {
+    ChartContainer,
+    ChartCrosshair,
+    ChartTooltip,
+    ChartTooltipContent,
+    componentToString,
+} from '@/components/ui/chart';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+    buildTrendChartData,
+    type DashboardTrendChartPoint,
+    type DashboardTrendPoint,
+} from '@/lib/dashboard';
 import { cn, formatSlovenianNumber } from '@/lib/utils';
 import { dashboard } from '@/routes';
 
@@ -47,20 +61,13 @@ type QuickAction = {
     variant: 'default' | 'outline';
 };
 
-type TrendPoint = {
-    month_date: string;
-    month_label: string;
-    total_amount: string;
-    diff_amount: string | null;
-};
-
 type TrendData = {
     latest_snapshot: {
         month_label: string;
         total_amount: string;
         diff_amount: string | null;
     } | null;
-    points: TrendPoint[];
+    points: DashboardTrendPoint[];
 };
 
 type InvestmentSummary = {
@@ -128,85 +135,52 @@ const heroCards = computed(() => [
 ]);
 
 const trendPoints = computed(() => props.trend?.points ?? []);
-const trendMaxValue = computed(() =>
-    Math.max(
-        0,
-        ...trendPoints.value.map((point) => Number(point.total_amount)),
-    ),
-);
-
-const chartDimensions = {
-    width: 920,
-    height: 320,
-    paddingTop: 20,
-    paddingRight: 20,
-    paddingBottom: 36,
-    paddingLeft: 56,
-};
-
-const chartInnerWidth =
-    chartDimensions.width -
-    chartDimensions.paddingLeft -
-    chartDimensions.paddingRight;
-const chartInnerHeight =
-    chartDimensions.height -
-    chartDimensions.paddingTop -
-    chartDimensions.paddingBottom;
-
-const trendGridLines = computed(() => {
-    const lineCount = 4;
-
-    return Array.from({ length: lineCount + 1 }, (_, index) => {
-        const ratio = index / lineCount;
-        const value = trendMaxValue.value * (1 - ratio);
-
-        return {
-            y: chartDimensions.paddingTop + chartInnerHeight * ratio,
-            label: formatMoney(value),
-        };
-    });
+const shortMonthFormatter = new Intl.DateTimeFormat('sl-SI', {
+    month: 'short',
+});
+const longMonthFormatter = new Intl.DateTimeFormat('sl-SI', {
+    month: 'long',
+    year: 'numeric',
 });
 
-const trendPath = computed(() =>
-    trendPoints.value
-        .map((point, index) => {
-            const command = index === 0 ? 'M' : 'L';
+const trendChartConfig = {
+    totalAmount: {
+        label: 'Skupna vrednost',
+        color: '#10b981',
+    },
+} satisfies ChartConfig;
 
-            return `${command} ${xPosition(index, trendPoints.value.length)} ${yPosition(Number(point.total_amount))}`;
-        })
-        .join(' '),
-);
+const trendChartData = computed(() => buildTrendChartData(trendPoints.value));
+const trendChartTicks = computed(() => {
+    const step = Math.max(1, Math.ceil(trendChartData.value.length / 6));
 
-const trendMarkers = computed(() =>
-    trendPoints.value.map((point, index) => ({
-        x: xPosition(index, trendPoints.value.length),
-        y: yPosition(Number(point.total_amount)),
-        value: point.total_amount,
-        label: point.month_label,
-    })),
-);
+    return trendChartData.value
+        .filter((_, index) => index % step === 0)
+        .map((point) => point.monthDate);
+});
 
-function xPosition(index: number, totalPoints: number): number {
-    if (totalPoints <= 1) {
-        return chartDimensions.paddingLeft + chartInnerWidth / 2;
-    }
-
-    return (
-        chartDimensions.paddingLeft +
-        (chartInnerWidth / (totalPoints - 1)) * index
-    );
+function trendXAccessor(point: DashboardTrendChartPoint): Date {
+    return point.monthDate;
 }
 
-function yPosition(value: number): number {
-    if (trendMaxValue.value === 0) {
-        return chartDimensions.paddingTop + chartInnerHeight;
-    }
+function trendYAccessor(point: DashboardTrendChartPoint): number {
+    return point.totalAmount;
+}
 
-    return (
-        chartDimensions.paddingTop +
-        chartInnerHeight -
-        (value / trendMaxValue.value) * chartInnerHeight
-    );
+function formatMoneyTick(value: number | Date): string {
+    return formatMoney(Number(value));
+}
+
+function formatTrendMonthTick(value: number | Date): string {
+    return shortMonthFormatter.format(new Date(value));
+}
+
+function formatTrendTooltipLabel(value: number | Date): string {
+    return longMonthFormatter.format(new Date(value));
+}
+
+function formatTooltipMoney(value: unknown): string {
+    return formatMoney(value as string | number | null);
 }
 
 function formatMoney(value: string | number | null): string {
@@ -387,59 +361,63 @@ function heroCardClass(key: string): string {
                                 </div>
                             </div>
 
-                            <div class="overflow-x-auto">
-                                <svg
-                                    :viewBox="`0 0 ${chartDimensions.width} ${chartDimensions.height}`"
-                                    class="min-w-[720px]"
+                            <ChartContainer
+                                :config="trendChartConfig"
+                                cursor
+                                class="!aspect-auto h-[220px] w-full sm:h-[240px]"
+                            >
+                                <VisXYContainer
+                                    :data="trendChartData"
+                                    :y-domain="[0, undefined]"
                                 >
-                                    <g>
-                                        <line
-                                            v-for="line in trendGridLines"
-                                            :key="line.y"
-                                            :x1="chartDimensions.paddingLeft"
-                                            :x2="
-                                                chartDimensions.width -
-                                                chartDimensions.paddingRight
-                                            "
-                                            :y1="line.y"
-                                            :y2="line.y"
-                                            stroke="currentColor"
-                                            stroke-dasharray="4 4"
-                                            class="text-border"
-                                        />
-                                        <text
-                                            v-for="line in trendGridLines"
-                                            :key="`${line.y}-label`"
-                                            x="12"
-                                            :y="line.y + 4"
-                                            class="fill-muted-foreground text-[12px]"
-                                        >
-                                            {{ line.label }}
-                                        </text>
-                                    </g>
-
-                                    <path
-                                        :d="trendPath"
-                                        fill="none"
-                                        stroke="#10b981"
-                                        stroke-width="4"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
+                                    <VisLine
+                                        :x="trendXAccessor"
+                                        :y="trendYAccessor"
+                                        color="var(--color-totalAmount)"
+                                        :line-width="4"
                                     />
-
-                                    <g
-                                        v-for="marker in trendMarkers"
-                                        :key="`${marker.label}-${marker.x}`"
-                                    >
-                                        <circle
-                                            :cx="marker.x"
-                                            :cy="marker.y"
-                                            r="5"
-                                            fill="#10b981"
-                                        />
-                                    </g>
-                                </svg>
-                            </div>
+                                    <VisScatter
+                                        :x="trendXAccessor"
+                                        :y="trendYAccessor"
+                                        color="var(--color-totalAmount)"
+                                        :size="8"
+                                    />
+                                    <VisAxis
+                                        type="x"
+                                        :x="trendXAccessor"
+                                        :tick-values="trendChartTicks"
+                                        :tick-format="formatTrendMonthTick"
+                                        :tick-line="false"
+                                        :domain-line="false"
+                                        :grid-line="false"
+                                    />
+                                    <VisAxis
+                                        type="y"
+                                        :tick-format="formatMoneyTick"
+                                        :tick-line="false"
+                                        :domain-line="false"
+                                        :grid-line="true"
+                                    />
+                                    <ChartTooltip />
+                                    <ChartCrosshair
+                                        :x="trendXAccessor"
+                                        :y="trendYAccessor"
+                                        color="var(--color-totalAmount)"
+                                        :template="
+                                            componentToString(
+                                                trendChartConfig,
+                                                ChartTooltipContent,
+                                                {
+                                                    labelFormatter:
+                                                        formatTrendTooltipLabel,
+                                                    valueFormatter:
+                                                        formatTooltipMoney,
+                                                },
+                                            )
+                                        "
+                                    />
+                                </VisXYContainer>
+                            </ChartContainer>
 
                             <div class="grid gap-3 sm:grid-cols-3">
                                 <div

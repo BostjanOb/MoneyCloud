@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+    buildPaycheckGrowthChartData,
     buildPaycheckGrowthSummary,
     displayedPaycheckGrowthSeries,
 } from '../../resources/js/lib/paycheckGrowth.ts';
@@ -73,7 +74,9 @@ test('paycheck growth summary uses bonus totals when bonuses are included', () =
                     '16500.00',
                     '18000.00',
                 ],
-                cumulative_bonuses_gross: Array(11).fill('0.00').concat('600.00'),
+                cumulative_bonuses_gross: Array(11)
+                    .fill('0.00')
+                    .concat('600.00'),
                 cumulative_bonuses_net: Array(11).fill('0.00').concat('500.00'),
             },
             {
@@ -155,4 +158,55 @@ test('paycheck growth summary uses bonus totals when bonuses are included', () =
         gross_change_amount: '500.00',
         gross_change_percentage: '16.67',
     });
+});
+
+test('paycheck growth chart data preserves partial year labels', () => {
+    const chartData = buildPaycheckGrowthChartData(
+        [
+            {
+                year: 2025,
+                is_partial: false,
+                recorded_through_month: 12,
+                net: '12000.00',
+                gross: '18000.00',
+                bonuses_gross: '0.00',
+                bonuses_net: '0.00',
+                gross_with_bonuses: '18000.00',
+                net_with_bonuses: '12000.00',
+                cumulative_net: Array(12).fill('0.00'),
+                cumulative_gross: Array(12).fill('0.00'),
+                cumulative_bonuses_gross: Array(12).fill('0.00'),
+                cumulative_bonuses_net: Array(12).fill('0.00'),
+            },
+            {
+                year: 2026,
+                is_partial: true,
+                recorded_through_month: 3,
+                net: '3300.00',
+                gross: '4800.00',
+                bonuses_gross: '0.00',
+                bonuses_net: '0.00',
+                gross_with_bonuses: '4800.00',
+                net_with_bonuses: '3300.00',
+                cumulative_net: Array(12).fill('0.00'),
+                cumulative_gross: Array(12).fill('0.00'),
+                cumulative_bonuses_gross: Array(12).fill('0.00'),
+                cumulative_bonuses_net: Array(12).fill('0.00'),
+            },
+        ],
+        [
+            { key: 'net', label: 'Neto', color: '#1', values: [12000, 3300] },
+            {
+                key: 'gross',
+                label: 'Bruto',
+                color: '#2',
+                values: [18000, 4800],
+            },
+        ],
+    );
+
+    assert.equal(chartData[0]?.yearLabel, '2025');
+    assert.equal(chartData[1]?.yearLabel, '2026*');
+    assert.equal(chartData[1]?.isPartial, true);
+    assert.equal(chartData[1]?.gross, 4800);
 });

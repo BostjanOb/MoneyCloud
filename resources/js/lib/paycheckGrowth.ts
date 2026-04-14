@@ -30,6 +30,13 @@ export type PaycheckGrowthSummary = {
     gross_change_percentage: string | null;
 };
 
+export type PaycheckGrowthChartPoint = {
+    year: number;
+    yearLabel: string;
+    isPartial: boolean;
+    [key: string]: boolean | number | string;
+};
+
 export function displayedPaycheckGrowthSeries(
     chartSeries: PaycheckGrowthSeries[],
     includeBonuses: boolean,
@@ -55,10 +62,14 @@ export function buildPaycheckGrowthSummary(
         return emptySummary();
     }
 
-    const previousRow = rows.length > 1 ? rows.at(-2) ?? null : null;
+    const previousRow = rows.length > 1 ? (rows.at(-2) ?? null) : null;
     const comparisonMonth = latestRow.recorded_through_month ?? 12;
-    const latestNet = includeBonuses ? latestRow.net_with_bonuses : latestRow.net;
-    const latestGross = includeBonuses ? latestRow.gross_with_bonuses : latestRow.gross;
+    const latestNet = includeBonuses
+        ? latestRow.net_with_bonuses
+        : latestRow.net;
+    const latestGross = includeBonuses
+        ? latestRow.gross_with_bonuses
+        : latestRow.gross;
     const previousNet = previousRow
         ? comparableValue(previousRow, comparisonMonth, includeBonuses, 'net')
         : null;
@@ -69,19 +80,40 @@ export function buildPaycheckGrowthSummary(
     return {
         latest_year: latestRow.year,
         previous_year: previousRow?.year ?? null,
-        net_change_amount: previousNet !== null
-            ? amountDifference(latestNet, previousNet)
-            : null,
-        net_change_percentage: previousNet !== null
-            ? percentageDifference(latestNet, previousNet)
-            : null,
-        gross_change_amount: previousGross !== null
-            ? amountDifference(latestGross, previousGross)
-            : null,
-        gross_change_percentage: previousGross !== null
-            ? percentageDifference(latestGross, previousGross)
-            : null,
+        net_change_amount:
+            previousNet !== null
+                ? amountDifference(latestNet, previousNet)
+                : null,
+        net_change_percentage:
+            previousNet !== null
+                ? percentageDifference(latestNet, previousNet)
+                : null,
+        gross_change_amount:
+            previousGross !== null
+                ? amountDifference(latestGross, previousGross)
+                : null,
+        gross_change_percentage:
+            previousGross !== null
+                ? percentageDifference(latestGross, previousGross)
+                : null,
     };
+}
+
+export function buildPaycheckGrowthChartData(
+    rows: readonly PaycheckGrowthRow[],
+    chartSeries: readonly PaycheckGrowthSeries[],
+): PaycheckGrowthChartPoint[] {
+    return rows.map((row, index) => ({
+        year: row.year,
+        yearLabel: row.is_partial ? `${row.year}*` : String(row.year),
+        isPartial: row.is_partial,
+        ...Object.fromEntries(
+            chartSeries.map((series) => [
+                series.key,
+                series.values[index] ?? 0,
+            ]),
+        ),
+    }));
 }
 
 function emptySummary(): PaycheckGrowthSummary {
@@ -99,12 +131,18 @@ function amountDifference(current: string, previous: string): string {
     return ((Number(current) - Number(previous)) as number).toFixed(2);
 }
 
-function percentageDifference(current: string, previous: string): string | null {
+function percentageDifference(
+    current: string,
+    previous: string,
+): string | null {
     if (Number(previous) === 0) {
         return null;
     }
 
-    return (((Number(current) - Number(previous)) / Number(previous)) * 100).toFixed(2);
+    return (
+        ((Number(current) - Number(previous)) / Number(previous)) *
+        100
+    ).toFixed(2);
 }
 
 function comparableValue(
@@ -126,5 +164,8 @@ function comparableValue(
             ? row.cumulative_bonuses_net
             : row.cumulative_bonuses_gross;
 
-    return (Number(baseValues[index] ?? '0.00') + Number(bonusValues[index] ?? '0.00')).toFixed(2);
+    return (
+        Number(baseValues[index] ?? '0.00') +
+        Number(bonusValues[index] ?? '0.00')
+    ).toFixed(2);
 }

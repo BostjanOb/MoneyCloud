@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { VisAxis, VisLine, VisScatter, VisXYContainer } from '@unovis/vue';
 import { Head, router, setLayoutProps } from '@inertiajs/vue3';
 import type { AcceptableValue } from 'reka-ui';
 import { computed, ref } from 'vue';
@@ -7,6 +8,15 @@ import {
     paycheckGrowth as statisticsPaycheckGrowth,
 } from '@/actions/App/Http/Controllers/StatisticsController';
 import Heading from '@/components/Heading.vue';
+import type { ChartConfig } from '@/components/ui/chart';
+import {
+    ChartContainer,
+    ChartCrosshair,
+    ChartLegendContent,
+    ChartTooltip,
+    ChartTooltipContent,
+    componentToString,
+} from '@/components/ui/chart';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -20,13 +30,16 @@ import {
 } from '@/components/ui/select';
 import { Table } from '@/components/ui/table';
 import {
+    buildPaycheckGrowthChartData,
     buildPaycheckGrowthSummary,
-    displayedPaycheckGrowthSeries
-    
-    
-    
+    displayedPaycheckGrowthSeries,
+    type PaycheckGrowthChartPoint,
 } from '@/lib/paycheckGrowth';
-import type {PaycheckGrowthRow, PaycheckGrowthSeries, PaycheckGrowthSummary} from '@/lib/paycheckGrowth';
+import type {
+    PaycheckGrowthRow,
+    PaycheckGrowthSeries,
+    PaycheckGrowthSummary,
+} from '@/lib/paycheckGrowth';
 import { formatSlovenianNumber } from '@/lib/utils';
 
 type PersonFilter = {
@@ -59,15 +72,9 @@ setLayoutProps({
 });
 
 const includeBonuses = ref(props.includeBonusesDefault);
-
-const chartDimensions = {
-    width: 900,
-    height: 320,
-    paddingTop: 20,
-    paddingRight: 20,
-    paddingBottom: 40,
-    paddingLeft: 56,
-};
+const yearNumberFormatter = new Intl.NumberFormat('sl-SI', {
+    maximumFractionDigits: 0,
+});
 
 const visibleSeries = computed(() =>
     displayedPaycheckGrowthSeries(props.chartSeries, includeBonuses.value),
@@ -76,46 +83,33 @@ const visibleSeries = computed(() =>
 const displayedSummary = computed(() =>
     buildPaycheckGrowthSummary(props.rows, includeBonuses.value),
 );
-
-const chartMaxValue = computed(() =>
-    Math.max(0, ...visibleSeries.value.flatMap((series) => series.values)),
+const visibleChartData = computed(() =>
+    buildPaycheckGrowthChartData(props.rows, visibleSeries.value),
 );
-
-const chartInnerWidth =
-    chartDimensions.width -
-    chartDimensions.paddingLeft -
-    chartDimensions.paddingRight;
-const chartInnerHeight =
-    chartDimensions.height -
-    chartDimensions.paddingTop -
-    chartDimensions.paddingBottom;
-
-const chartLines = computed(() =>
-    visibleSeries.value.map((series) => ({
-        ...series,
-        path: buildPath(series.values),
-        points: series.values.map((value, index) => ({
-            value,
-            x: xPosition(index, series.values.length),
-            y: yPosition(value),
-            isPartial: props.rows[index]?.is_partial ?? false,
-        })),
-    })),
+const visibleChartConfig = computed<ChartConfig>(() =>
+    Object.fromEntries(
+        visibleSeries.value.map((series) => [
+            series.key,
+            {
+                label: series.label,
+                color: series.color,
+            },
+        ]),
+    ),
 );
-
-const chartGridLines = computed(() => {
-    const lineCount = 4;
-
-    return Array.from({ length: lineCount + 1 }, (_, index) => {
-        const ratio = index / lineCount;
-        const value = chartMaxValue.value * (1 - ratio);
-
-        return {
-            y: chartDimensions.paddingTop + chartInnerHeight * ratio,
-            label: formatMoney(value),
-        };
-    });
-});
+const visibleChartTicks = computed(() =>
+    visibleChartData.value.map((point) => point.year),
+);
+const visibleChartYAccessors = computed(() =>
+    visibleSeries.value.map(
+        (series) =>
+            (point: PaycheckGrowthChartPoint): number =>
+                Number(point[series.key] ?? 0),
+    ),
+);
+const visibleChartColors = computed(() =>
+    visibleSeries.value.map((series) => `var(--color-${series.key})`),
+);
 
 const summaryCards = computed(() => {
     const latestRow = props.rows.at(-1);
@@ -132,13 +126,17 @@ const summaryCards = computed(() => {
 
     return [
         {
-            label: includeBonuses.value ? 'Neto dohodek z bonusi' : 'Neto dohodek',
+            label: includeBonuses.value
+                ? 'Neto dohodek z bonusi'
+                : 'Neto dohodek',
             value: netValue,
             changeAmount: displayedSummary.value.net_change_amount,
             changePercentage: displayedSummary.value.net_change_percentage,
         },
         {
-            label: includeBonuses.value ? 'Bruto dohodek z bonusi' : 'Bruto dohodek',
+            label: includeBonuses.value
+                ? 'Bruto dohodek z bonusi'
+                : 'Bruto dohodek',
             value: grossValue,
             changeAmount: displayedSummary.value.gross_change_amount,
             changePercentage: displayedSummary.value.gross_change_percentage,
@@ -164,41 +162,50 @@ function updatePersonFilter(value: AcceptableValue): void {
     );
 }
 
-function xPosition(index: number, totalPoints: number): number {
-    if (totalPoints <= 1) {
-        return chartDimensions.paddingLeft + chartInnerWidth / 2;
-    }
-
-    return (
-        chartDimensions.paddingLeft +
-        (chartInnerWidth / (totalPoints - 1)) * index
-    );
+function paycheckGrowthXAccessor(point: PaycheckGrowthChartPoint): number {
+    return point.year;
 }
 
-function yPosition(value: number): number {
-    if (chartMaxValue.value === 0) {
-        return chartDimensions.paddingTop + chartInnerHeight;
-    }
-
-    return (
-        chartDimensions.paddingTop +
-        chartInnerHeight -
-        (value / chartMaxValue.value) * chartInnerHeight
-    );
+function paycheckGrowthYAccessor(
+    key: string,
+): (point: PaycheckGrowthChartPoint) => number {
+    return (point) => Number(point[key] ?? 0);
 }
 
-function buildPath(values: number[]): string {
-    if (values.length === 0) {
-        return '';
+function formatPaycheckYearTick(value: number | Date): string {
+    const year = Number(value);
+    const point = visibleChartData.value.find((item) => item.year === year);
+
+    return point?.yearLabel ?? yearNumberFormatter.format(year);
+}
+
+function formatPaycheckTooltipLabel(value: number | Date): string {
+    const year = Number(value);
+    const point = visibleChartData.value.find((item) => item.year === year);
+
+    if (!point) {
+        return yearNumberFormatter.format(year);
     }
 
-    return values
-        .map((value, index) => {
-            const command = index === 0 ? 'M' : 'L';
+    return point.isPartial
+        ? `${point.yearLabel} (delno leto)`
+        : point.yearLabel;
+}
 
-            return `${command} ${xPosition(index, values.length)} ${yPosition(value)}`;
-        })
-        .join(' ');
+function formatMoneyTick(value: number | Date): string {
+    return formatMoney(Number(value));
+}
+
+function formatTooltipMoney(value: unknown): string {
+    return formatMoney(value as string | number | null);
+}
+
+function paycheckPointSize(point: PaycheckGrowthChartPoint): number {
+    return point.isPartial ? 10 : 7;
+}
+
+function paycheckPointStrokeWidth(point: PaycheckGrowthChartPoint): number {
+    return point.isPartial ? 2 : 0;
 }
 
 function formatMoney(value: string | number | null): string {
@@ -231,10 +238,6 @@ function formatSignedPercent(value: string | number | null): string {
     return `${prefix}${formatSlovenianNumber(amount)} %`;
 }
 
-function yearAxisLabel(row: PaycheckGrowthRow): string {
-    return row.is_partial ? `${row.year}*` : String(row.year);
-}
-
 function partialYearsLabel(): string {
     const partialYears = props.rows
         .filter((row) => row.is_partial)
@@ -248,7 +251,10 @@ function partialYearsLabel(): string {
 }
 
 function summaryComparisonText(): string {
-    if (displayedSummary.value.latest_year === null || displayedSummary.value.previous_year === null) {
+    if (
+        displayedSummary.value.latest_year === null ||
+        displayedSummary.value.previous_year === null
+    ) {
         return 'Primerjava bo na voljo po dveh prikazanih letih.';
     }
 
@@ -347,101 +353,77 @@ function summaryComparisonText(): string {
                     v-if="props.rows.length === 0"
                     class="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground"
                 >
-                    Ko bodo vnesene letne plače, se bo tukaj prikazal graf rasti.
+                    Ko bodo vnesene letne plače, se bo tukaj prikazal graf
+                    rasti.
                 </div>
 
                 <div v-else class="space-y-4">
-                    <div class="flex flex-wrap gap-3 text-xs">
-                        <div
-                            v-for="series in chartLines"
-                            :key="series.key"
-                            class="flex items-center gap-2"
-                        >
-                            <span
-                                class="h-2.5 w-2.5 rounded-full"
-                                :style="{ backgroundColor: series.color }"
-                            />
-                            <span>{{ series.label }}</span>
-                        </div>
-                    </div>
-
-                    <svg
-                        :viewBox="`0 0 ${chartDimensions.width} ${chartDimensions.height}`"
-                        class="w-full overflow-visible"
-                        role="img"
-                        aria-label="Graf rasti plač po letih"
+                    <ChartContainer
+                        :config="visibleChartConfig"
+                        cursor
+                        class="!aspect-auto h-[220px] w-full sm:h-[240px]"
                     >
-                        <g>
-                            <line
-                                v-for="gridLine in chartGridLines"
-                                :key="gridLine.y"
-                                :x1="chartDimensions.paddingLeft"
-                                :x2="
-                                    chartDimensions.width -
-                                    chartDimensions.paddingRight
-                                "
-                                :y1="gridLine.y"
-                                :y2="gridLine.y"
-                                stroke="currentColor"
-                                class="text-border"
-                                stroke-dasharray="4 6"
+                        <VisXYContainer
+                            :data="visibleChartData"
+                            :y-domain="[0, undefined]"
+                        >
+                            <VisLine
+                                v-for="series in visibleSeries"
+                                :key="`${series.key}-line`"
+                                :x="paycheckGrowthXAccessor"
+                                :y="paycheckGrowthYAccessor(series.key)"
+                                :color="`var(--color-${series.key})`"
+                                :line-width="3"
                             />
-                            <text
-                                v-for="gridLine in chartGridLines"
-                                :key="`${gridLine.y}-label`"
-                                :x="chartDimensions.paddingLeft - 8"
-                                :y="gridLine.y + 4"
-                                text-anchor="end"
-                                class="fill-muted-foreground text-[11px]"
-                            >
-                                {{ gridLine.label }}
-                            </text>
-                        </g>
-
-                        <g>
-                            <path
-                                v-for="series in chartLines"
-                                :key="series.key"
-                                :d="series.path"
-                                fill="none"
-                                :stroke="series.color"
-                                stroke-width="3"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                            />
-                            <template
-                                v-for="series in chartLines"
+                            <VisScatter
+                                v-for="series in visibleSeries"
                                 :key="`${series.key}-points`"
-                            >
-                                <circle
-                                    v-for="point in series.points"
-                                    :key="`${series.key}-${point.x}-${point.y}`"
-                                    :cx="point.x"
-                                    :cy="point.y"
-                                    :r="point.isPartial ? 5 : 4"
-                                    :fill="series.color"
-                                    :class="
-                                        point.isPartial
-                                            ? 'stroke-background stroke-[2]'
-                                            : ''
-                                    "
-                                />
-                            </template>
-                        </g>
-
-                        <g>
-                            <text
-                                v-for="(row, index) in props.rows"
-                                :key="row.year"
-                                :x="xPosition(index, props.rows.length)"
-                                :y="chartDimensions.height - 12"
-                                text-anchor="middle"
-                                class="fill-muted-foreground text-[11px]"
-                            >
-                                {{ yearAxisLabel(row) }}
-                            </text>
-                        </g>
-                    </svg>
+                                :x="paycheckGrowthXAccessor"
+                                :y="paycheckGrowthYAccessor(series.key)"
+                                :color="`var(--color-${series.key})`"
+                                :size="paycheckPointSize"
+                                stroke-color="var(--background)"
+                                :stroke-width="paycheckPointStrokeWidth"
+                            />
+                            <VisAxis
+                                type="x"
+                                :x="paycheckGrowthXAccessor"
+                                :tick-values="visibleChartTicks"
+                                :tick-format="formatPaycheckYearTick"
+                                :tick-line="false"
+                                :domain-line="false"
+                                :grid-line="false"
+                            />
+                            <VisAxis
+                                type="y"
+                                :tick-format="formatMoneyTick"
+                                :tick-line="false"
+                                :domain-line="false"
+                                :grid-line="true"
+                            />
+                            <ChartTooltip />
+                            <ChartCrosshair
+                                :x="paycheckGrowthXAccessor"
+                                :y="visibleChartYAccessors"
+                                :color="visibleChartColors"
+                                :template="
+                                    componentToString(
+                                        visibleChartConfig,
+                                        ChartTooltipContent,
+                                        {
+                                            labelFormatter:
+                                                formatPaycheckTooltipLabel,
+                                            valueFormatter: formatTooltipMoney,
+                                        },
+                                    )
+                                "
+                            />
+                        </VisXYContainer>
+                        <ChartLegendContent
+                            vertical-align="top"
+                            class="flex-wrap justify-start"
+                        />
+                    </ChartContainer>
 
                     <p class="text-xs text-muted-foreground">
                         {{ partialYearsLabel() }}
@@ -503,7 +485,9 @@ function summaryComparisonText(): string {
                             :key="row.year"
                             class="border-b transition-colors hover:bg-muted/50"
                         >
-                            <td class="p-2 font-medium align-middle whitespace-nowrap">
+                            <td
+                                class="p-2 align-middle font-medium whitespace-nowrap"
+                            >
                                 {{ row.year }}
                             </td>
                             <td

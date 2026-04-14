@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { VisAxis, VisLine, VisScatter, VisXYContainer } from '@unovis/vue';
 import { Head, setLayoutProps, useForm } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import {
@@ -25,7 +26,20 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table } from '@/components/ui/table';
-import { sortMonthlyHistoryRows } from '@/lib/monthlySummary';
+import type { ChartConfig } from '@/components/ui/chart';
+import {
+    ChartContainer,
+    ChartCrosshair,
+    ChartLegendContent,
+    ChartTooltip,
+    ChartTooltipContent,
+    componentToString,
+} from '@/components/ui/chart';
+import {
+    buildMonthlyChartData,
+    sortMonthlyHistoryRows,
+    type MonthlySummaryChartPoint,
+} from '@/lib/monthlySummary';
 import { formatSlovenianNumber } from '@/lib/utils';
 
 type MonthlyRow = {
@@ -114,53 +128,46 @@ const latestCards = computed(() => [
 
 const historyRows = computed(() => sortMonthlyHistoryRows(props.rows));
 
-const chartDimensions = {
-    width: 900,
-    height: 320,
-    paddingTop: 20,
-    paddingRight: 20,
-    paddingBottom: 40,
-    paddingLeft: 48,
-};
-
-const chartMaxValue = computed(() =>
-    Math.max(0, ...props.chartSeries.flatMap((series) => series.values)),
-);
-
-const chartInnerWidth =
-    chartDimensions.width -
-    chartDimensions.paddingLeft -
-    chartDimensions.paddingRight;
-const chartInnerHeight =
-    chartDimensions.height -
-    chartDimensions.paddingTop -
-    chartDimensions.paddingBottom;
-
-const chartLines = computed(() =>
-    props.chartSeries.map((series) => ({
-        ...series,
-        path: buildPath(series.values),
-        points: series.values.map((value, index) => ({
-            value,
-            x: xPosition(index, series.values.length),
-            y: yPosition(value),
-        })),
-    })),
-);
-
-const chartGridLines = computed(() => {
-    const lineCount = 4;
-
-    return Array.from({ length: lineCount + 1 }, (_, index) => {
-        const ratio = index / lineCount;
-        const value = chartMaxValue.value * (1 - ratio);
-
-        return {
-            y: chartDimensions.paddingTop + chartInnerHeight * ratio,
-            label: formatMoney(value),
-        };
-    });
+const shortMonthFormatter = new Intl.DateTimeFormat('sl-SI', {
+    month: 'short',
+    year: '2-digit',
 });
+const longMonthFormatter = new Intl.DateTimeFormat('sl-SI', {
+    month: 'long',
+    year: 'numeric',
+});
+
+const monthlyChartData = computed(() =>
+    buildMonthlyChartData(props.rows, props.chartSeries),
+);
+const monthlyChartConfig = computed<ChartConfig>(() =>
+    Object.fromEntries(
+        props.chartSeries.map((series) => [
+            series.key,
+            {
+                label: series.label,
+                color: series.color,
+            },
+        ]),
+    ),
+);
+const monthlyChartTicks = computed(() => {
+    const step = Math.max(1, Math.ceil(monthlyChartData.value.length / 6));
+
+    return monthlyChartData.value
+        .filter((_, index) => index % step === 0)
+        .map((point) => point.monthDate);
+});
+const monthlyChartYAccessors = computed(() =>
+    props.chartSeries.map(
+        (series) =>
+            (point: MonthlySummaryChartPoint): number =>
+                Number(point[series.key] ?? 0),
+    ),
+);
+const monthlyChartColors = computed(() =>
+    props.chartSeries.map((series) => `var(--color-${series.key})`),
+);
 
 function currentMonthInput(): string {
     return new Date().toISOString().slice(0, 7);
@@ -170,41 +177,30 @@ function toMonthInput(value: string): string {
     return value.slice(0, 7);
 }
 
-function xPosition(index: number, totalPoints: number): number {
-    if (totalPoints <= 1) {
-        return chartDimensions.paddingLeft + chartInnerWidth / 2;
-    }
-
-    return (
-        chartDimensions.paddingLeft +
-        (chartInnerWidth / (totalPoints - 1)) * index
-    );
+function monthlyXAccessor(point: MonthlySummaryChartPoint): Date {
+    return point.monthDate;
 }
 
-function yPosition(value: number): number {
-    if (chartMaxValue.value === 0) {
-        return chartDimensions.paddingTop + chartInnerHeight;
-    }
-
-    return (
-        chartDimensions.paddingTop +
-        chartInnerHeight -
-        (value / chartMaxValue.value) * chartInnerHeight
-    );
+function monthlyYAccessor(
+    key: string,
+): (point: MonthlySummaryChartPoint) => number {
+    return (point) => Number(point[key] ?? 0);
 }
 
-function buildPath(values: number[]): string {
-    if (values.length === 0) {
-        return '';
-    }
+function formatMonthTick(value: number | Date): string {
+    return shortMonthFormatter.format(new Date(value));
+}
 
-    return values
-        .map((value, index) => {
-            const command = index === 0 ? 'M' : 'L';
+function formatMonthTooltip(value: number | Date): string {
+    return longMonthFormatter.format(new Date(value));
+}
 
-            return `${command} ${xPosition(index, values.length)} ${yPosition(value)}`;
-        })
-        .join(' ');
+function formatMoneyTick(value: number | Date): string {
+    return formatMoney(Number(value));
+}
+
+function formatTooltipMoney(value: unknown): string {
+    return formatMoney(value as string | number);
 }
 
 function formatMoney(value: string | number): string {
@@ -361,92 +357,69 @@ function submitSnapshot(): void {
                 </div>
 
                 <div v-else class="space-y-4">
-                    <div class="flex flex-wrap gap-3 text-xs">
-                        <div
-                            v-for="series in chartLines"
-                            :key="series.key"
-                            class="flex items-center gap-2"
-                        >
-                            <span
-                                class="h-2.5 w-2.5 rounded-full"
-                                :style="{ backgroundColor: series.color }"
-                            />
-                            <span>{{ series.label }}</span>
-                        </div>
-                    </div>
-
-                    <svg
-                        :viewBox="`0 0 ${chartDimensions.width} ${chartDimensions.height}`"
-                        class="w-full overflow-visible"
-                        role="img"
-                        aria-label="Graf mesečnega povzetka"
+                    <ChartContainer
+                        :config="monthlyChartConfig"
+                        cursor
+                        class="!aspect-auto h-[220px] w-full sm:h-[240px]"
                     >
-                        <g>
-                            <line
-                                v-for="gridLine in chartGridLines"
-                                :key="gridLine.y"
-                                :x1="chartDimensions.paddingLeft"
-                                :x2="
-                                    chartDimensions.width -
-                                    chartDimensions.paddingRight
-                                "
-                                :y1="gridLine.y"
-                                :y2="gridLine.y"
-                                stroke="currentColor"
-                                class="text-border"
-                                stroke-dasharray="4 6"
+                        <VisXYContainer
+                            :data="monthlyChartData"
+                            :y-domain="[0, undefined]"
+                        >
+                            <VisLine
+                                v-for="series in props.chartSeries"
+                                :key="`${series.key}-line`"
+                                :x="monthlyXAccessor"
+                                :y="monthlyYAccessor(series.key)"
+                                :color="`var(--color-${series.key})`"
+                                :line-width="3"
                             />
-                            <text
-                                v-for="gridLine in chartGridLines"
-                                :key="`${gridLine.y}-label`"
-                                :x="chartDimensions.paddingLeft - 8"
-                                :y="gridLine.y + 4"
-                                text-anchor="end"
-                                class="fill-muted-foreground text-[11px]"
-                            >
-                                {{ gridLine.label }}
-                            </text>
-                        </g>
-
-                        <g>
-                            <path
-                                v-for="series in chartLines"
-                                :key="series.key"
-                                :d="series.path"
-                                fill="none"
-                                :stroke="series.color"
-                                stroke-width="3"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                            />
-                            <template
-                                v-for="series in chartLines"
+                            <VisScatter
+                                v-for="series in props.chartSeries"
                                 :key="`${series.key}-points`"
-                            >
-                                <circle
-                                    v-for="point in series.points"
-                                    :key="`${series.key}-${point.x}-${point.y}`"
-                                    :cx="point.x"
-                                    :cy="point.y"
-                                    r="4"
-                                    :fill="series.color"
-                                />
-                            </template>
-                        </g>
-
-                        <g>
-                            <text
-                                v-for="(row, index) in props.rows"
-                                :key="row.id"
-                                :x="xPosition(index, props.rows.length)"
-                                :y="chartDimensions.height - 12"
-                                text-anchor="middle"
-                                class="fill-muted-foreground text-[11px]"
-                            >
-                                {{ row.month_label }}
-                            </text>
-                        </g>
-                    </svg>
+                                :x="monthlyXAccessor"
+                                :y="monthlyYAccessor(series.key)"
+                                :color="`var(--color-${series.key})`"
+                                :size="7"
+                            />
+                            <VisAxis
+                                type="x"
+                                :x="monthlyXAccessor"
+                                :tick-values="monthlyChartTicks"
+                                :tick-format="formatMonthTick"
+                                :tick-line="false"
+                                :domain-line="false"
+                                :grid-line="false"
+                            />
+                            <VisAxis
+                                type="y"
+                                :tick-format="formatMoneyTick"
+                                :tick-line="false"
+                                :domain-line="false"
+                                :grid-line="true"
+                            />
+                            <ChartTooltip />
+                            <ChartCrosshair
+                                :x="monthlyXAccessor"
+                                :y="monthlyChartYAccessors"
+                                :color="monthlyChartColors"
+                                :template="
+                                    componentToString(
+                                        monthlyChartConfig,
+                                        ChartTooltipContent,
+                                        {
+                                            labelFormatter: formatMonthTooltip,
+                                            valueFormatter: formatTooltipMoney,
+                                        },
+                                    )
+                                "
+                            />
+                        </VisXYContainer>
+                        <ChartLegendContent
+                            vertical-align="top"
+                            class="flex-wrap justify-start"
+                        />
+                    </ChartContainer>
                 </div>
             </CardContent>
         </Card>
