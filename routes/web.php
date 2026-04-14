@@ -13,6 +13,7 @@ use App\Http\Controllers\PaycheckController;
 use App\Http\Controllers\PaycheckYearController;
 use App\Http\Controllers\PersonController;
 use App\Http\Controllers\SavingsAccountController;
+use App\Http\Controllers\SavingsBalanceAdjustmentController;
 use App\Http\Controllers\SavingsInterestController;
 use App\Http\Controllers\StatisticsController;
 use App\Http\Controllers\TaxSettingController;
@@ -45,6 +46,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/', [SavingsAccountController::class, 'store'])->name('savings.store');
         Route::put('/{savingsAccount}', [SavingsAccountController::class, 'update'])->name('savings.update');
         Route::delete('/{savingsAccount}', [SavingsAccountController::class, 'destroy'])->name('savings.destroy');
+        Route::post('/{savingsAccount}/stanje', [SavingsBalanceAdjustmentController::class, 'store'])
+            ->name('savings.balance-adjustments.store');
         Route::post('/{savingsAccount}/obresti', [SavingsInterestController::class, 'store'])->name('savings.interest.store');
     });
 

@@ -8,6 +8,7 @@ import {
     update as savingsUpdate,
     destroy as savingsDestroy,
 } from '@/actions/App/Http/Controllers/SavingsAccountController';
+import { store as savingsBalanceAdjustmentStore } from '@/actions/App/Http/Controllers/SavingsBalanceAdjustmentController';
 import { store as savingsInterestStore } from '@/actions/App/Http/Controllers/SavingsInterestController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
@@ -61,6 +62,12 @@ type PersonOption = {
     label: string;
 };
 
+type LeafAccountOption = {
+    id: number;
+    label: string;
+    amount: string;
+};
+
 type Totals = {
     amount: string;
     annual_yield: string;
@@ -70,6 +77,7 @@ type Totals = {
 type Props = {
     accounts: AccountNode[];
     personOptions: PersonOption[];
+    leafAccountOptions: LeafAccountOption[];
     totals: Totals;
 };
 
@@ -93,11 +101,14 @@ defineOptions({
 });
 
 const NO_PARENT_VALUE = '__none__';
+const NO_RELATED_ACCOUNT_VALUE = '__none__';
 const defaultPerson = props.personOptions[0]?.value ?? '';
 
 const showAccountModal = ref(false);
+const showBalanceModal = ref(false);
 const showInterestModal = ref(false);
 const editingAccount = ref<AccountNode | null>(null);
+const selectedBalanceAccount = ref<AccountNode | null>(null);
 const selectedInterestAccount = ref<AccountNode | null>(null);
 
 const accountForm = useForm({
@@ -111,6 +122,12 @@ const accountForm = useForm({
 
 const interestForm = useForm({
     amount: '',
+});
+
+const balanceForm = useForm({
+    operation: 'add',
+    amount: '',
+    related_account_id: NO_RELATED_ACCOUNT_VALUE,
 });
 
 const rootAccounts = computed(() => props.accounts);
@@ -133,6 +150,12 @@ const accountRows = computed(() =>
             parentName: account.name,
         })),
     ]),
+);
+
+const relatedAccountOptions = computed(() =>
+    props.leafAccountOptions.filter(
+        (account) => account.id !== selectedBalanceAccount.value?.id,
+    ),
 );
 
 const interestPreviewRows = computed(() => {
@@ -192,6 +215,31 @@ const projectedLeafAmount = computed(() => {
     return fromCents(toCents(account.amount) + toCents(interestForm.amount));
 });
 
+const selectedRelatedAccount = computed(() =>
+    relatedAccountOptions.value.find(
+        (account) => String(account.id) === balanceForm.related_account_id,
+    ) ?? null,
+);
+
+const balanceFlowHint = computed(() => {
+    const targetAccount = selectedBalanceAccount.value;
+    const relatedAccount = selectedRelatedAccount.value;
+
+    if (targetAccount === null) {
+        return '';
+    }
+
+    if (relatedAccount === null) {
+        return balanceForm.operation === 'add'
+            ? 'Če drugega računa ne izberete, bo znesek dodan kot zunanji priliv.'
+            : 'Če drugega računa ne izberete, bo znesek odštet kot zunanji odliv.';
+    }
+
+    return balanceForm.operation === 'add'
+        ? `Znesek bo prenesen iz računa ${relatedAccount.label} na račun ${targetAccount.name}.`
+        : `Znesek bo prenesen iz računa ${targetAccount.name} na račun ${relatedAccount.label}.`;
+});
+
 function formatNumber(value: string | number): string {
     return formatSlovenianNumber(value);
 }
@@ -227,6 +275,22 @@ function openCreateAccount(): void {
     editingAccount.value = null;
     resetAccountForm();
     showAccountModal.value = true;
+}
+
+function resetBalanceForm(): void {
+    balanceForm.defaults({
+        operation: 'add',
+        amount: '',
+        related_account_id: NO_RELATED_ACCOUNT_VALUE,
+    });
+    balanceForm.reset();
+    balanceForm.clearErrors();
+}
+
+function openBalanceModal(account: AccountNode): void {
+    selectedBalanceAccount.value = account;
+    resetBalanceForm();
+    showBalanceModal.value = true;
 }
 
 function openEditAccount(account: AccountNode): void {
@@ -286,6 +350,32 @@ function submitAccount(): void {
     accountForm.post(savingsStore.url(), options);
 }
 
+function submitBalance(): void {
+    const account = selectedBalanceAccount.value;
+
+    if (account === null) {
+        return;
+    }
+
+    balanceForm.transform((data) => ({
+        operation: data.operation,
+        amount: data.amount,
+        related_account_id:
+            data.related_account_id === NO_RELATED_ACCOUNT_VALUE
+                ? null
+                : Number(data.related_account_id),
+    }));
+
+    balanceForm.post(savingsBalanceAdjustmentStore.url(account.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            showBalanceModal.value = false;
+            selectedBalanceAccount.value = null;
+            resetBalanceForm();
+        },
+    });
+}
+
 function deleteAccount(account: AccountNode): void {
     const confirmation = account.has_children
         ? 'Ste prepričani, da želite izbrisati ta račun in vse njegove podračune?'
@@ -340,6 +430,18 @@ function updatePerson(value: AcceptableValue): void {
 function updateParent(value: AcceptableValue): void {
     if (typeof value === 'string') {
         accountForm.parent_id = value;
+    }
+}
+
+function updateBalanceOperation(value: AcceptableValue): void {
+    if (value === 'add' || value === 'subtract') {
+        balanceForm.operation = value;
+    }
+}
+
+function updateRelatedAccount(value: AcceptableValue): void {
+    if (typeof value === 'string') {
+        balanceForm.related_account_id = value;
     }
 }
 </script>
@@ -456,6 +558,13 @@ function updateParent(value: AcceptableValue): void {
                             >
                             <TableCell class="text-right">
                                 <div class="flex justify-end gap-1">
+                                    <Button
+                                        v-if="!row.account.has_children"
+                                        variant="ghost"
+                                        size="sm"
+                                        @click="openBalanceModal(row.account)"
+                                        >Prilagodi</Button
+                                    >
                                     <Button
                                         variant="ghost"
                                         size="sm"
@@ -643,6 +752,110 @@ function updateParent(value: AcceptableValue): void {
                         {{
                             editingAccount ? 'Shrani spremembe' : 'Dodaj račun'
                         }}
+                    </Button>
+                </DialogFooter>
+            </form>
+        </DialogContent>
+    </Dialog>
+
+    <Dialog v-model:open="showBalanceModal">
+        <DialogContent class="sm:max-w-xl">
+            <DialogHeader>
+                <DialogTitle>Prenos ali popravek zneska</DialogTitle>
+                <DialogDescription>
+                    Prilagodite stanje računa
+                    {{ selectedBalanceAccount?.name }} ali prenesite znesek med
+                    dvema leaf računoma.
+                </DialogDescription>
+            </DialogHeader>
+
+            <form class="grid gap-4" @submit.prevent="submitBalance">
+                <div class="grid gap-2">
+                    <Label for="balance-operation">Vrsta spremembe</Label>
+                    <Select
+                        :model-value="balanceForm.operation"
+                        @update:model-value="updateBalanceOperation"
+                    >
+                        <SelectTrigger id="balance-operation">
+                            <SelectValue placeholder="Izberite vrsto spremembe" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="add">Dodaj</SelectItem>
+                            <SelectItem value="subtract">Odštej</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <InputError :message="balanceForm.errors.operation" />
+                </div>
+
+                <div class="grid gap-2">
+                    <Label for="balance-amount">Znesek</Label>
+                    <Input
+                        id="balance-amount"
+                        v-model="balanceForm.amount"
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                    />
+                    <InputError :message="balanceForm.errors.amount" />
+                </div>
+
+                <div class="grid gap-2">
+                    <Label for="balance-related-account">
+                        Drugi račun
+                        <span class="text-muted-foreground">(neobvezno)</span>
+                    </Label>
+                    <Select
+                        :model-value="balanceForm.related_account_id"
+                        @update:model-value="updateRelatedAccount"
+                    >
+                        <SelectTrigger id="balance-related-account">
+                            <SelectValue placeholder="Brez drugega računa" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem :value="NO_RELATED_ACCOUNT_VALUE">
+                                Brez drugega računa
+                            </SelectItem>
+                            <SelectItem
+                                v-for="option in relatedAccountOptions"
+                                :key="option.id"
+                                :value="String(option.id)"
+                            >
+                                {{ option.label }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <p class="text-sm text-muted-foreground">
+                        {{ balanceFlowHint }}
+                    </p>
+                    <InputError :message="balanceForm.errors.related_account_id" />
+                </div>
+
+                <div
+                    v-if="selectedBalanceAccount"
+                    class="rounded-lg bg-muted/40 p-4 text-sm"
+                >
+                    <p>
+                        Izbrani račun:
+                        {{ selectedBalanceAccount.name }}
+                        ({{ formatNumber(selectedBalanceAccount.amount) }} €)
+                    </p>
+                    <p v-if="selectedRelatedAccount">
+                        Drugi račun:
+                        {{ selectedRelatedAccount.label }}
+                        ({{ formatNumber(selectedRelatedAccount.amount) }} €)
+                    </p>
+                </div>
+
+                <DialogFooter>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="showBalanceModal = false"
+                    >
+                        Prekliči
+                    </Button>
+                    <Button type="submit" :disabled="balanceForm.processing">
+                        Shrani spremembo
                     </Button>
                 </DialogFooter>
             </form>

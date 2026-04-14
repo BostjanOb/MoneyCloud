@@ -34,6 +34,7 @@ class SavingsAccountController extends Controller
                     'value' => (string) $person->id,
                     'label' => $person->name,
                 ])->values()->all(),
+            'leafAccountOptions' => $this->leafAccountOptions(),
             'totals' => [
                 'amount' => SavingsAccount::fromCents(
                     $accounts->sum(fn (SavingsAccount $account): int => SavingsAccount::toCents($account->amount)),
@@ -127,5 +128,28 @@ class SavingsAccountController extends Controller
         return (int) round(
             SavingsAccount::toCents($account->amount) * ((float) $account->apy / 100) / $divisor,
         );
+    }
+
+    /** @return array<int, array{id: int, label: string, amount: string}> */
+    private function leafAccountOptions(): array
+    {
+        return SavingsAccount::query()
+            ->with('parent')
+            ->doesntHave('children')
+            ->orderBy('name')
+            ->get()
+            ->map(function (SavingsAccount $account): array {
+                $label = $account->parent
+                    ? sprintf('%s / %s', $account->parent->name, $account->name)
+                    : $account->name;
+
+                return [
+                    'id' => $account->id,
+                    'label' => $label,
+                    'amount' => $account->amount,
+                ];
+            })
+            ->values()
+            ->all();
     }
 }
