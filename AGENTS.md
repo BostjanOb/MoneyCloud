@@ -1,23 +1,29 @@
 <laravel-boost-guidelines>
 === .ai/project rules ===
 
-# AGENT.md
-
 ## Project Overview
 
-Personal finance app — "Moje Finance". First module: **Plače** (Paychecks).
+Personal finance app — "MoneyCloud".
 All UI text must be in **Slovenian**.
 
-## Key Architecture Decisions
+## Plan Mode
 
-1. **Employee is a PHP Enum** — no table
-2. **TaxCalculationService** — a pure service class that takes a PaycheckYear and returns the full calculation breakdown. Controllers call this service; Vue receives the result as props.
+- Make the plan extremely concise. Sacrifice grammar for the sake of concision.
+- At the end of each plan, give me a list of unresolved questions to answer, if any.
 
 ## Conventions
 
 - no Axios
-- Decimal columns: `decimal(10,2)` for money, `decimal(12,2)` for tax brackets
 - Format numbers in Slovenian style: `1.234,56` (dot = thousands, comma = decimal)
+
+## Elequent Models
+
+- For model scopes use PHP Attribute #[Scope] (Laravel 12)
+- Do not start elequent queries with ::query()
+
+## TailwindCSS
+
+- If size is needed, write as size-X not w-X h-X. For example, instead "h-4 w-4" write "size-4"
 
 === foundation rules ===
 
@@ -46,7 +52,7 @@ This application is a Laravel application and its main Laravel ecosystems packag
 - tailwindcss (TAILWINDCSS) - v4
 - vue (VUE) - v3
 - @laravel/vite-plugin-wayfinder (WAYFINDER_VITE) - v0
-- eslint (ESLINT) - v9
+- eslint (ESLINT) - v10
 - prettier (PRETTIER) - v3
 
 ## Skills Activation

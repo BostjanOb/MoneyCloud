@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
     buildPaycheckGrowthChartData,
     buildPaycheckGrowthSummary,
+    displayedPaycheckGrowthRows,
     displayedPaycheckGrowthSeries,
 } from '../../resources/js/lib/paycheckGrowth.ts';
 
@@ -158,6 +159,61 @@ test('paycheck growth summary uses bonus totals when bonuses are included', () =
         gross_change_amount: '500.00',
         gross_change_percentage: '16.67',
     });
+});
+
+test('displayed paycheck growth rows show newest years first', () => {
+    const rows = displayedPaycheckGrowthRows([
+        {
+            year: 2024,
+            is_partial: false,
+            recorded_through_month: 12,
+            net: '100.00',
+            gross: '150.00',
+            bonuses_gross: '0.00',
+            bonuses_net: '0.00',
+            gross_with_bonuses: '150.00',
+            net_with_bonuses: '100.00',
+            cumulative_net: Array(12).fill('0.00'),
+            cumulative_gross: Array(12).fill('0.00'),
+            cumulative_bonuses_gross: Array(12).fill('0.00'),
+            cumulative_bonuses_net: Array(12).fill('0.00'),
+        },
+        {
+            year: 2026,
+            is_partial: true,
+            recorded_through_month: 3,
+            net: '200.00',
+            gross: '300.00',
+            bonuses_gross: '20.00',
+            bonuses_net: '15.00',
+            gross_with_bonuses: '320.00',
+            net_with_bonuses: '215.00',
+            cumulative_net: Array(12).fill('0.00'),
+            cumulative_gross: Array(12).fill('0.00'),
+            cumulative_bonuses_gross: Array(12).fill('0.00'),
+            cumulative_bonuses_net: Array(12).fill('0.00'),
+        },
+        {
+            year: 2025,
+            is_partial: false,
+            recorded_through_month: 12,
+            net: '150.00',
+            gross: '225.00',
+            bonuses_gross: '10.00',
+            bonuses_net: '8.00',
+            gross_with_bonuses: '235.00',
+            net_with_bonuses: '158.00',
+            cumulative_net: Array(12).fill('0.00'),
+            cumulative_gross: Array(12).fill('0.00'),
+            cumulative_bonuses_gross: Array(12).fill('0.00'),
+            cumulative_bonuses_net: Array(12).fill('0.00'),
+        },
+    ]);
+
+    assert.deepEqual(
+        rows.map((row) => row.year),
+        [2026, 2025, 2024],
+    );
 });
 
 test('paycheck growth chart data preserves partial year labels', () => {

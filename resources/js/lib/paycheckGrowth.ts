@@ -48,6 +48,12 @@ export function displayedPaycheckGrowthSeries(
     return chartSeries.filter((series) => visibleKeys.includes(series.key));
 }
 
+export function displayedPaycheckGrowthRows(
+    rows: readonly PaycheckGrowthRow[],
+): PaycheckGrowthRow[] {
+    return [...rows].sort((left, right) => right.year - left.year);
+}
+
 export function buildPaycheckGrowthSummary(
     rows: PaycheckGrowthRow[],
     includeBonuses: boolean,

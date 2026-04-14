@@ -32,6 +32,7 @@ import { Table } from '@/components/ui/table';
 import {
     buildPaycheckGrowthChartData,
     buildPaycheckGrowthSummary,
+    displayedPaycheckGrowthRows,
     displayedPaycheckGrowthSeries,
     type PaycheckGrowthChartPoint,
 } from '@/lib/paycheckGrowth';
@@ -83,6 +84,7 @@ const visibleSeries = computed(() =>
 const displayedSummary = computed(() =>
     buildPaycheckGrowthSummary(props.rows, includeBonuses.value),
 );
+const displayedRows = computed(() => displayedPaycheckGrowthRows(props.rows));
 const visibleChartData = computed(() =>
     buildPaycheckGrowthChartData(props.rows, visibleSeries.value),
 );
@@ -465,12 +467,12 @@ function summaryComparisonText(): string {
                             <th
                                 class="h-10 px-2 text-right font-medium whitespace-nowrap"
                             >
-                                Bonusi bruto
+                                Bonusi neto
                             </th>
                             <th
                                 class="h-10 px-2 text-right font-medium whitespace-nowrap"
                             >
-                                Bonusi neto
+                                Neto seštevek
                             </th>
                             <th
                                 class="h-10 px-2 text-left font-medium whitespace-nowrap"
@@ -481,7 +483,7 @@ function summaryComparisonText(): string {
                     </thead>
                     <tbody>
                         <tr
-                            v-for="row in props.rows"
+                            v-for="row in displayedRows"
                             :key="row.year"
                             class="border-b transition-colors hover:bg-muted/50"
                         >
@@ -503,12 +505,12 @@ function summaryComparisonText(): string {
                             <td
                                 class="p-2 text-right align-middle whitespace-nowrap"
                             >
-                                {{ formatMoney(row.bonuses_gross) }}
+                                {{ formatMoney(row.bonuses_net) }}
                             </td>
                             <td
                                 class="p-2 text-right align-middle whitespace-nowrap"
                             >
-                                {{ formatMoney(row.bonuses_net) }}
+                                {{ formatMoney(row.net_with_bonuses) }}
                             </td>
                             <td class="p-2 align-middle whitespace-nowrap">
                                 <Badge
