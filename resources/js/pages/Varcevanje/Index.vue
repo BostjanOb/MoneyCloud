@@ -215,10 +215,11 @@ const projectedLeafAmount = computed(() => {
     return fromCents(toCents(account.amount) + toCents(interestForm.amount));
 });
 
-const selectedRelatedAccount = computed(() =>
-    relatedAccountOptions.value.find(
-        (account) => String(account.id) === balanceForm.related_account_id,
-    ) ?? null,
+const selectedRelatedAccount = computed(
+    () =>
+        relatedAccountOptions.value.find(
+            (account) => String(account.id) === balanceForm.related_account_id,
+        ) ?? null,
 );
 
 const balanceFlowHint = computed(() => {
@@ -777,7 +778,9 @@ function updateRelatedAccount(value: AcceptableValue): void {
                         @update:model-value="updateBalanceOperation"
                     >
                         <SelectTrigger id="balance-operation">
-                            <SelectValue placeholder="Izberite vrsto spremembe" />
+                            <SelectValue
+                                placeholder="Izberite vrsto spremembe"
+                            />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="add">Dodaj</SelectItem>
@@ -827,7 +830,9 @@ function updateRelatedAccount(value: AcceptableValue): void {
                     <p class="text-sm text-muted-foreground">
                         {{ balanceFlowHint }}
                     </p>
-                    <InputError :message="balanceForm.errors.related_account_id" />
+                    <InputError
+                        :message="balanceForm.errors.related_account_id"
+                    />
                 </div>
 
                 <div

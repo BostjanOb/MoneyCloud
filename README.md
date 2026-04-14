@@ -1,3 +1,6 @@
+<p align="center">
+   <img src="https://raw.githubusercontent.com/BostjanOb/MoneyCloud/refs/heads/main/public/logo.svg" width="400" alt="MoneyCloud"></p>
+
 # MoneyCloud
 
 MoneyCloud is a personal finance app for managing everyday money in one place. It started with the **Plače** module for paycheck tracking and tax calculations, and now also includes savings, investments, crypto tracking, people management, and simple financial statistics.

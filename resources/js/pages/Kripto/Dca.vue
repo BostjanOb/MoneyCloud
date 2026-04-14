@@ -160,9 +160,7 @@ const netAmountPreview = computed(() => {
 
     const grossValue = quantity * price;
 
-    return (
-        grossValue + (isSellTransaction.value ? -fee : fee)
-    ).toFixed(2);
+    return (grossValue + (isSellTransaction.value ? -fee : fee)).toFixed(2);
 });
 
 function localNowForInput(): string {
@@ -577,9 +575,7 @@ function deletePurchase(purchase: DcaPurchase): void {
                                         }}
                                     </TableCell>
                                     <TableCell numeric class="text-right">
-                                        {{
-                                            formatMoney(purchase.trade_value)
-                                        }}
+                                        {{ formatMoney(purchase.trade_value) }}
                                     </TableCell>
                                     <TableCell numeric class="text-right">
                                         {{ formatMoney(purchase.fee) }}
@@ -626,8 +622,8 @@ function deletePurchase(purchase: DcaPurchase): void {
 
         <Card v-else>
             <CardContent class="py-8 text-center text-sm text-muted-foreground">
-                Ni še DCA transakcij. Dodajte prvi nakup ali prodajo in po
-                želji hkrati uskladite tudi kripto stanje.
+                Ni še DCA transakcij. Dodajte prvi nakup ali prodajo in po želji
+                hkrati uskladite tudi kripto stanje.
             </CardContent>
         </Card>
     </div>
