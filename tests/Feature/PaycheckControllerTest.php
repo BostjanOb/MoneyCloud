@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\BonusType;
+use App\Models\Bonus;
 use App\Models\Paycheck;
 use App\Models\PaycheckYear;
 use App\Models\Person;
@@ -84,6 +85,32 @@ test('index page includes all bonus type options', function () {
                 ['value' => BonusType::BONI_MALICA->value, 'label' => BonusType::BONI_MALICA->label()],
                 ['value' => BonusType::OSTALO->value, 'label' => BonusType::OSTALO->label()],
             ])
+        );
+});
+
+test('index page includes bonuses with paid at date', function () {
+    $user = User::factory()->create();
+    $person = createBostjanPersonForPaycheckControllerTest();
+
+    $year = PaycheckYear::factory()->create([
+        'person_id' => $person->id,
+        'year' => 2026,
+    ]);
+
+    $bonus = Bonus::factory()->create([
+        'paycheck_year_id' => $year->id,
+        'type' => BonusType::REGRES,
+        'amount' => 1200,
+        'paid_at' => '2026-06-15',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('place.index', ['person' => 'bostjan', 'year' => 2026]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Place/Index')
+            ->where('bonuses.0.type', BonusType::REGRES->value)
+            ->where('bonuses.0.paid_at', $bonus->paid_at?->toJSON())
         );
 });
 

@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\BonusType;
+use App\Models\Bonus;
 use App\Models\CryptoBalance;
 use App\Models\InvestmentProvider;
 use App\Models\InvestmentPurchase;
@@ -26,9 +28,11 @@ test('demo seeder creates the expected dataset and remains idempotent', function
         ->and(SavingsAccount::query()->count())->toBe(6)
         ->and(PaycheckYear::query()->count())->toBe(8)
         ->and(Paycheck::query()->count())->toBe(80)
+        ->and(Bonus::count())->toBe(11)
         ->and(MonthlyPortfolioSnapshot::query()->count())->toBe(24);
 
     $demoUser = User::query()->firstWhere('email', 'demo@example.com');
+    $maja = Person::query()->firstWhere('slug', 'maja-kranjc');
     $vwce = InvestmentSymbol::query()->firstWhere('symbol', 'VWCE');
     $rs94 = InvestmentSymbol::query()->firstWhere('symbol', 'RS94');
     $aapl = InvestmentSymbol::query()->firstWhere('symbol', 'AAPL');
@@ -51,9 +55,20 @@ test('demo seeder creates the expected dataset and remains idempotent', function
         ->and(InvestmentPurchase::query()->where('investment_symbol_id', $bnb?->id)->count())->toBe(0);
 
     $latestSnapshot = MonthlyPortfolioSnapshot::query()->orderByDesc('month_date')->first();
+    $majaYear2025 = PaycheckYear::query()
+        ->whereBelongsTo($maja)
+        ->where('year', 2025)
+        ->first();
+    $majaRegres2025 = Bonus::whereBelongsTo($majaYear2025, 'paycheckYear')
+        ->where('type', BonusType::REGRES)
+        ->first();
 
     expect($latestSnapshot?->month_date?->toDateString())->toBe('2026-04-01')
-        ->and($latestSnapshot?->source)->toBe(MonthlyPortfolioSnapshot::SOURCE_SCHEDULED);
+        ->and($latestSnapshot?->source)->toBe(MonthlyPortfolioSnapshot::SOURCE_SCHEDULED)
+        ->and($majaRegres2025)->not->toBeNull()
+        ->and($majaRegres2025?->amount)->toBe('1120.00')
+        ->and($majaRegres2025?->taxable)->toBeFalse()
+        ->and($majaRegres2025?->paid_at?->toDateString())->toBe('2025-06-13');
 
     $this->seed(DemoSeeder::class);
 
@@ -64,6 +79,7 @@ test('demo seeder creates the expected dataset and remains idempotent', function
         ->and(SavingsAccount::query()->count())->toBe(6)
         ->and(PaycheckYear::query()->count())->toBe(8)
         ->and(Paycheck::query()->count())->toBe(80)
+        ->and(Bonus::count())->toBe(11)
         ->and(MonthlyPortfolioSnapshot::query()->count())->toBe(24);
 
     CarbonImmutable::setTestNow();

@@ -2,8 +2,10 @@
 
 namespace Database\Seeders;
 
+use App\Enums\BonusType;
 use App\Enums\InvestmentPriceSource;
 use App\Enums\InvestmentSymbolType;
+use App\Models\Bonus;
 use App\Models\CryptoBalance;
 use App\Models\InvestmentProvider;
 use App\Models\InvestmentPurchase;
@@ -462,8 +464,168 @@ class DemoSeeder extends Seeder
                         ],
                     );
                 }
+
+                $this->seedPaycheckBonuses($paycheckYear, $profile['slug']);
             }
         }
+    }
+
+    private function seedPaycheckBonuses(PaycheckYear $paycheckYear, string $personSlug): void
+    {
+        foreach ($this->paycheckBonuses($paycheckYear->year, $personSlug) as $bonus) {
+            $existingBonus = Bonus::where('paycheck_year_id', $paycheckYear->id)
+                ->where('type', $bonus['type']->value)
+                ->whereDate('paid_at', $bonus['paid_at'])
+                ->first();
+
+            if ($existingBonus) {
+                $existingBonus->update([
+                    'amount' => $bonus['amount'],
+                    'taxable' => $bonus['taxable'],
+                    'paid_tax' => $bonus['paid_tax'],
+                    'description' => $bonus['description'],
+                ]);
+
+                continue;
+            }
+
+            Bonus::create([
+                'paycheck_year_id' => $paycheckYear->id,
+                'type' => $bonus['type']->value,
+                'amount' => $bonus['amount'],
+                'taxable' => $bonus['taxable'],
+                'paid_tax' => $bonus['paid_tax'],
+                'description' => $bonus['description'],
+                'paid_at' => $bonus['paid_at'],
+            ]);
+        }
+    }
+
+    /**
+     * @return array<int, array{
+     *     type: BonusType,
+     *     amount: string,
+     *     taxable: bool,
+     *     paid_tax: string,
+     *     description: string,
+     *     paid_at: string
+     * }>
+     */
+    private function paycheckBonuses(int $year, string $personSlug): array
+    {
+        return match ($personSlug) {
+            'maja-kranjc' => match ($year) {
+                2023 => [
+                    [
+                        'type' => BonusType::REGRES,
+                        'amount' => '980.00',
+                        'taxable' => false,
+                        'paid_tax' => '0.00',
+                        'description' => 'Regres',
+                        'paid_at' => '2023-06-15',
+                    ],
+                ],
+                2024 => [
+                    [
+                        'type' => BonusType::REGRES,
+                        'amount' => '1040.00',
+                        'taxable' => false,
+                        'paid_tax' => '0.00',
+                        'description' => 'Regres',
+                        'paid_at' => '2024-06-14',
+                    ],
+                    [
+                        'type' => BonusType::SP,
+                        'amount' => '820.00',
+                        'taxable' => true,
+                        'paid_tax' => '180.40',
+                        'description' => 'Nagrada za uspešnost',
+                        'paid_at' => '2024-12-20',
+                    ],
+                ],
+                2025 => [
+                    [
+                        'type' => BonusType::REGRES,
+                        'amount' => '1120.00',
+                        'taxable' => false,
+                        'paid_tax' => '0.00',
+                        'description' => 'Regres',
+                        'paid_at' => '2025-06-13',
+                    ],
+                    [
+                        'type' => BonusType::OSTALO,
+                        'amount' => '340.00',
+                        'taxable' => false,
+                        'paid_tax' => '0.00',
+                        'description' => 'Nagrada ob zaključku projekta',
+                        'paid_at' => '2025-02-07',
+                    ],
+                ],
+                2026 => [
+                    [
+                        'type' => BonusType::BONI_MALICA,
+                        'amount' => '185.00',
+                        'taxable' => false,
+                        'paid_tax' => '0.00',
+                        'description' => 'Letni boni za malico',
+                        'paid_at' => '2026-03-05',
+                    ],
+                ],
+                default => [],
+            },
+            'luka-zupan' => match ($year) {
+                2023 => [
+                    [
+                        'type' => BonusType::REGRES,
+                        'amount' => '780.00',
+                        'taxable' => false,
+                        'paid_tax' => '0.00',
+                        'description' => 'Regres',
+                        'paid_at' => '2023-06-16',
+                    ],
+                ],
+                2024 => [
+                    [
+                        'type' => BonusType::REGRES,
+                        'amount' => '840.00',
+                        'taxable' => false,
+                        'paid_tax' => '0.00',
+                        'description' => 'Regres',
+                        'paid_at' => '2024-06-17',
+                    ],
+                ],
+                2025 => [
+                    [
+                        'type' => BonusType::REGRES,
+                        'amount' => '910.00',
+                        'taxable' => false,
+                        'paid_tax' => '0.00',
+                        'description' => 'Regres',
+                        'paid_at' => '2025-06-16',
+                    ],
+                    [
+                        'type' => BonusType::SP,
+                        'amount' => '640.00',
+                        'taxable' => true,
+                        'paid_tax' => '140.80',
+                        'description' => 'Nagrada za uspešnost',
+                        'paid_at' => '2025-12-19',
+                    ],
+                ],
+                2026 => [
+                    [
+                        'type' => BonusType::OSTALO,
+                        'amount' => '150.00',
+                        'taxable' => false,
+                        'paid_tax' => '0.00',
+                        'description' => 'Nagrada za priporočilo',
+                        'paid_at' => '2026-01-10',
+                    ],
+                ],
+                default => [],
+            },
+            default => [],
+        };
     }
 
     /**

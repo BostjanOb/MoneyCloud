@@ -47,6 +47,11 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import {
+    filterBonuses,
+    formatBonusPaidAtComment,
+    normalizeBonusPaidAtForInput,
+} from '@/lib/placeBonuses';
 import { formatSlovenianNumber } from '@/lib/utils';
 
 type Paycheck = {
@@ -216,6 +221,11 @@ const bonusTypeLabels = computed(() => {
     );
 });
 
+const selectedBonusType = ref('all');
+const displayedBonuses = computed(() =>
+    filterBonuses(props.bonuses, selectedBonusType.value),
+);
+
 const hasTaxableBonuses = computed(() =>
     props.bonuses.some((bonus) => bonus.taxable),
 );
@@ -342,7 +352,7 @@ function openEditBonus(bonus: Bonus) {
     bonusForm.taxable = bonus.taxable;
     bonusForm.paid_tax = bonus.taxable ? bonus.paid_tax : '';
     bonusForm.description = bonus.description ?? '';
-    bonusForm.paid_at = bonus.paid_at ?? '';
+    bonusForm.paid_at = normalizeBonusPaidAtForInput(bonus.paid_at);
     showBonusModal.value = true;
 }
 
@@ -670,8 +680,39 @@ const monthRows = computed(() => {
                     <CardTitle>Dodatki (regres, božičnica...)</CardTitle>
                     <Button size="sm" @click="openAddBonus">Dodaj</Button>
                 </CardHeader>
-                <CardContent>
-                    <Table v-if="bonuses.length > 0">
+                <CardContent class="space-y-4">
+                    <div
+                        v-if="bonuses.length > 0"
+                        class="flex flex-col gap-2 sm:max-w-[220px]"
+                    >
+                        <Label for="bonus-filter-type">Tip</Label>
+                        <Select
+                            :model-value="selectedBonusType"
+                            @update:model-value="
+                                (value) => {
+                                    if (typeof value === 'string') {
+                                        selectedBonusType = value;
+                                    }
+                                }
+                            "
+                        >
+                            <SelectTrigger id="bonus-filter-type">
+                                <SelectValue placeholder="Vsi tipi" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Vsi tipi</SelectItem>
+                                <SelectItem
+                                    v-for="option in bonusTypeOptions"
+                                    :key="option.value"
+                                    :value="option.value"
+                                >
+                                    {{ option.label }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <Table v-if="displayedBonuses.length > 0">
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Tip</TableHead>
@@ -687,13 +728,44 @@ const monthRows = computed(() => {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            <TableRow v-for="bonus in bonuses" :key="bonus.id">
+                            <TableRow
+                                v-for="bonus in displayedBonuses"
+                                :key="bonus.id"
+                            >
                                 <TableCell>{{
                                     bonusTypeLabel(bonus.type)
                                 }}</TableCell>
-                                <TableCell>{{
-                                    bonus.description || '–'
-                                }}</TableCell>
+                                <TableCell>
+                                    <div class="space-y-1">
+                                        <p v-if="bonus.description">
+                                            {{ bonus.description }}
+                                        </p>
+                                        <p
+                                            v-if="
+                                                formatBonusPaidAtComment(
+                                                    bonus.paid_at,
+                                                )
+                                            "
+                                            class="text-sm text-muted-foreground"
+                                        >
+                                            {{
+                                                formatBonusPaidAtComment(
+                                                    bonus.paid_at,
+                                                )
+                                            }}
+                                        </p>
+                                        <span
+                                            v-if="
+                                                !bonus.description &&
+                                                !formatBonusPaidAtComment(
+                                                    bonus.paid_at,
+                                                )
+                                            "
+                                        >
+                                            –
+                                        </span>
+                                    </div>
+                                </TableCell>
                                 <TableCell>{{
                                     bonus.taxable ? 'Da' : 'Ne'
                                 }}</TableCell>
@@ -728,6 +800,12 @@ const monthRows = computed(() => {
                             </TableRow>
                         </TableBody>
                     </Table>
+                    <p
+                        v-else-if="bonuses.length > 0"
+                        class="text-sm text-muted-foreground"
+                    >
+                        Ni dodatkov za izbran tip.
+                    </p>
                     <p v-else class="text-sm text-muted-foreground">
                         Ni dodatkov.
                     </p>
