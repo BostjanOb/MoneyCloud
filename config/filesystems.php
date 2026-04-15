@@ -70,8 +70,8 @@ return [
             'endpoint' => env('B2_ENDPOINT'),
             'use_path_style_endpoint' => env('B2_USE_PATH_STYLE_ENDPOINT', false),
             'throw' => env('B2_THROW_ERROR', true),
-            'request_checksum_calculation' => 'when_required',
-            'response_checksum_validation' => 'when_required',
+            'request_checksum_calculation' => 'when_supported',
+            'response_checksum_validation' => 'when_supported',
         ],
     ],
 
