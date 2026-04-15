@@ -72,7 +72,7 @@ return [
             'throw' => env('B2_THROW_ERROR', true),
             'request_checksum_calculation' => 'when_required',
             'response_checksum_validation' => 'when_required',
-        ]
+        ],
     ],
 
     /*
