@@ -1,5 +1,8 @@
 <p align="center">
-   <img src="https://raw.githubusercontent.com/BostjanOb/MoneyCloud/refs/heads/main/public/logo.svg" width="400" alt="MoneyCloud"></p>
+   <img src="https://raw.githubusercontent.com/BostjanOb/MoneyCloud/refs/heads/main/public/logo.svg" width="400" alt="MoneyCloud logo">
+
+   <img src="https://raw.githubusercontent.com/BostjanOb/MoneyCloud/refs/heads/main/screenshot.png" alt="MoneyCloud screenshot">
+</p>
 
 # MoneyCloud
 
