@@ -2,12 +2,15 @@
 
 use App\Enums\InvestmentSymbolType;
 use App\Models\Bonus;
+use App\Models\CryptoBalance;
+use App\Models\InvestmentProvider;
 use App\Models\InvestmentPurchase;
 use App\Models\InvestmentSymbol;
 use App\Models\MonthlyPortfolioSnapshot;
 use App\Models\Paycheck;
 use App\Models\PaycheckYear;
 use App\Models\Person;
+use App\Models\SavingsAccount;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 
@@ -32,11 +35,24 @@ test('statistics index redirects to monthly summary', function () {
 
 test('authenticated user can view monthly summary page', function () {
     $user = User::factory()->create();
-    $btc = InvestmentSymbol::factory()->crypto('BTC')->create();
+    $bond = InvestmentSymbol::factory()->bond()->create([
+        'symbol' => 'BOND',
+        'current_price' => '100.00',
+    ]);
+    $btc = InvestmentSymbol::factory()->crypto('BTC')->create([
+        'current_price' => '200.00',
+    ]);
     $vwce = InvestmentSymbol::factory()->create([
         'type' => InvestmentSymbolType::ETF,
         'symbol' => 'VWCE',
+        'current_price' => '100.00',
     ]);
+    $krka = InvestmentSymbol::factory()->create([
+        'type' => InvestmentSymbolType::STOCK,
+        'symbol' => 'KRKG',
+        'current_price' => '100.00',
+    ]);
+    $cryptoProvider = InvestmentProvider::factory()->crypto()->create();
 
     MonthlyPortfolioSnapshot::factory()->create([
         'month_date' => '2025-01-01',
@@ -59,33 +75,177 @@ test('authenticated user can view monthly summary page', function () {
         'source' => MonthlyPortfolioSnapshot::SOURCE_SCHEDULED,
     ]);
 
+    SavingsAccount::factory()->create([
+        'amount' => '1500.00',
+    ]);
     InvestmentPurchase::factory()->create([
-        'investment_symbol_id' => $btc->id,
-        'purchased_at' => '2024-05-10 09:00:00',
-        'quantity' => '0.50000000',
-        'price_per_unit' => '1000.00',
-        'fee' => '20.00',
+        'investment_symbol_id' => $bond->id,
+        'quantity' => '2.00000000',
+        'price_per_unit' => '95.00',
+        'fee' => '0.00',
     ]);
     InvestmentPurchase::factory()->create([
         'investment_symbol_id' => $vwce->id,
-        'purchased_at' => '2025-03-12 09:00:00',
-        'quantity' => '10.00000000',
-        'price_per_unit' => '500.00',
-        'fee' => '25.00',
+        'quantity' => '5.00000000',
+        'price_per_unit' => '90.00',
+        'fee' => '0.00',
+    ]);
+    InvestmentPurchase::factory()->create([
+        'investment_symbol_id' => $krka->id,
+        'quantity' => '3.00000000',
+        'price_per_unit' => '110.00',
+        'fee' => '0.00',
+    ]);
+    CryptoBalance::factory()->create([
+        'investment_provider_id' => $cryptoProvider->id,
+        'investment_symbol_id' => $btc->id,
+        'manual_quantity' => '2.00000000',
     ]);
 
-    $this->actingAs($user)
+    $response = $this->actingAs($user)
         ->get(route('statistics.monthly-summary'))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('Statistika/MesecniPovzetek')
             ->has('rows', 2)
+            ->has('summary_cards', 6)
             ->where('rows.0.total_amount', '2000.00')
             ->where('rows.1.diff_amount', '200.00')
             ->where('rows.1.diff_percentage', '10.00')
             ->where('latest.month_date', '2025-02-01')
             ->has('chartSeries', 6)
         );
+
+    $cards = collect($response->inertiaProps('summary_cards'))->keyBy('key');
+
+    expect($cards->get('savings_amount'))->toMatchArray([
+        'current_amount' => '1500.00',
+        'diff_amount' => '400.00',
+        'diff_percentage' => '36.36',
+        'tone' => 'positive',
+        'comparison_label' => 'Primerjava z vnosom za 1. 2. 2025.',
+    ]);
+
+    expect($cards->get('stock_amount'))->toMatchArray([
+        'current_amount' => '300.00',
+        'diff_amount' => '-100.00',
+        'diff_percentage' => '-25.00',
+        'tone' => 'negative',
+    ]);
+
+    expect($cards->get('total_amount'))->toMatchArray([
+        'current_amount' => '2900.00',
+        'diff_amount' => '700.00',
+        'diff_percentage' => '31.82',
+        'tone' => 'positive',
+    ]);
+});
+
+test('monthly summary cards show negative diff when current state is below latest snapshot', function () {
+    $user = User::factory()->create();
+
+    MonthlyPortfolioSnapshot::factory()->create([
+        'month_date' => '2025-02-01',
+        'savings_amount' => '500.00',
+        'bond_amount' => '0.00',
+        'etf_amount' => '0.00',
+        'crypto_amount' => '0.00',
+        'stock_amount' => '0.00',
+        'total_amount' => '500.00',
+        'source' => MonthlyPortfolioSnapshot::SOURCE_SCHEDULED,
+    ]);
+
+    SavingsAccount::factory()->create([
+        'amount' => '300.00',
+    ]);
+
+    $response = $this->actingAs($user)
+        ->get(route('statistics.monthly-summary'))
+        ->assertOk();
+
+    $cards = collect($response->inertiaProps('summary_cards'))->keyBy('key');
+
+    expect($cards->get('savings_amount'))->toMatchArray([
+        'current_amount' => '300.00',
+        'diff_amount' => '-200.00',
+        'diff_percentage' => '-40.00',
+        'tone' => 'negative',
+    ]);
+
+    expect($cards->get('total_amount'))->toMatchArray([
+        'current_amount' => '300.00',
+        'diff_amount' => '-200.00',
+        'diff_percentage' => '-40.00',
+        'tone' => 'negative',
+    ]);
+});
+
+test('monthly summary cards show warning state when there is no saved snapshot', function () {
+    $user = User::factory()->create();
+
+    SavingsAccount::factory()->create([
+        'amount' => '250.00',
+    ]);
+
+    $response = $this->actingAs($user)
+        ->get(route('statistics.monthly-summary'))
+        ->assertOk();
+
+    $cards = collect($response->inertiaProps('summary_cards'))->keyBy('key');
+
+    expect($cards->get('savings_amount'))->toMatchArray([
+        'current_amount' => '250.00',
+        'diff_amount' => null,
+        'diff_percentage' => null,
+        'tone' => 'warning',
+        'comparison_label' => 'Ni shranjenega mesečnega vnosa za primerjavo.',
+    ]);
+
+    expect($cards->get('total_amount'))->toMatchArray([
+        'current_amount' => '250.00',
+        'diff_amount' => null,
+        'diff_percentage' => null,
+        'tone' => 'warning',
+    ]);
+});
+
+test('monthly summary cards keep percentage empty when latest snapshot bucket is zero', function () {
+    $user = User::factory()->create();
+
+    MonthlyPortfolioSnapshot::factory()->create([
+        'month_date' => '2025-02-01',
+        'savings_amount' => '0.00',
+        'bond_amount' => '0.00',
+        'etf_amount' => '0.00',
+        'crypto_amount' => '0.00',
+        'stock_amount' => '0.00',
+        'total_amount' => '0.00',
+        'source' => MonthlyPortfolioSnapshot::SOURCE_SCHEDULED,
+    ]);
+
+    SavingsAccount::factory()->create([
+        'amount' => '100.00',
+    ]);
+
+    $response = $this->actingAs($user)
+        ->get(route('statistics.monthly-summary'))
+        ->assertOk();
+
+    $cards = collect($response->inertiaProps('summary_cards'))->keyBy('key');
+
+    expect($cards->get('savings_amount'))->toMatchArray([
+        'current_amount' => '100.00',
+        'diff_amount' => '100.00',
+        'diff_percentage' => null,
+        'tone' => 'positive',
+    ]);
+
+    expect($cards->get('total_amount'))->toMatchArray([
+        'current_amount' => '100.00',
+        'diff_amount' => '100.00',
+        'diff_percentage' => null,
+        'tone' => 'positive',
+    ]);
 });
 
 test('authenticated user can view yearly invested page', function () {

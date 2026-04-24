@@ -65,9 +65,20 @@ type MonthlyChartSeries = {
     values: number[];
 };
 
+type SummaryCard = {
+    key: string;
+    label: string;
+    current_amount: string;
+    diff_amount: string | null;
+    diff_percentage: string | null;
+    tone: 'positive' | 'negative' | 'neutral' | 'warning';
+    comparison_label: string;
+};
+
 type Props = {
     rows: MonthlyRow[];
     chartSeries: MonthlyChartSeries[];
+    summary_cards: SummaryCard[];
     latest: MonthlyRow | null;
 };
 
@@ -97,34 +108,6 @@ const snapshotForm = useForm({
     crypto_amount: '0',
     stock_amount: '0',
 });
-
-const latestSnapshot = computed(
-    () =>
-        props.latest ?? {
-            id: 0,
-            month_date: '',
-            month_label: 'Ni podatkov',
-            savings_amount: '0.00',
-            bond_amount: '0.00',
-            etf_amount: '0.00',
-            crypto_amount: '0.00',
-            stock_amount: '0.00',
-            total_amount: '0.00',
-            source: 'manual',
-            source_label: 'Ročno',
-            diff_amount: null,
-            diff_percentage: null,
-        },
-);
-
-const latestCards = computed(() => [
-    { label: 'Varčevanje', value: latestSnapshot.value.savings_amount },
-    { label: 'Obveznice', value: latestSnapshot.value.bond_amount },
-    { label: 'ETF', value: latestSnapshot.value.etf_amount },
-    { label: 'Kripto', value: latestSnapshot.value.crypto_amount },
-    { label: 'Delnice', value: latestSnapshot.value.stock_amount },
-    { label: 'Skupaj', value: latestSnapshot.value.total_amount },
-]);
 
 const historyRows = computed(() => sortMonthlyHistoryRows(props.rows));
 
@@ -247,6 +230,22 @@ function valueTone(value: string | number | null): string {
     return 'text-foreground';
 }
 
+function summaryCardToneClass(tone: SummaryCard['tone']): string {
+    if (tone === 'positive') {
+        return 'text-emerald-600 dark:text-emerald-400';
+    }
+
+    if (tone === 'negative') {
+        return 'text-destructive';
+    }
+
+    if (tone === 'warning') {
+        return 'text-amber-600 dark:text-amber-400';
+    }
+
+    return 'text-foreground';
+}
+
 function resetSnapshotForm(): void {
     snapshotForm.defaults({
         month_date: currentMonthInput(),
@@ -323,21 +322,33 @@ function submitSnapshot(): void {
         </div>
 
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <Card v-for="card in latestCards" :key="card.label">
+            <Card v-for="card in props.summary_cards" :key="card.key">
                 <CardHeader class="pb-2">
                     <CardTitle class="text-sm text-muted-foreground">
                         {{ card.label }}
                     </CardTitle>
                 </CardHeader>
-                <CardContent>
-                    <p class="text-2xl font-semibold">
-                        {{ formatMoney(card.value) }}
+                <CardContent class="space-y-2">
+                    <p class="text-2xl font-semibold tracking-tight">
+                        {{ formatMoney(card.current_amount) }}
                     </p>
-                    <p
-                        v-if="props.latest !== null && card.label === 'Skupaj'"
-                        class="mt-1 text-xs text-muted-foreground"
-                    >
-                        Zadnji shranjeni mesec: {{ props.latest.month_label }}
+                    <div class="flex items-start justify-between gap-3">
+                        <p
+                            :class="[
+                                'text-sm font-medium',
+                                summaryCardToneClass(card.tone),
+                            ]"
+                        >
+                            {{ formatSignedMoney(card.diff_amount) }}
+                        </p>
+                        <span
+                            class="rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground"
+                        >
+                            {{ formatPercent(card.diff_percentage) }}
+                        </span>
+                    </div>
+                    <p class="text-xs text-muted-foreground">
+                        {{ card.comparison_label }}
                     </p>
                 </CardContent>
             </Card>

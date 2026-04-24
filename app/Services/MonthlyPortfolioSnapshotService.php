@@ -16,6 +16,7 @@ class MonthlyPortfolioSnapshotService
      * @return array{
      *     rows: array<int, array<string, mixed>>,
      *     chartSeries: array<int, array<string, mixed>>,
+     *     summary_cards: array<int, array<string, mixed>>,
      *     latest: array<string, mixed>|null
      * }
      */
@@ -23,15 +24,21 @@ class MonthlyPortfolioSnapshotService
     {
         $rows = [];
         $previousSnapshot = null;
+        $snapshots = MonthlyPortfolioSnapshot::ordered()->get();
 
-        foreach (MonthlyPortfolioSnapshot::query()->ordered()->get() as $snapshot) {
+        foreach ($snapshots as $snapshot) {
             $rows[] = $this->transformSnapshot($snapshot, $previousSnapshot);
             $previousSnapshot = $snapshot;
         }
 
+        /** @var MonthlyPortfolioSnapshot|null $latestSnapshot */
+        $latestSnapshot = $snapshots->last();
+        $currentStateTotals = $this->currentStateTotals();
+
         return [
             'rows' => $rows,
             'chartSeries' => $this->buildChartSeries($rows),
+            'summary_cards' => $this->buildSummaryCards($currentStateTotals, $latestSnapshot),
             'latest' => $rows === [] ? null : $rows[array_key_last($rows)],
         ];
     }
@@ -47,13 +54,11 @@ class MonthlyPortfolioSnapshotService
             'stock_amount' => 0,
         ];
 
-        $totals['savings_amount'] = SavingsAccount::query()
-            ->whereNull('parent_id')
+        $totals['savings_amount'] = SavingsAccount::whereNull('parent_id')
             ->get(['id', 'amount'])
             ->sum(fn (SavingsAccount $account): int => SavingsAccount::toCents($account->amount));
 
-        InvestmentPurchase::query()
-            ->with('symbol:id,type,current_price')
+        InvestmentPurchase::with('symbol:id,type,current_price')
             ->whereHas(
                 'symbol',
                 fn ($query) => $query->where('type', '!=', InvestmentSymbolType::CRYPTO->value),
@@ -77,8 +82,10 @@ class MonthlyPortfolioSnapshotService
                 );
             });
 
-        $totals['crypto_amount'] = CryptoBalance::query()
-            ->with(['provider:id,supported_symbol_types', 'symbol:id,type,current_price'])
+        $totals['crypto_amount'] = CryptoBalance::with([
+            'provider:id,supported_symbol_types',
+            'symbol:id,type,current_price',
+        ])
             ->get()
             ->filter(fn (CryptoBalance $balance): bool => $balance->provider->supportsCrypto()
                 && $balance->symbol->type === InvestmentSymbolType::CRYPTO)
@@ -89,6 +96,83 @@ class MonthlyPortfolioSnapshotService
 
         return collect($totals)
             ->map(fn (int $value): string => MonthlyPortfolioSnapshot::fromCents($value))
+            ->all();
+    }
+
+    /**
+     * @param  array<string, string>  $currentStateTotals
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildSummaryCards(
+        array $currentStateTotals,
+        ?MonthlyPortfolioSnapshot $latestSnapshot,
+    ): array {
+        $cardLabels = [
+            'savings_amount' => 'Varčevanje',
+            'bond_amount' => 'Obveznice',
+            'etf_amount' => 'ETF',
+            'crypto_amount' => 'Kripto',
+            'stock_amount' => 'Delnice',
+            'total_amount' => 'Skupaj',
+        ];
+        $currentTotals = [
+            ...$currentStateTotals,
+            'total_amount' => MonthlyPortfolioSnapshot::fromCents(
+                $this->sumAmountsInCents($currentStateTotals),
+            ),
+        ];
+        $comparisonLabel = $latestSnapshot instanceof MonthlyPortfolioSnapshot
+            ? sprintf(
+                'Primerjava z vnosom za %s.',
+                $latestSnapshot->month_date?->format('j. n. Y'),
+            )
+            : 'Ni shranjenega mesečnega vnosa za primerjavo.';
+
+        return collect($cardLabels)
+            ->map(function (string $label, string $key) use (
+                $comparisonLabel,
+                $currentTotals,
+                $latestSnapshot,
+            ): array {
+                $currentAmount = $currentTotals[$key] ?? '0.00';
+
+                if (! $latestSnapshot instanceof MonthlyPortfolioSnapshot) {
+                    return [
+                        'key' => $key,
+                        'label' => $label,
+                        'current_amount' => $currentAmount,
+                        'diff_amount' => null,
+                        'diff_percentage' => null,
+                        'tone' => 'warning',
+                        'comparison_label' => $comparisonLabel,
+                    ];
+                }
+
+                $previousAmount = (string) ($latestSnapshot->getAttribute($key) ?? '0.00');
+                $currentAmountInCents = MonthlyPortfolioSnapshot::toCents($currentAmount);
+                $previousAmountInCents = MonthlyPortfolioSnapshot::toCents($previousAmount);
+                $diffInCents = $currentAmountInCents - $previousAmountInCents;
+
+                return [
+                    'key' => $key,
+                    'label' => $label,
+                    'current_amount' => $currentAmount,
+                    'diff_amount' => MonthlyPortfolioSnapshot::fromCents($diffInCents),
+                    'diff_percentage' => $previousAmountInCents === 0
+                        ? null
+                        : number_format(
+                            ($diffInCents / $previousAmountInCents) * 100,
+                            2,
+                            '.',
+                            '',
+                        ),
+                    'tone' => $diffInCents > 0
+                        ? 'positive'
+                        : ($diffInCents < 0 ? 'negative' : 'neutral'),
+                    'comparison_label' => $comparisonLabel,
+                ];
+            })
+            ->values()
             ->all();
     }
 
@@ -242,5 +326,12 @@ class MonthlyPortfolioSnapshotService
     private function quantityValueInCents(string|int|float $quantity, string|int|float $pricePerUnit): int
     {
         return (int) round(((float) $quantity) * ((float) $pricePerUnit) * 100);
+    }
+
+    /** @param  array<string, string>  $amounts */
+    private function sumAmountsInCents(array $amounts): int
+    {
+        return collect($amounts)
+            ->sum(fn (string $amount): int => MonthlyPortfolioSnapshot::toCents($amount));
     }
 }
