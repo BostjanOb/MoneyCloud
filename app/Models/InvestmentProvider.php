@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\BalanceSyncProvider;
 use App\Enums\InvestmentSymbolType;
 use Database\Factories\InvestmentProviderFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'linked_savings_account_id',
     'requires_linked_savings_account',
     'supported_symbol_types',
+    'balance_sync_provider',
     'sort_order',
 ])]
 class InvestmentProvider extends Model
@@ -29,6 +31,7 @@ class InvestmentProvider extends Model
             'linked_savings_account_id' => 'integer',
             'requires_linked_savings_account' => 'boolean',
             'supported_symbol_types' => 'array',
+            'balance_sync_provider' => 'string',
             'sort_order' => 'integer',
         ];
     }
@@ -97,5 +100,17 @@ class InvestmentProvider extends Model
     public function requiresLinkedSavingsAccount(): bool
     {
         return $this->requires_linked_savings_account;
+    }
+
+    public function canSyncBalances(): bool
+    {
+        return $this->supportsCrypto() && $this->balanceSyncProvider() !== null;
+    }
+
+    public function balanceSyncProvider(): ?BalanceSyncProvider
+    {
+        return is_string($this->balance_sync_provider)
+            ? BalanceSyncProvider::tryFrom($this->balance_sync_provider)
+            : null;
     }
 }

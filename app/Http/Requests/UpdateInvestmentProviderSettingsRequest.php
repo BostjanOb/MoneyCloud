@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\BalanceSyncProvider;
 use App\Enums\InvestmentSymbolType;
 use App\Models\InvestmentProvider;
 use Illuminate\Validation\Rule;
@@ -33,6 +34,7 @@ class UpdateInvestmentProviderSettingsRequest extends StoreInvestmentProviderSet
             'linked_savings_account_id' => ['nullable', 'integer', Rule::exists('savings_accounts', 'id')],
             'supported_symbol_types' => ['required', 'array', 'min:1'],
             'supported_symbol_types.*' => ['required', 'distinct', Rule::enum(InvestmentSymbolType::class)],
+            'balance_sync_provider' => ['nullable', Rule::enum(BalanceSyncProvider::class)],
         ];
     }
 }

@@ -1,18 +1,33 @@
 <script setup lang="ts">
-import { Head, Link, router, setLayoutProps, useForm } from '@inertiajs/vue3';
+import {
+    Head,
+    Link,
+    router,
+    setLayoutProps,
+    useForm,
+    usePage,
+} from '@inertiajs/vue3';
 import type { AcceptableValue } from 'reka-ui';
 import { computed, ref } from 'vue';
 import {
     destroy as balanceDestroy,
     index as balancesIndex,
     store as balanceStore,
+    sync as balanceSync,
     update as balanceUpdate,
 } from '@/actions/App/Http/Controllers/CryptoBalanceController';
 import { index as dcaIndex } from '@/actions/App/Http/Controllers/CryptoDcaPurchaseController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
     Dialog,
     DialogContent,
@@ -75,12 +90,21 @@ type SymbolSummaryRow = {
 
 type Props = {
     providerOptions: ProviderOption[];
+    syncProviderOptions: ProviderOption[];
     symbolOptions: SymbolOption[];
     balanceRows: BalanceRow[];
     symbolSummary: SymbolSummaryRow[];
 };
 
 const props = defineProps<Props>();
+const page = usePage();
+const flash = computed(
+    () =>
+        (page.props.flash ?? {}) as {
+            status?: string;
+            error?: string;
+        },
+);
 
 setLayoutProps({
     breadcrumbs: [
@@ -199,6 +223,14 @@ function submitBalance(): void {
     });
 }
 
+function submitSync(providerId: number): void {
+    router.post(balanceSync.url(), {
+        investment_provider_id: providerId,
+    }, {
+        preserveScroll: true,
+    });
+}
+
 function deleteBalance(row: BalanceRow): void {
     if (
         !confirm(
@@ -216,6 +248,16 @@ function deleteBalance(row: BalanceRow): void {
     <Head title="Kripto - Stanja" />
 
     <div class="flex flex-col gap-6 p-4">
+        <Alert v-if="flash.status">
+            <AlertTitle>Sinhronizacija zaključena</AlertTitle>
+            <AlertDescription>{{ flash.status }}</AlertDescription>
+        </Alert>
+
+        <Alert v-if="flash.error" variant="destructive">
+            <AlertTitle>Sinhronizacija ni uspela</AlertTitle>
+            <AlertDescription>{{ flash.error }}</AlertDescription>
+        </Alert>
+
         <div
             class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
         >
@@ -308,8 +350,26 @@ function deleteBalance(row: BalanceRow): void {
         </Card>
 
         <Card>
-            <CardHeader>
+            <CardHeader
+                class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+            >
                 <CardTitle>Stanja po platformah</CardTitle>
+                <DropdownMenu v-if="syncProviderOptions.length > 0">
+                    <DropdownMenuTrigger as-child>
+                        <Button variant="outline" size="sm">
+                            Sinhroniziraj stanja
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                            v-for="provider in syncProviderOptions"
+                            :key="provider.id"
+                            @click="submitSync(provider.id)"
+                        >
+                            {{ provider.name }}
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </CardHeader>
             <CardContent class="overflow-x-auto">
                 <Table v-if="balanceRows.length > 0">

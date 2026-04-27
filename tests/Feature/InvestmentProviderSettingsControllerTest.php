@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\BalanceSyncProvider;
 use App\Enums\InvestmentSymbolType;
 use App\Models\InvestmentProvider;
 use App\Models\SavingsAccount;
@@ -22,6 +23,7 @@ function investmentProviderPayload(array $overrides = []): array
             InvestmentSymbolType::ETF->value,
             InvestmentSymbolType::STOCK->value,
         ],
+        'balance_sync_provider' => null,
     ], $overrides);
 }
 
@@ -38,6 +40,9 @@ test('investment provider settings routes require authentication', function () {
 test('authenticated user can view the investment provider settings pages', function () {
     $user = User::factory()->create();
     $provider = InvestmentProvider::query()->firstWhere('slug', 'ibkr');
+    $provider->update([
+        'balance_sync_provider' => BalanceSyncProvider::Binance->value,
+    ]);
     $parentAccount = SavingsAccount::factory()->create([
         'name' => 'Banka',
     ]);
@@ -64,6 +69,8 @@ test('authenticated user can view the investment provider settings pages', funct
             ->component('Investicije/PonudnikiForm')
             ->where('provider', null)
             ->has('typeOptions', 4)
+            ->has('syncProviderOptions', 1)
+            ->where('syncProviderOptions.0.value', BalanceSyncProvider::Binance->value)
             ->has('savingsAccountOptions', 1)
             ->where('savingsAccountOptions.0.label', 'Banka / Rezerva')
         );
@@ -76,6 +83,7 @@ test('authenticated user can view the investment provider settings pages', funct
             ->where('provider.id', $provider->id)
             ->where('provider.slug', $provider->slug)
             ->where('provider.supported_symbol_types', ['etf', 'stock', 'crypto'])
+            ->where('provider.balance_sync_provider', BalanceSyncProvider::Binance->value)
         );
 });
 
@@ -93,7 +101,9 @@ test('can store an investment provider from settings', function () {
             'supported_symbol_types' => [
                 InvestmentSymbolType::ETF->value,
                 InvestmentSymbolType::STOCK->value,
+                InvestmentSymbolType::CRYPTO->value,
             ],
+            'balance_sync_provider' => BalanceSyncProvider::Binance->value,
         ]))
         ->assertRedirect(route('investments.providers.index'));
 
@@ -103,7 +113,8 @@ test('can store an investment provider from settings', function () {
         ->and($provider->sort_order)->toBe(7)
         ->and($provider->requires_linked_savings_account)->toBeTrue()
         ->and($provider->linked_savings_account_id)->toBe($linkedAccount->id)
-        ->and($provider->supported_symbol_types)->toBe(['etf', 'stock']);
+        ->and($provider->supported_symbol_types)->toBe(['etf', 'stock', 'crypto'])
+        ->and($provider->balance_sync_provider)->toBe(BalanceSyncProvider::Binance->value);
 });
 
 test('can update an investment provider from settings', function () {
@@ -113,8 +124,9 @@ test('can update an investment provider from settings', function () {
 
     $provider->update([
         'linked_savings_account_id' => $linkedAccount->id,
-        'requires_linked_savings_account' => true,
+        'requires_linked_savings_account' => false,
         'supported_symbol_types' => [InvestmentSymbolType::BOND->value],
+        'balance_sync_provider' => null,
     ]);
 
     $this->actingAs($user)
@@ -122,21 +134,23 @@ test('can update an investment provider from settings', function () {
             'name' => 'Ilirika Plus',
             'slug' => '',
             'sort_order' => 9,
-            'requires_linked_savings_account' => false,
+            'requires_linked_savings_account' => true,
             'linked_savings_account_id' => $linkedAccount->id,
             'supported_symbol_types' => [
                 InvestmentSymbolType::BOND->value,
                 InvestmentSymbolType::CRYPTO->value,
             ],
+            'balance_sync_provider' => BalanceSyncProvider::Binance->value,
         ]))
         ->assertRedirect(route('investments.providers.index'));
 
     expect($provider->fresh()->name)->toBe('Ilirika Plus')
         ->and($provider->fresh()->slug)->toBe('ilirika-plus')
         ->and($provider->fresh()->sort_order)->toBe(9)
-        ->and($provider->fresh()->requires_linked_savings_account)->toBeFalse()
-        ->and($provider->fresh()->linked_savings_account_id)->toBeNull()
-        ->and($provider->fresh()->supported_symbol_types)->toBe(['bond', 'crypto']);
+        ->and($provider->fresh()->requires_linked_savings_account)->toBeTrue()
+        ->and($provider->fresh()->linked_savings_account_id)->toBe($linkedAccount->id)
+        ->and($provider->fresh()->supported_symbol_types)->toBe(['bond', 'crypto'])
+        ->and($provider->fresh()->balance_sync_provider)->toBe(BalanceSyncProvider::Binance->value);
 });
 
 test('investment provider settings reject non leaf linked savings accounts', function () {
@@ -163,6 +177,17 @@ test('investment provider settings enforce unique slugs', function () {
             'slug' => 'ibkr',
         ]))
         ->assertSessionHasErrors('slug');
+});
+
+test('investment provider settings reject sync provider for non crypto providers', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('investments.providers.store'), investmentProviderPayload([
+            'supported_symbol_types' => [InvestmentSymbolType::BOND->value],
+            'balance_sync_provider' => BalanceSyncProvider::Binance->value,
+        ]))
+        ->assertSessionHasErrors('balance_sync_provider');
 });
 
 test('investment provider settings route does not collide with provider detail pages', function () {

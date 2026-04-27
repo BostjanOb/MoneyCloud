@@ -33,6 +33,7 @@ type ProviderFormData = {
     linked_savings_account_id: number | null;
     requires_linked_savings_account: boolean;
     supported_symbol_types: string[];
+    balance_sync_provider: string | null;
 };
 
 type TypeOption = {
@@ -46,13 +47,20 @@ type SavingsAccountOption = {
     amount: string;
 };
 
+type SyncProviderOption = {
+    value: string;
+    label: string;
+};
+
 type Props = {
     provider: ProviderFormData | null;
     typeOptions: TypeOption[];
+    syncProviderOptions: SyncProviderOption[];
     savingsAccountOptions: SavingsAccountOption[];
 };
 
 const NO_SAVINGS_ACCOUNT = '__none__';
+const NO_SYNC_PROVIDER = '__none__';
 
 const props = defineProps<Props>();
 
@@ -81,6 +89,9 @@ watchEffect(() => {
 });
 
 const isEditing = computed(() => props.provider !== null);
+const supportsCrypto = computed(() =>
+    form.supported_symbol_types.includes('crypto'),
+);
 
 const form = useForm({
     name: props.provider?.name ?? '',
@@ -92,6 +103,8 @@ const form = useForm({
         ? String(props.provider.linked_savings_account_id)
         : NO_SAVINGS_ACCOUNT,
     supported_symbol_types: props.provider?.supported_symbol_types ?? [],
+    balance_sync_provider:
+        props.provider?.balance_sync_provider ?? NO_SYNC_PROVIDER,
 });
 
 const selectedLinkedSavingsAccount = computed(() =>
@@ -103,6 +116,12 @@ const selectedLinkedSavingsAccount = computed(() =>
 function updateLinkedSavingsAccount(value: AcceptableValue): void {
     if (typeof value === 'string') {
         form.linked_savings_account_id = value;
+    }
+}
+
+function updateBalanceSyncProvider(value: AcceptableValue): void {
+    if (typeof value === 'string') {
+        form.balance_sync_provider = value;
     }
 }
 
@@ -136,6 +155,11 @@ function toggleSupportedType(
     form.supported_symbol_types = form.supported_symbol_types.filter(
         (supportedType) => supportedType !== type,
     );
+
+    if (type === 'crypto') {
+        form.balance_sync_provider = NO_SYNC_PROVIDER;
+        form.clearErrors('balance_sync_provider');
+    }
 }
 
 function formatMoney(value: string): string {
@@ -152,6 +176,11 @@ function submitProvider(): void {
                 ? Number(data.linked_savings_account_id)
                 : null,
         supported_symbol_types: data.supported_symbol_types,
+        balance_sync_provider:
+            data.supported_symbol_types.includes('crypto') &&
+            data.balance_sync_provider !== NO_SYNC_PROVIDER
+                ? data.balance_sync_provider
+                : null,
     }));
 
     if (props.provider) {
@@ -331,6 +360,52 @@ function submitProvider(): void {
                             </p>
                             <InputError
                                 :message="form.errors.linked_savings_account_id"
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card v-if="supportsCrypto">
+                    <CardHeader>
+                        <CardTitle>Sinhronizacija stanj</CardTitle>
+                    </CardHeader>
+                    <CardContent class="grid gap-4">
+                        <div class="grid gap-2">
+                            <Label for="provider-balance-sync-provider">
+                                Vir sinhronizacije
+                            </Label>
+                            <Select
+                                :model-value="form.balance_sync_provider"
+                                @update:model-value="
+                                    updateBalanceSyncProvider
+                                "
+                            >
+                                <SelectTrigger
+                                    id="provider-balance-sync-provider"
+                                >
+                                    <SelectValue
+                                        placeholder="Brez sinhronizacije"
+                                    />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem :value="NO_SYNC_PROVIDER">
+                                        Brez sinhronizacije
+                                    </SelectItem>
+                                    <SelectItem
+                                        v-for="option in syncProviderOptions"
+                                        :key="option.value"
+                                        :value="option.value"
+                                    >
+                                        {{ option.label }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <p class="text-sm text-muted-foreground">
+                                Sinhronizacija bo posodabljala samo obstoječa
+                                kripto stanja te platforme.
+                            </p>
+                            <InputError
+                                :message="form.errors.balance_sync_provider"
                             />
                         </div>
                     </CardContent>

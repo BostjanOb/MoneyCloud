@@ -1,11 +1,13 @@
 <?php
 
+use App\Enums\BalanceSyncProvider;
 use App\Enums\InvestmentSymbolType;
 use App\Models\CryptoBalance;
 use App\Models\InvestmentProvider;
 use App\Models\InvestmentPurchase;
 use App\Models\InvestmentSymbol;
 use App\Models\User;
+use App\Services\CryptoBalanceSyncService;
 
 beforeEach(function () {
     $this->withoutVite();
@@ -20,6 +22,7 @@ test('authenticated user can view crypto balances and symbol summary without dca
     $user = User::factory()->create();
     $provider = InvestmentProvider::factory()->crypto()->create([
         'name' => 'NEXO',
+        'balance_sync_provider' => BalanceSyncProvider::Binance->value,
     ]);
     $ledger = InvestmentProvider::factory()->crypto('ledger', 'Ledger')->create([
         'name' => 'Ledger',
@@ -52,6 +55,8 @@ test('authenticated user can view crypto balances and symbol summary without dca
         ->assertInertia(fn ($page) => $page
             ->component('Kripto/Stanja')
             ->has('providerOptions', 2)
+            ->has('syncProviderOptions', 1)
+            ->where('syncProviderOptions.0.name', 'NEXO')
             ->where('providerOptions.1.name', 'NEXO')
             ->has('symbolOptions', 1)
             ->where('symbolOptions.0.symbol', 'BTC')
@@ -161,4 +166,35 @@ test('manual crypto balance rejects non crypto platforms and symbols', function 
             'investment_provider_id',
             'investment_symbol_id',
         ]);
+});
+
+test('manual crypto balance sync route triggers provider sync and flashes the result', function () {
+    $user = User::factory()->create();
+    $provider = InvestmentProvider::factory()->crypto('binance', 'Binance')->create([
+        'balance_sync_provider' => BalanceSyncProvider::Binance->value,
+    ]);
+    $symbol = InvestmentSymbol::factory()->crypto('BTC')->create();
+
+    CryptoBalance::factory()->create([
+        'investment_provider_id' => $provider->id,
+        'investment_symbol_id' => $symbol->id,
+        'manual_quantity' => '0.10000000',
+    ]);
+
+    $mock = Mockery::mock(CryptoBalanceSyncService::class);
+    $mock->shouldReceive('syncProvider')
+        ->once()
+        ->withArgs(fn (InvestmentProvider $selectedProvider): bool => $selectedProvider->is($provider))
+        ->andReturn([
+            'updated_count' => 2,
+            'skipped_count' => 1,
+        ]);
+    app()->instance(CryptoBalanceSyncService::class, $mock);
+
+    $this->actingAs($user)
+        ->post(route('crypto.balances.sync'), [
+            'investment_provider_id' => $provider->id,
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('status', 'Binance: sinhroniziranih 2 stanj, preskočenih 1.');
 });

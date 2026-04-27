@@ -76,6 +76,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::redirect('kripto', '/kripto/stanja');
     Route::prefix('kripto')->group(function () {
         Route::get('stanja', [CryptoBalanceController::class, 'index'])->name('crypto.balances.index');
+        Route::post('stanja/sync', [CryptoBalanceController::class, 'sync'])->name('crypto.balances.sync');
         Route::post('stanja', [CryptoBalanceController::class, 'store'])->name('crypto.balances.store');
         Route::put('stanja/{cryptoBalance}', [CryptoBalanceController::class, 'update'])->name('crypto.balances.update');
         Route::delete('stanja/{cryptoBalance}', [CryptoBalanceController::class, 'destroy'])->name('crypto.balances.destroy');

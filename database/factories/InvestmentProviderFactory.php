@@ -23,6 +23,7 @@ class InvestmentProviderFactory extends Factory
             'linked_savings_account_id' => null,
             'requires_linked_savings_account' => false,
             'supported_symbol_types' => [],
+            'balance_sync_provider' => null,
             'sort_order' => 0,
         ];
     }

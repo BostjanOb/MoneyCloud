@@ -30,6 +30,24 @@ class CryptoPortfolioService
             ->all();
     }
 
+    /** @return array<int, array{id: int, slug: string, name: string}> */
+    public function syncProviderOptions(): array
+    {
+        return InvestmentProvider::whereNotNull('balance_sync_provider')
+            ->whereHas('cryptoBalances')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (InvestmentProvider $provider): bool => $provider->canSyncBalances())
+            ->map(fn (InvestmentProvider $provider): array => [
+                'id' => $provider->id,
+                'slug' => $provider->slug,
+                'name' => $provider->name,
+            ])
+            ->values()
+            ->all();
+    }
+
     /** @return array<int, array{id: int, symbol: string, label: string, current_price: string}> */
     public function symbolOptions(): array
     {

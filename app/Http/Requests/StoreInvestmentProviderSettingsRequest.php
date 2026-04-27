@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\BalanceSyncProvider;
 use App\Enums\InvestmentSymbolType;
 use App\Models\SavingsAccount;
 use Illuminate\Foundation\Http\FormRequest;
@@ -29,12 +30,19 @@ class StoreInvestmentProviderSettingsRequest extends FormRequest
             'linked_savings_account_id' => ['nullable', 'integer', Rule::exists('savings_accounts', 'id')],
             'supported_symbol_types' => ['required', 'array', 'min:1'],
             'supported_symbol_types.*' => ['required', 'distinct', Rule::enum(InvestmentSymbolType::class)],
+            'balance_sync_provider' => ['nullable', Rule::enum(BalanceSyncProvider::class)],
         ];
     }
 
     protected function prepareForValidation(): void
     {
         $requiresLinkedSavingsAccount = $this->boolean('requires_linked_savings_account');
+        $supportedSymbolTypes = collect($this->input('supported_symbol_types', []))
+            ->filter(fn (mixed $type): bool => is_string($type) && $type !== '')
+            ->map(fn (string $type): string => mb_strtolower($type))
+            ->unique()
+            ->values()
+            ->all();
 
         $this->merge([
             'slug' => Str::slug((string) ($this->filled('slug') ? $this->input('slug') : $this->input('name'))),
@@ -45,12 +53,10 @@ class StoreInvestmentProviderSettingsRequest extends FormRequest
             'linked_savings_account_id' => $requiresLinkedSavingsAccount && $this->filled('linked_savings_account_id')
                 ? (int) $this->input('linked_savings_account_id')
                 : null,
-            'supported_symbol_types' => collect($this->input('supported_symbol_types', []))
-                ->filter(fn (mixed $type): bool => is_string($type) && $type !== '')
-                ->map(fn (string $type): string => mb_strtolower($type))
-                ->unique()
-                ->values()
-                ->all(),
+            'supported_symbol_types' => $supportedSymbolTypes,
+            'balance_sync_provider' => $this->filled('balance_sync_provider')
+                ? mb_strtolower((string) $this->input('balance_sync_provider'))
+                : null,
         ]);
     }
 
@@ -65,6 +71,16 @@ class StoreInvestmentProviderSettingsRequest extends FormRequest
                     $validator->errors()->add(
                         'linked_savings_account_id',
                         'Izbrani račun mora biti leaf račun brez podračunov.',
+                    );
+                }
+
+                if (
+                    $this->filled('balance_sync_provider')
+                    && ! in_array(InvestmentSymbolType::CRYPTO->value, $this->input('supported_symbol_types', []), true)
+                ) {
+                    $validator->errors()->add(
+                        'balance_sync_provider',
+                        'Sinhronizacija stanj je na voljo samo za ponudnike s podporo za kripto.',
                     );
                 }
             },

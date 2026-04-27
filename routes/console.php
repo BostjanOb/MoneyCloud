@@ -4,6 +4,7 @@ use App\Console\Commands\CaptureMonthlyPortfolioSnapshotCommand;
 use App\Console\Commands\RefreshCryptoPricesCommand;
 use App\Console\Commands\RefreshLjsePricesCommand;
 use App\Console\Commands\RefreshYfApiPricesCommand;
+use App\Console\Commands\SyncCryptoBalancesCommand;
 use Illuminate\Support\Facades\Schedule;
 
 Schedule::command(CaptureMonthlyPortfolioSnapshotCommand::class)
@@ -20,4 +21,8 @@ Schedule::command(RefreshYfApiPricesCommand::class)
 
 Schedule::command(RefreshLjsePricesCommand::class)
     ->everyThreeHours()
+    ->withoutOverlapping();
+
+Schedule::command(SyncCryptoBalancesCommand::class)
+    ->everySixHours()
     ->withoutOverlapping();

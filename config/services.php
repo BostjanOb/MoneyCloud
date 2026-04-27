@@ -45,4 +45,11 @@ return [
         'base_url' => env('YFAPI_BASE_URL', 'https://yfapi.net'),
     ],
 
+    'binance' => [
+        'api_key' => env('BINANCE_API_KEY'),
+        'api_secret' => env('BINANCE_API_SECRET'),
+        'base_url' => env('BINANCE_BASE_URL', 'https://api.binance.com/api/'),
+        'fapi_url' => env('BINANCE_FAPI_URL', 'https://fapi.binance.com/fapi/'),
+        'sapi_url' => env('BINANCE_SAPI_URL', 'https://api.binance.com/sapi/'),
+    ],
 ];

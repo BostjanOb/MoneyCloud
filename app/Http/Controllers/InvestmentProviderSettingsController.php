@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\BalanceSyncProvider;
 use App\Enums\InvestmentSymbolType;
 use App\Http\Requests\StoreInvestmentProviderSettingsRequest;
 use App\Http\Requests\UpdateInvestmentProviderSettingsRequest;
@@ -66,6 +67,13 @@ class InvestmentProviderSettingsController extends Controller
                 ])
                 ->values()
                 ->all(),
+            'syncProviderOptions' => collect(BalanceSyncProvider::cases())
+                ->map(fn (BalanceSyncProvider $provider): array => [
+                    'value' => $provider->value,
+                    'label' => $provider->label(),
+                ])
+                ->values()
+                ->all(),
             'savingsAccountOptions' => $this->leafSavingsAccountOptions(),
         ]);
     }
@@ -98,6 +106,7 @@ class InvestmentProviderSettingsController extends Controller
             'linked_savings_account_id' => $provider->linked_savings_account_id,
             'requires_linked_savings_account' => $provider->requiresLinkedSavingsAccount(),
             'supported_symbol_types' => $provider->supported_symbol_types ?? [],
+            'balance_sync_provider' => $provider->balanceSyncProvider()?->value,
         ];
     }
 
