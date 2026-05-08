@@ -1,16 +1,25 @@
 <script setup lang="ts">
-import { Head, Link, router, setLayoutProps, useForm } from '@inertiajs/vue3';
+import {
+    Head,
+    Link,
+    router,
+    setLayoutProps,
+    useForm,
+    usePage,
+} from '@inertiajs/vue3';
 import type { AcceptableValue } from 'reka-ui';
 import { computed, ref } from 'vue';
 import { index as balancesIndex } from '@/actions/App/Http/Controllers/CryptoBalanceController';
 import {
     destroy as dcaDestroy,
+    importMethod as dcaImport,
     index as dcaIndex,
     store as dcaStore,
     update as dcaUpdate,
 } from '@/actions/App/Http/Controllers/CryptoDcaPurchaseController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -99,6 +108,14 @@ type Props = {
 };
 
 const props = defineProps<Props>();
+const page = usePage();
+const flash = computed(
+    () =>
+        (page.props.flash ?? {}) as {
+            status?: string;
+            error?: string;
+        },
+);
 
 setLayoutProps({
     breadcrumbs: [
@@ -114,7 +131,23 @@ setLayoutProps({
 });
 
 const showPurchaseModal = ref(false);
+const showImportModal = ref(false);
 const editingPurchase = ref<DcaPurchase | null>(null);
+const importFileInput = ref<HTMLInputElement | null>(null);
+const binanceProvider = computed(() =>
+    props.providerOptions.find((provider) => provider.slug === 'binance'),
+);
+
+const importForm = useForm({
+    investment_provider_id:
+        binanceProvider.value !== undefined
+            ? String(binanceProvider.value.id)
+            : props.providerOptions[0] !== undefined
+              ? String(props.providerOptions[0].id)
+              : '',
+    file: null as File | null,
+    add_to_balance: false,
+});
 const activeSymbolId = ref(
     props.symbolGroups[0] !== undefined
         ? String(props.symbolGroups[0].symbol.id)
@@ -359,6 +392,54 @@ function submitPurchase(): void {
     });
 }
 
+function openImportModal(): void {
+    importForm.clearErrors();
+    importForm.investment_provider_id =
+        binanceProvider.value !== undefined
+            ? String(binanceProvider.value.id)
+            : props.providerOptions[0] !== undefined
+              ? String(props.providerOptions[0].id)
+              : '';
+    importForm.file = null;
+    importForm.add_to_balance = false;
+
+    if (importFileInput.value) {
+        importFileInput.value.value = '';
+    }
+
+    showImportModal.value = true;
+}
+
+function updateImportProvider(value: AcceptableValue): void {
+    if (typeof value === 'string') {
+        importForm.investment_provider_id = value;
+    }
+}
+
+function updateImportAddToBalance(value: boolean | 'indeterminate'): void {
+    importForm.add_to_balance = value === true;
+}
+
+function handleImportFileChange(event: Event): void {
+    const target = event.target as HTMLInputElement;
+    importForm.file = target.files?.[0] ?? null;
+}
+
+function submitImport(): void {
+    importForm.post(dcaImport.url(), {
+        forceFormData: true,
+        preserveScroll: true,
+        onSuccess: () => {
+            showImportModal.value = false;
+            importForm.reset('file');
+
+            if (importFileInput.value) {
+                importFileInput.value.value = '';
+            }
+        },
+    });
+}
+
 function deletePurchase(purchase: DcaPurchase): void {
     if (
         !confirm(
@@ -388,6 +469,14 @@ function deletePurchase(purchase: DcaPurchase): void {
                     <Link :href="balancesIndex.url()">Stanja</Link>
                 </Button>
                 <Button
+                    variant="outline"
+                    size="sm"
+                    :disabled="providerOptions.length === 0"
+                    @click="openImportModal"
+                >
+                    Uvozi CSV
+                </Button>
+                <Button
                     size="sm"
                     :disabled="
                         providerOptions.length === 0 ||
@@ -399,6 +488,15 @@ function deletePurchase(purchase: DcaPurchase): void {
                 </Button>
             </div>
         </div>
+
+        <Alert v-if="flash.status">
+            <AlertTitle>Uvoz</AlertTitle>
+            <AlertDescription>{{ flash.status }}</AlertDescription>
+        </Alert>
+        <Alert v-if="flash.error" variant="destructive">
+            <AlertTitle>Napaka</AlertTitle>
+            <AlertDescription>{{ flash.error }}</AlertDescription>
+        </Alert>
 
         <Tabs
             v-if="symbolGroups.length > 0"
@@ -836,6 +934,89 @@ function deletePurchase(purchase: DcaPurchase): void {
                     </Button>
                     <Button type="submit" :disabled="purchaseForm.processing">
                         Shrani
+                    </Button>
+                </DialogFooter>
+            </form>
+        </DialogContent>
+    </Dialog>
+
+    <Dialog v-model:open="showImportModal">
+        <DialogContent class="sm:max-w-lg">
+            <DialogHeader>
+                <DialogTitle>Uvozi DCA transakcije</DialogTitle>
+                <DialogDescription>
+                    Naložite Binance "Recurring Convert" CSV izvoz. Podvojene
+                    transakcije bodo preskočene.
+                </DialogDescription>
+            </DialogHeader>
+
+            <form class="grid gap-4" @submit.prevent="submitImport">
+                <div class="space-y-1.5">
+                    <Label for="import-provider">Platforma</Label>
+                    <Select
+                        :model-value="importForm.investment_provider_id"
+                        @update:model-value="updateImportProvider"
+                    >
+                        <SelectTrigger id="import-provider">
+                            <SelectValue placeholder="Izberite platformo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem
+                                v-for="provider in providerOptions"
+                                :key="provider.id"
+                                :value="String(provider.id)"
+                            >
+                                {{ provider.name }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <InputError
+                        :message="importForm.errors.investment_provider_id"
+                    />
+                </div>
+
+                <div class="space-y-1.5">
+                    <Label for="import-file">CSV datoteka</Label>
+                    <Input
+                        id="import-file"
+                        ref="importFileInput"
+                        type="file"
+                        accept=".csv,text/csv"
+                        @change="handleImportFileChange"
+                    />
+                    <InputError :message="importForm.errors.file" />
+                </div>
+
+                <div class="space-y-1.5">
+                    <Label
+                        for="import-add-to-balance"
+                        class="flex items-center gap-3"
+                    >
+                        <Checkbox
+                            id="import-add-to-balance"
+                            :model-value="importForm.add_to_balance"
+                            @update:model-value="updateImportAddToBalance"
+                        />
+                        <span>Posodobi tudi kripto stanje</span>
+                    </Label>
+                    <InputError :message="importForm.errors.add_to_balance" />
+                </div>
+
+                <DialogFooter>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="showImportModal = false"
+                    >
+                        Prekliči
+                    </Button>
+                    <Button
+                        type="submit"
+                        :disabled="
+                            importForm.processing || importForm.file === null
+                        "
+                    >
+                        Uvozi
                     </Button>
                 </DialogFooter>
             </form>

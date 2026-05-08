@@ -83,6 +83,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::get('dca', [CryptoDcaPurchaseController::class, 'index'])->name('crypto.dca.index');
         Route::post('dca', [CryptoDcaPurchaseController::class, 'store'])->name('crypto.dca.store');
+        Route::post('dca/uvoz', [CryptoDcaPurchaseController::class, 'import'])->name('crypto.dca.import');
         Route::put('dca/{investmentPurchase}', [CryptoDcaPurchaseController::class, 'update'])->name('crypto.dca.update');
         Route::delete('dca/{investmentPurchase}', [CryptoDcaPurchaseController::class, 'destroy'])->name('crypto.dca.destroy');
     });

@@ -7,6 +7,7 @@ use App\Models\InvestmentPurchase;
 use App\Models\InvestmentSymbol;
 use App\Models\SavingsAccount;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 
 beforeEach(function () {
     $this->withoutVite();
@@ -324,6 +325,160 @@ test('crypto dca purchase rejects non crypto platforms and symbols', function ()
             'investment_provider_id',
             'investment_symbol_id',
         ]);
+});
+
+test('binance csv import creates purchases and skips duplicates on rerun', function () {
+    $user = User::factory()->create();
+    $provider = InvestmentProvider::factory()->crypto('binance', 'Binance')->create();
+    $btc = InvestmentSymbol::factory()->crypto('BTC')->create();
+    $eth = InvestmentSymbol::factory()->crypto('ETH')->create();
+
+    $csv = "Create Time,Wallet,Frequency,Hourly,From Amount,From Coin,To Amount,To Coin,Price,Inverse Price,Settlement Date,Plan ID,Status\n"
+        ."26-04-26 21:18:26,SPOT,WEEKLY,- -,20,EUR,0.00984375,ETH,2031.74500386,0.00049219,26-04-26 21:18:26,1273656,SUCCESS\n"
+        ."26-04-26 21:04:19,SPOT,WEEKLY,- -,30,EUR,0.00044751,BTC,67036.12205382,0.00001492,26-04-26 21:04:19,9250107,SUCCESS\n";
+
+    $file = UploadedFile::fake()->createWithContent('binance.csv', $csv);
+
+    $this->actingAs($user)
+        ->post(route('crypto.dca.import'), [
+            'investment_provider_id' => $provider->id,
+            'file' => $file,
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('status');
+
+    expect(InvestmentPurchase::query()->count())->toBe(2);
+
+    $btcPurchase = InvestmentPurchase::query()
+        ->where('investment_symbol_id', $btc->id)
+        ->firstOrFail();
+
+    expect($btcPurchase->quantity)->toBe('0.00044751')
+        ->and($btcPurchase->price_per_unit)->toBe('67036.12')
+        ->and($btcPurchase->fee)->toBe('0.00')
+        ->and($btcPurchase->transaction_type->value)->toBe('buy')
+        ->and($btcPurchase->purchased_at->format('Y-m-d H:i:s'))->toBe('2026-04-26 21:04:19');
+
+    expect(InvestmentPurchase::query()->where('investment_symbol_id', $eth->id)->count())->toBe(1);
+    expect(CryptoBalance::query()->count())->toBe(0);
+
+    $duplicateFile = UploadedFile::fake()->createWithContent('binance.csv', $csv);
+
+    $this->actingAs($user)
+        ->post(route('crypto.dca.import'), [
+            'investment_provider_id' => $provider->id,
+            'file' => $duplicateFile,
+        ])
+        ->assertRedirect();
+
+    expect(InvestmentPurchase::query()->count())->toBe(2);
+});
+
+test('binance csv import accepts files with utf-8 bom', function () {
+    $user = User::factory()->create();
+    $provider = InvestmentProvider::factory()->crypto('binance', 'Binance')->create();
+    InvestmentSymbol::factory()->crypto('BTC')->create();
+
+    $csv = "\u{FEFF}Create Time,Wallet,Frequency,Hourly,From Amount,From Coin,To Amount,To Coin,Price,Inverse Price,Settlement Date,Plan ID,Status\n"
+        ."26-04-26 21:04:19,SPOT,WEEKLY,- -,30,EUR,0.00044751,BTC,67036.12,0.00001492,26-04-26 21:04:19,9250107,SUCCESS\n";
+
+    $file = UploadedFile::fake()->createWithContent('binance.csv', $csv);
+
+    $this->actingAs($user)
+        ->post(route('crypto.dca.import'), [
+            'investment_provider_id' => $provider->id,
+            'file' => $file,
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('status');
+
+    expect(InvestmentPurchase::query()->count())->toBe(1);
+});
+
+test('binance csv import can also update crypto balance', function () {
+    $user = User::factory()->create();
+    $provider = InvestmentProvider::factory()->crypto('binance', 'Binance')->create();
+    $btc = InvestmentSymbol::factory()->crypto('BTC')->create();
+
+    $csv = "Create Time,Wallet,Frequency,Hourly,From Amount,From Coin,To Amount,To Coin,Price,Inverse Price,Settlement Date,Plan ID,Status\n"
+        ."26-04-26 21:04:19,SPOT,WEEKLY,- -,30,EUR,0.00044751,BTC,67036.12205382,0.00001492,26-04-26 21:04:19,9250107,SUCCESS\n";
+
+    $file = UploadedFile::fake()->createWithContent('binance.csv', $csv);
+
+    $this->actingAs($user)
+        ->post(route('crypto.dca.import'), [
+            'investment_provider_id' => $provider->id,
+            'file' => $file,
+            'add_to_balance' => true,
+        ])
+        ->assertRedirect();
+
+    $this->assertDatabaseHas('crypto_balances', [
+        'investment_provider_id' => $provider->id,
+        'investment_symbol_id' => $btc->id,
+        'manual_quantity' => '0.00044751',
+    ]);
+});
+
+test('binance csv import skips failed rows non eur and missing symbols', function () {
+    $user = User::factory()->create();
+    $provider = InvestmentProvider::factory()->crypto('binance', 'Binance')->create();
+    InvestmentSymbol::factory()->crypto('BTC')->create();
+
+    $csv = "Create Time,Wallet,Frequency,Hourly,From Amount,From Coin,To Amount,To Coin,Price,Inverse Price,Settlement Date,Plan ID,Status\n"
+        ."26-04-26 21:04:19,SPOT,WEEKLY,- -,30,EUR,0.00044751,BTC,67036.12,0.00001492,26-04-26 21:04:19,9250107,SUCCESS\n"
+        ."26-04-19 21:04:19,SPOT,WEEKLY,- -,30,EUR,0.00046779,BTC,64130.27,0.00001559,26-04-19 21:04:19,9250107,FAILED\n"
+        ."26-04-12 21:04:17,SPOT,WEEKLY,- -,30,USD,0.00048987,BTC,61240.01,0.00001633,26-04-12 21:04:18,9250107,SUCCESS\n"
+        ."26-04-05 21:18:25,SPOT,WEEKLY,- -,20,EUR,0.01112203,SOL,180.00,0.00555,26-04-05 21:18:26,1273656,SUCCESS\n";
+
+    $file = UploadedFile::fake()->createWithContent('binance.csv', $csv);
+
+    $this->actingAs($user)
+        ->post(route('crypto.dca.import'), [
+            'investment_provider_id' => $provider->id,
+            'file' => $file,
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('status');
+
+    expect(InvestmentPurchase::query()->count())->toBe(1);
+});
+
+test('binance csv import rejects invalid header', function () {
+    $user = User::factory()->create();
+    $provider = InvestmentProvider::factory()->crypto('binance', 'Binance')->create();
+
+    $file = UploadedFile::fake()->createWithContent(
+        'binance.csv',
+        "wrong,header\nfoo,bar\n",
+    );
+
+    $this->actingAs($user)
+        ->post(route('crypto.dca.import'), [
+            'investment_provider_id' => $provider->id,
+            'file' => $file,
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('error');
+
+    expect(InvestmentPurchase::query()->count())->toBe(0);
+});
+
+test('binance csv import rejects non crypto provider', function () {
+    $user = User::factory()->create();
+    $stockProvider = InvestmentProvider::factory()->ilirika()->create();
+
+    $csv = "Create Time,Wallet,Frequency,Hourly,From Amount,From Coin,To Amount,To Coin,Price,Inverse Price,Settlement Date,Plan ID,Status\n"
+        ."26-04-26 21:04:19,SPOT,WEEKLY,- -,30,EUR,0.00044751,BTC,67036.12,0.00001492,26-04-26 21:04:19,9250107,SUCCESS\n";
+
+    $file = UploadedFile::fake()->createWithContent('binance.csv', $csv);
+
+    $this->actingAs($user)
+        ->post(route('crypto.dca.import'), [
+            'investment_provider_id' => $stockProvider->id,
+            'file' => $file,
+        ])
+        ->assertSessionHasErrors('investment_provider_id');
 });
 
 test('crypto dca update and delete require a crypto purchase', function () {
