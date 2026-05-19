@@ -225,7 +225,7 @@ class CryptoDcaPurchaseService
             'from_coin' => $fromCoin,
             'to_coin' => $toCoin,
             'quantity' => number_format((float) $toAmount, 8, '.', ''),
-            'price_per_unit' => number_format((float) $price, 2, '.', ''),
+            'price_per_unit' => number_format((float) $price, 3, '.', ''),
             'status' => $status,
         ];
     }

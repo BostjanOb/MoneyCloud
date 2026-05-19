@@ -17,6 +17,16 @@ export function formatSlovenianNumber(value: string | number): string {
     return slovenianNumberFormatter.format(Number(value));
 }
 
+const slovenianUnitPriceFormatter = new Intl.NumberFormat('sl-SI', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 3,
+    useGrouping: 'always',
+});
+
+export function formatUnitPrice(value: string | number): string {
+    return slovenianUnitPriceFormatter.format(Number(value));
+}
+
 export function toUrl(href: NonNullable<InertiaLinkProps['href']>) {
     return typeof href === 'string' ? href : href?.url;
 }

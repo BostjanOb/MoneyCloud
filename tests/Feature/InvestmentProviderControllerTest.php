@@ -376,3 +376,60 @@ test('generic investment pages hide crypto only providers and crypto purchases',
             ->where('symbolOptions.0.symbol', 'AAPL')
         );
 });
+
+test('purchase stores a three decimal unit price without rounding', function () {
+    $user = User::factory()->create();
+    $provider = InvestmentProvider::factory()->create([
+        'slug' => 'degiro',
+        'name' => 'DEGIRO',
+        'requires_linked_savings_account' => false,
+        'supported_symbol_types' => [InvestmentSymbolType::STOCK->value],
+    ]);
+    $symbol = InvestmentSymbol::factory()->create([
+        'type' => InvestmentSymbolType::STOCK,
+    ]);
+
+    $this->actingAs($user)
+        ->post(route('investments.purchases.store', $provider->slug), [
+            'investment_symbol_id' => $symbol->id,
+            'purchased_at' => now()->toDateTimeString(),
+            'quantity' => '10',
+            'price_per_unit' => '7.815',
+            'fee' => '0.00',
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    $this->assertDatabaseHas('investment_purchases', [
+        'investment_provider_id' => $provider->id,
+        'investment_symbol_id' => $symbol->id,
+        'price_per_unit' => '7.815',
+    ]);
+
+    expect(InvestmentPurchase::query()->firstOrFail()->price_per_unit)->toBe('7.815');
+});
+
+test('purchase rejects a unit price with more than three decimals', function () {
+    $user = User::factory()->create();
+    $provider = InvestmentProvider::factory()->create([
+        'slug' => 'degiro',
+        'name' => 'DEGIRO',
+        'requires_linked_savings_account' => false,
+        'supported_symbol_types' => [InvestmentSymbolType::STOCK->value],
+    ]);
+    $symbol = InvestmentSymbol::factory()->create([
+        'type' => InvestmentSymbolType::STOCK,
+    ]);
+
+    $this->actingAs($user)
+        ->post(route('investments.purchases.store', $provider->slug), [
+            'investment_symbol_id' => $symbol->id,
+            'purchased_at' => now()->toDateTimeString(),
+            'quantity' => '10',
+            'price_per_unit' => '7.8155',
+            'fee' => '0.00',
+        ])
+        ->assertSessionHasErrors('price_per_unit');
+
+    $this->assertDatabaseCount('investment_purchases', 0);
+});

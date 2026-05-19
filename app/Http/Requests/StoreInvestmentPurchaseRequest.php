@@ -24,7 +24,7 @@ class StoreInvestmentPurchaseRequest extends FormRequest
             'investment_symbol_id' => ['required', 'integer', Rule::exists('investment_symbols', 'id')],
             'purchased_at' => ['required', 'date'],
             'quantity' => ['required', 'numeric', 'gt:0'],
-            'price_per_unit' => ['required', 'numeric', 'min:0'],
+            'price_per_unit' => ['required', 'numeric', 'min:0', 'decimal:0,3'],
             'fee' => ['required', 'numeric', 'min:0'],
             'yield' => ['nullable', 'numeric', 'min:0'],
             'coupon_date' => ['nullable', 'date'],

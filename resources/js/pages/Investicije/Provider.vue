@@ -40,7 +40,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { formatSlovenianNumber } from '@/lib/utils';
+import { formatSlovenianNumber, formatUnitPrice } from '@/lib/utils';
 
 type Provider = {
     id: number;
@@ -198,6 +198,10 @@ function toDatetimeLocalInput(value: string): string {
 
 function formatMoney(value: string | number): string {
     return `${formatSlovenianNumber(value)} €`;
+}
+
+function formatUnitPriceMoney(value: string | number): string {
+    return `${formatUnitPrice(value)} €`;
 }
 
 function formatSignedMoney(value: string | number): string {
@@ -603,7 +607,7 @@ function deletePurchase(purchase: Purchase): void {
                                 {{ formatQuantity(purchase.quantity) }}
                             </TableCell>
                             <TableCell numeric class="text-right">
-                                {{ formatMoney(purchase.price_per_unit) }}
+                                {{ formatUnitPriceMoney(purchase.price_per_unit) }}
                             </TableCell>
                             <TableCell numeric class="text-right">
                                 {{ formatMoney(purchase.price) }}
@@ -746,7 +750,7 @@ function deletePurchase(purchase: Purchase): void {
                         v-model="purchaseForm.price_per_unit"
                         type="number"
                         min="0"
-                        step="0.01"
+                        step="0.001"
                     />
                     <InputError :message="purchaseForm.errors.price_per_unit" />
                 </div>

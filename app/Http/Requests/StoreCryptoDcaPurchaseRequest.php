@@ -28,7 +28,7 @@ class StoreCryptoDcaPurchaseRequest extends FormRequest
             'purchased_at' => ['required', 'date'],
             'transaction_type' => ['required', Rule::in(array_column(InvestmentTransactionType::cases(), 'value'))],
             'quantity' => ['required', 'numeric', 'gt:0'],
-            'price_per_unit' => ['required', 'numeric', 'min:0'],
+            'price_per_unit' => ['required', 'numeric', 'min:0', 'decimal:0,3'],
             'fee' => ['required', 'numeric', 'min:0'],
             'add_to_balance' => ['sometimes', 'boolean'],
             'balance_provider_id' => [

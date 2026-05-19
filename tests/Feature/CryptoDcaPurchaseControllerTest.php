@@ -354,7 +354,7 @@ test('binance csv import creates purchases and skips duplicates on rerun', funct
         ->firstOrFail();
 
     expect($btcPurchase->quantity)->toBe('0.00044751')
-        ->and($btcPurchase->price_per_unit)->toBe('67036.12')
+        ->and($btcPurchase->price_per_unit)->toBe('67036.122')
         ->and($btcPurchase->fee)->toBe('0.00')
         ->and($btcPurchase->transaction_type->value)->toBe('buy')
         ->and($btcPurchase->purchased_at->format('Y-m-d H:i:s'))->toBe('2026-04-26 21:04:19');

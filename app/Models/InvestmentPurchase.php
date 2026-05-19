@@ -34,7 +34,7 @@ class InvestmentPurchase extends Model
             'purchased_at' => 'datetime',
             'transaction_type' => InvestmentTransactionType::class,
             'quantity' => 'decimal:8',
-            'price_per_unit' => 'decimal:2',
+            'price_per_unit' => 'decimal:3',
             'fee' => 'decimal:2',
             'yield' => 'decimal:2',
             'coupon_date' => 'date',
