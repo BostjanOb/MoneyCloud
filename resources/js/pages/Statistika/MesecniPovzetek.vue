@@ -501,11 +501,6 @@ function submitSnapshot(): void {
                                 Diff
                             </th>
                             <th
-                                class="h-10 px-2 text-left font-medium whitespace-nowrap"
-                            >
-                                Vir
-                            </th>
-                            <th
                                 class="h-10 px-2 text-right font-medium whitespace-nowrap"
                             >
                                 Akcije
@@ -562,17 +557,6 @@ function submitSnapshot(): void {
                                 :class="valueTone(row.diff_amount)"
                             >
                                 {{ formatSignedMoney(row.diff_amount) }}
-                            </td>
-                            <td class="p-2 align-middle whitespace-nowrap">
-                                <Badge
-                                    :variant="
-                                        row.source === 'scheduled'
-                                            ? 'secondary'
-                                            : 'outline'
-                                    "
-                                >
-                                    {{ row.source_label }}
-                                </Badge>
                             </td>
                             <td
                                 class="p-2 text-right align-middle whitespace-nowrap"
