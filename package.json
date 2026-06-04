@@ -15,7 +15,6 @@
     "devDependencies": {
         "@eslint/js": "^10.0.1",
         "@stylistic/eslint-plugin": "^5.10.0",
-        "@tailwindcss/typography": "^0.5.19",
         "@vue/eslint-config-typescript": "^14.7.0",
         "concurrently": "^9.2.1",
         "eslint": "^10.4.1",
@@ -30,6 +29,7 @@
         "@inertiajs/vue3": "^3.3.0",
         "@laravel/vite-plugin-wayfinder": "^0.1.7",
         "@lucide/vue": "^1.17.0",
+        "@tailwindcss/typography": "^0.5.19",
         "@tailwindcss/vite": "^4.3.0",
         "@tanstack/vue-table": "^8.21.3",
         "@types/node": "^25.9.1",
