@@ -1,9 +1,10 @@
 <?php
 
 use App\Jobs\GenerateFinancialAdvisorReport;
+use App\Models\FinancialAdvisorReport;
 use App\Models\User;
 use App\Services\FinancialAdvisorReportService;
-use Illuminate\Support\Facades\Cache;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -23,9 +24,21 @@ test('authenticated users see an empty advisor state', function () {
         );
 });
 
-test('a cached report is passed to the page', function () {
-    $payload = [
-        'generated_at' => '2026-06-04T08:00:00+02:00',
+test('the latest stored report is passed to the page', function () {
+    FinancialAdvisorReport::factory()->create([
+        'generated_at' => CarbonImmutable::parse('2026-05-01 08:00:00'),
+        'report' => [
+            'povzetek' => 'Stara analiza',
+            'ocena_neto_premozenja' => 'Stara ocena',
+            'mocne_tocke' => [],
+            'tveganja' => [],
+            'priporocila' => [],
+            'davcni_nasveti' => [],
+            'naslednji_koraki' => [],
+        ],
+    ]);
+    FinancialAdvisorReport::factory()->create([
+        'generated_at' => CarbonImmutable::parse('2026-06-04 08:00:00'),
         'report' => [
             'povzetek' => 'Test povzetek',
             'ocena_neto_premozenja' => 'Test ocena',
@@ -35,9 +48,7 @@ test('a cached report is passed to the page', function () {
             'davcni_nasveti' => [],
             'naslednji_koraki' => ['Korak 1'],
         ],
-    ];
-
-    Cache::forever(FinancialAdvisorReportService::CACHE_KEY, $payload);
+    ]);
 
     $this->actingAs(User::factory()->create())
         ->get(route('advisor.index'))

@@ -27,7 +27,3 @@ Schedule::command(RefreshLjsePricesCommand::class)
 Schedule::command(SyncCryptoBalancesCommand::class)
     ->everySixHours()
     ->withoutOverlapping();
-
-Schedule::command(GenerateFinancialAdvisorReportCommand::class)
-    ->weeklyOn(1, '08:00')
-    ->withoutOverlapping();

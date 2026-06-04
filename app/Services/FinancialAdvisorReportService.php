@@ -3,17 +3,16 @@
 namespace App\Services;
 
 use App\Ai\Agents\FinancialAnalyst;
+use App\Models\FinancialAdvisorReport;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * Generates and caches the periodic structured analysis produced by the
+ * Generates and persists the periodic structured analysis produced by the
  * {@see FinancialAnalyst} agent.
  */
 class FinancialAdvisorReportService
 {
-    public const CACHE_KEY = 'financial_advisor.report';
-
     public const GENERATING_KEY = 'financial_advisor.generating';
 
     public function __construct(
@@ -21,7 +20,7 @@ class FinancialAdvisorReportService
     ) {}
 
     /**
-     * Generate a fresh analysis, cache it, and return it.
+     * Generate a fresh analysis, persist it, and return it.
      *
      * @return array{generated_at: string, report: array<string, mixed>}
      */
@@ -29,15 +28,13 @@ class FinancialAdvisorReportService
     {
         try {
             $response = (new FinancialAnalyst)->prompt($this->buildPrompt());
-            
-            $payload = [
-                'generated_at' => CarbonImmutable::now('Europe/Ljubljana')->toIso8601String(),
+
+            $report = FinancialAdvisorReport::create([
+                'generated_at' => CarbonImmutable::now('Europe/Ljubljana'),
                 'report' => $response->toArray(),
-            ];
+            ]);
 
-            Cache::forever(self::CACHE_KEY, $payload);
-
-            return $payload;
+            return $this->toPayload($report);
         } finally {
             Cache::forget(self::GENERATING_KEY);
         }
@@ -65,15 +62,29 @@ class FinancialAdvisorReportService
      *
      * @return array{generated_at: string, report: array<string, mixed>}|null
      */
-    public function cached(): ?array
+    public function latest(): ?array
     {
-        return Cache::get(self::CACHE_KEY);
+        $report = FinancialAdvisorReport::latestFirst()->first();
+
+        return $report ? $this->toPayload($report) : null;
     }
 
     public function clear(): void
     {
-        Cache::forget(self::CACHE_KEY);
         Cache::forget(self::GENERATING_KEY);
+    }
+
+    /**
+     * Shape a stored report into the payload the frontend expects.
+     *
+     * @return array{generated_at: string, report: array<string, mixed>}
+     */
+    private function toPayload(FinancialAdvisorReport $report): array
+    {
+        return [
+            'generated_at' => $report->generated_at->toIso8601String(),
+            'report' => $report->report,
+        ];
     }
 
     /**

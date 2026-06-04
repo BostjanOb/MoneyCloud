@@ -13,7 +13,7 @@ class FinancialAdvisorController extends Controller
     public function index(FinancialAdvisorReportService $reports): Response
     {
         return Inertia::render('Svetovalec', [
-            'report' => $reports->cached(),
+            'report' => $reports->latest(),
             'isGenerating' => $reports->isGenerating(),
         ]);
     }
