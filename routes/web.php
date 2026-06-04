@@ -4,6 +4,8 @@ use App\Http\Controllers\BonusController;
 use App\Http\Controllers\CryptoBalanceController;
 use App\Http\Controllers\CryptoDcaPurchaseController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\FinancialAdvisorChatController;
+use App\Http\Controllers\FinancialAdvisorController;
 use App\Http\Controllers\InvestmentProviderController;
 use App\Http\Controllers\InvestmentProviderSettingsController;
 use App\Http\Controllers\InvestmentPurchaseController;
@@ -22,6 +24,11 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/', DashboardController::class)->name('dashboard');
     Route::redirect('dashboard', '/');
+
+    Route::get('svetovalec', [FinancialAdvisorController::class, 'index'])->name('advisor.index');
+    Route::post('svetovalec/generiraj', [FinancialAdvisorController::class, 'generate'])->name('advisor.generate');
+    Route::get('svetovalec/klepet', [FinancialAdvisorChatController::class, 'index'])->name('advisor.chat');
+    Route::post('svetovalec/klepet', [FinancialAdvisorChatController::class, 'stream'])->name('advisor.chat.stream');
 
     Route::get('osebe', [PersonController::class, 'index'])->name('people.index');
     Route::get('osebe/novo', [PersonController::class, 'create'])->name('people.create');

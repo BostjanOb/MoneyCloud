@@ -6,6 +6,18 @@ import laravel from 'laravel-vite-plugin';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+    build: {
+        rollupOptions: {
+            onwarn(warning, defaultHandler) {
+                // Ignore harmless "/* #__PURE__ */" annotation warnings from dependencies
+                if (warning.code === 'INVALID_ANNOTATION' && warning.message.includes('node_modules')) {
+                    return;
+                }
+
+                defaultHandler(warning);
+            },
+        },
+    },
     plugins: [
         laravel({
             input: ['resources/css/app.css', 'resources/js/app.ts'],

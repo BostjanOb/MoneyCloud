@@ -7,9 +7,12 @@ import {
     LayoutGrid,
     PiggyBank,
     Settings,
+    Sparkles,
     Wallet,
 } from '@lucide/vue';
 import { computed } from 'vue';
+import { index as advisorChatIndex } from '@/actions/App/Http/Controllers/FinancialAdvisorChatController';
+import { index as advisorIndex } from '@/actions/App/Http/Controllers/FinancialAdvisorController';
 import { index as cryptoBalanceIndex } from '@/actions/App/Http/Controllers/CryptoBalanceController';
 import { index as cryptoDcaIndex } from '@/actions/App/Http/Controllers/CryptoDcaPurchaseController';
 import { show as investmentProviderShow } from '@/actions/App/Http/Controllers/InvestmentProviderController';
@@ -54,6 +57,21 @@ const mainNavItems = computed<NavItem[]>(() => {
             title: 'Dashboard',
             href: dashboard(),
             icon: LayoutGrid,
+        },
+        {
+            title: 'Svetovalec',
+            href: advisorIndex.url(),
+            icon: Sparkles,
+            children: [
+                {
+                    title: 'Pregled',
+                    href: advisorIndex.url(),
+                },
+                {
+                    title: 'Klepet',
+                    href: advisorChatIndex.url(),
+                },
+            ],
         },
         {
             title: 'Varčevanje',
