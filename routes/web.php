@@ -28,6 +28,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('svetovalec', [FinancialAdvisorController::class, 'index'])->name('advisor.index');
     Route::post('svetovalec/generiraj', [FinancialAdvisorController::class, 'generate'])->name('advisor.generate');
     Route::get('svetovalec/klepet', [FinancialAdvisorChatController::class, 'index'])->name('advisor.chat');
+    Route::post('svetovalec/klepet/actual-budget', [FinancialAdvisorChatController::class, 'refreshActualBudget'])->name('advisor.chat.actual-budget.refresh');
     Route::post('svetovalec/klepet', [FinancialAdvisorChatController::class, 'stream'])->name('advisor.chat.stream');
 
     Route::get('osebe', [PersonController::class, 'index'])->name('people.index');

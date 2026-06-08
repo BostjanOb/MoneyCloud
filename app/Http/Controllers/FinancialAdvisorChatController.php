@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Ai\Agents\FinancialAdvisor;
+use App\Services\ActualBudgetContextService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -14,7 +16,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class FinancialAdvisorChatController extends Controller
 {
-    public function index(Request $request): InertiaResponse
+    public function index(Request $request, ActualBudgetContextService $actualBudget): InertiaResponse
     {
         $user = $request->user();
 
@@ -37,7 +39,25 @@ class FinancialAdvisorChatController extends Controller
             'conversations' => $conversations,
             'activeConversationId' => $activeConversationId,
             'messages' => $this->messagesFor($activeConversationId, $user->id),
+            'actualBudget' => $actualBudget->metadata(),
         ]);
+    }
+
+    public function refreshActualBudget(ActualBudgetContextService $actualBudget): RedirectResponse
+    {
+        if (! $actualBudget->isConfigured()) {
+            return back()->with('error', 'Actual Budget ni nastavljen.');
+        }
+
+        try {
+            $actualBudget->refreshChatContext();
+
+            return back()->with('status', 'Actual Budget podatki so osveženi.');
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return back()->with('error', 'Actual Budget podatkov trenutno ni mogoče osvežiti.');
+        }
     }
 
     public function stream(Request $request): Response

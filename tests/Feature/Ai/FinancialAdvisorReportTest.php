@@ -4,11 +4,19 @@ use App\Ai\Agents\FinancialAnalyst;
 use App\Jobs\GenerateFinancialAdvisorReport;
 use App\Models\FinancialAdvisorReport;
 use App\Models\SavingsAccount;
+use App\Services\ActualBudgetContextService;
 use App\Services\FinancialAdvisorReportService;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Laravel\Ai\Prompts\AgentPrompt;
 
 beforeEach(function () {
+    config([
+        'services.actual_budget.api_key' => null,
+        'services.actual_budget.budget_sync_id' => null,
+    ]);
+
     SavingsAccount::factory()->create(['parent_id' => null, 'amount' => '10000.00', 'apy' => '3.00']);
 });
 
@@ -32,6 +40,15 @@ test('report service generates, persists, and returns a structured report', func
         ->and($service->latest())->toBe($payload);
 
     FinancialAnalyst::assertPrompted(fn (AgentPrompt $prompt) => $prompt->contains('tedensko'));
+});
+
+test('report skips actual budget when it is not configured', function () {
+    FinancialAnalyst::fake();
+    Http::fake();
+
+    app(FinancialAdvisorReportService::class)->generate();
+
+    Http::assertNothingSent();
 });
 
 test('latest returns null before any report is generated', function () {
@@ -87,4 +104,33 @@ test('the command queues report generation by default', function () {
 
     // Queue connection is sync in tests, so the report is generated immediately.
     expect(app(FinancialAdvisorReportService::class)->latest())->not->toBeNull();
+});
+
+test('report stores stale actual budget warning when live data is unavailable', function () {
+    FinancialAnalyst::fake();
+    config([
+        'services.actual_budget.api_key' => 'test-key',
+        'services.actual_budget.base_url' => 'https://money-api.test/v1',
+        'services.actual_budget.budget_sync_id' => 'budget-sync-id',
+    ]);
+    Cache::forever(ActualBudgetContextService::CACHE_KEY, [
+        'available' => true,
+        'source' => 'cache',
+        'generated_at' => now()->toIso8601String(),
+        'window' => ['days' => 90, 'since' => now()->subDays(90)->toDateString(), 'until' => now()->toDateString()],
+        'warnings' => [],
+        'accounts' => [],
+        'category_groups' => [],
+        'categories' => [],
+        'payees' => [],
+        'budget_months' => [],
+        'transactions' => [],
+    ]);
+    Http::fake([
+        'https://money-api.test/*' => Http::response(['error' => 'Actual ni dosegljiv.'], 500),
+    ]);
+
+    $payload = app(FinancialAdvisorReportService::class)->generate();
+
+    expect($payload['report']['opozorila'])->toContain(ActualBudgetContextService::STALE_WARNING);
 });

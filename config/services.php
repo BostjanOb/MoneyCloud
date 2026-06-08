@@ -52,4 +52,12 @@ return [
         'fapi_url' => env('BINANCE_FAPI_URL', 'https://fapi.binance.com/fapi/'),
         'sapi_url' => env('BINANCE_SAPI_URL', 'https://api.binance.com/sapi/'),
     ],
+
+    'actual_budget' => [
+        'api_key' => env('ACTUAL_BUDGET_API_KEY'),
+        'base_url' => env('ACTUAL_BUDGET_BASE_URL', 'https://money-api.bostjan.cloud/v1'),
+        'budget_sync_id' => env('ACTUAL_BUDGET_SYNC_ID'),
+        'encryption_password' => env('ACTUAL_BUDGET_ENCRYPTION_PASSWORD'),
+        'transaction_page_size' => (int) env('ACTUAL_BUDGET_TRANSACTION_PAGE_SIZE', 200),
+    ],
 ];

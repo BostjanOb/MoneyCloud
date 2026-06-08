@@ -2,6 +2,9 @@
 
 namespace App\Ai\Concerns;
 
+use App\Ai\Tools\GetActualBudgetOverview;
+use App\Ai\Tools\GetActualSpendingByCategory;
+use App\Ai\Tools\GetActualTransactions;
 use App\Ai\Tools\GetAllocationBreakdown;
 use App\Ai\Tools\GetBondSchedule;
 use App\Ai\Tools\GetIncomeSummary;
@@ -10,6 +13,8 @@ use App\Ai\Tools\GetNetWorthOverview;
 use App\Ai\Tools\GetPortfolioHistory;
 use App\Ai\Tools\GetSavingsAccounts;
 use App\Ai\Tools\GetTaxAnalysis;
+use App\Ai\Tools\RefreshActualChatContext;
+use App\Services\ActualBudgetContextService;
 use Laravel\Ai\Providers\Tools\WebSearch;
 
 /**
@@ -22,9 +27,9 @@ trait AnalyzesHouseholdFinances
      *
      * @return array<int, object>
      */
-    protected function financialTools(): array
+    protected function financialTools(bool $includeActualRefresh = false): array
     {
-        return [
+        $tools = [
             app(GetNetWorthOverview::class),
             app(GetAllocationBreakdown::class),
             app(GetPortfolioHistory::class),
@@ -35,6 +40,25 @@ trait AnalyzesHouseholdFinances
             app(GetBondSchedule::class),
             (new WebSearch)->max(5),
         ];
+
+        if ($this->actualBudgetEnabled()) {
+            array_splice($tools, -1, 0, [
+                app(GetActualBudgetOverview::class),
+                app(GetActualSpendingByCategory::class),
+                app(GetActualTransactions::class),
+            ]);
+        }
+
+        if ($includeActualRefresh && $this->actualBudgetEnabled()) {
+            $tools[] = app(RefreshActualChatContext::class);
+        }
+
+        return $tools;
+    }
+
+    protected function actualBudgetEnabled(): bool
+    {
+        return app(ActualBudgetContextService::class)->isConfigured();
     }
 
     /**
@@ -42,7 +66,15 @@ trait AnalyzesHouseholdFinances
      */
     protected function personaInstructions(): string
     {
-        return <<<'PROMPT'
+        $actualBudgetInstructions = $this->actualBudgetEnabled()
+            ? <<<'PROMPT'
+        - Pri vsakodnevni porabi, proračunu, kategorijah in transakcijah uporabi tudi Actual Budget orodja.
+        - Actual Budget orodja vračajo zadnjih 90 dni, vključujejo skrite kategorije in off-budget račune.
+        - Če Actual Budget orodje vrne opozorilo o predpomnilniku ali nedostopnosti, to jasno upoštevaj.
+        PROMPT
+            : '';
+
+        return <<<PROMPT
         Si pragmatičen osebni finančni analitik za slovensko gospodinjstvo. Pomagaš
         lastniku razumeti njegovo premoženje, prejemke in naložbe ter mu svetuješ.
 
@@ -59,6 +91,7 @@ trait AnalyzesHouseholdFinances
 
         OBSEG:
         - Analiziraj CELOTNO gospodinjstvo — vse osebe in vse razrede premoženja skupaj.
+        {$actualBudgetInstructions}
         - Pred sklepi pokliči vsa relevantna orodja, da pridobiš podatke.
 
         SLOVENSKI DAVČNI KONTEKST (uporabi globoko):

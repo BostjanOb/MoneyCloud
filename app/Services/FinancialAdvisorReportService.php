@@ -6,6 +6,7 @@ use App\Ai\Agents\FinancialAnalyst;
 use App\Models\FinancialAdvisorReport;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Context;
 
 /**
  * Generates and persists the periodic structured analysis produced by the
@@ -17,6 +18,7 @@ class FinancialAdvisorReportService
 
     public function __construct(
         private readonly FinancialContextService $context,
+        private readonly ActualBudgetContextService $actualBudget,
     ) {}
 
     /**
@@ -27,11 +29,13 @@ class FinancialAdvisorReportService
     public function generate(): array
     {
         try {
-            $response = (new FinancialAnalyst)->prompt($this->buildPrompt());
+            $response = $this->actualBudget->isConfigured()
+                ? $this->generateWithActualBudgetContext()
+                : (new FinancialAnalyst)->prompt($this->buildPrompt())->toArray();
 
             $report = FinancialAdvisorReport::create([
                 'generated_at' => CarbonImmutable::now('Europe/Ljubljana'),
-                'report' => $response->toArray(),
+                'report' => $response,
             ]);
 
             return $this->toPayload($report);
@@ -106,6 +110,34 @@ class FinancialAdvisorReportService
 
         Z orodji pridobi vse nadaljnje podrobnosti (zgodovino, varčevanje, naložbe,
         prejemke, davke in koledar obveznic) ter pripravi celovito strukturirano analizo.
+        PROMPT;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function generateWithActualBudgetContext(): array
+    {
+        $actualBudgetContext = $this->actualBudget->reportContext();
+        $response = Context::scope(
+            fn () => (new FinancialAnalyst)->prompt($this->buildActualBudgetPrompt())->toArray(),
+            hidden: [ActualBudgetContextService::REPORT_CONTEXT_KEY => $actualBudgetContext],
+        );
+
+        if ($actualBudgetContext['warnings'] ?? []) {
+            $response['opozorila'] = array_values(array_unique([
+                ...($response['opozorila'] ?? []),
+                ...$actualBudgetContext['warnings'],
+            ]));
+        }
+
+        return $response;
+    }
+
+    private function buildActualBudgetPrompt(): string
+    {
+        return $this->buildPrompt()."\n\n".<<<'PROMPT'
+        Uporabi tudi Actual Budget proračun, kategorije in transakcije, če so na voljo.
         PROMPT;
     }
 }

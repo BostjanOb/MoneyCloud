@@ -45,6 +45,6 @@ class FinancialAdvisor implements Agent, Conversational, HasTools
      */
     public function tools(): iterable
     {
-        return $this->financialTools();
+        return $this->financialTools(includeActualRefresh: true);
     }
 }

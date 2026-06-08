@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
-import { Plus, SendHorizontal, Sparkles } from '@lucide/vue';
-import { nextTick, ref, watch } from 'vue';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { Plus, RefreshCw, SendHorizontal, Sparkles } from '@lucide/vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import {
+    refreshActualBudget,
     index as advisorChatIndex,
     stream as advisorChatStream,
 } from '@/actions/App/Http/Controllers/FinancialAdvisorChatController';
@@ -24,10 +25,27 @@ type ChatMessage = {
     html?: string | null;
 };
 
+type ActualBudgetMetadata = {
+    configured: boolean;
+    available: boolean;
+    generated_at: string | null;
+    transaction_count: number;
+    account_count: number;
+    warnings: string[];
+};
+
 const props = defineProps<{
     conversations: Conversation[];
     activeConversationId: string | null;
     messages: ChatMessage[];
+    actualBudget: ActualBudgetMetadata;
+}>();
+
+const page = usePage<{
+    flash: {
+        status?: string | null;
+        error?: string | null;
+    };
 }>();
 
 defineOptions({
@@ -57,7 +75,25 @@ const localConversations = ref<Conversation[]>(
 const currentConversationId = ref<string | null>(props.activeConversationId);
 const input = ref('');
 const streaming = ref(false);
+const refreshingActualBudget = ref(false);
 const thread = ref<HTMLElement | null>(null);
+
+const dateFormatter = new Intl.DateTimeFormat('sl-SI', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+});
+
+const actualBudgetLabel = computed(() => {
+    if (!props.actualBudget.configured) {
+        return null;
+    }
+
+    if (!props.actualBudget.available || !props.actualBudget.generated_at) {
+        return 'Actual Budget ni osvežen.';
+    }
+
+    return `Actual Budget: ${dateFormatter.format(new Date(props.actualBudget.generated_at))} (${props.actualBudget.transaction_count} transakcij)`;
+});
 
 // Inertia reuses this page component across visits, so the local state must be
 // re-synced from props whenever navigation returns a fresh set of messages
@@ -231,24 +267,90 @@ function registerConversation(id: string, message: string): void {
         updated_at: new Date().toISOString(),
     });
 }
+
+function refreshActual(): void {
+    if (!props.actualBudget.configured || refreshingActualBudget.value) {
+        return;
+    }
+
+    refreshingActualBudget.value = true;
+
+    router.post(
+        refreshActualBudget.url(),
+        {},
+        {
+            only: ['actualBudget', 'flash'],
+            preserveScroll: true,
+            onFinish: () => {
+                refreshingActualBudget.value = false;
+            },
+        },
+    );
+}
 </script>
 
 <template>
     <Head title="Klepet s svetovalcem" />
 
     <div class="flex flex-col gap-4 p-4">
-        <div class="flex items-center justify-between gap-4">
+        <div
+            class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+        >
             <Heading
                 title="Klepet s svetovalcem"
                 description="Vprašaj karkoli o premoženju, prejemkih in naložbah gospodinjstva"
             />
-            <Button as-child variant="outline" size="sm">
-                <Link :href="advisorChatIndex.url()">
-                    <Plus class="size-4" />
-                    Nov pogovor
-                </Link>
-            </Button>
+            <div class="flex flex-col items-start gap-2 sm:items-end">
+                <div class="flex flex-wrap gap-2">
+                    <Button
+                        v-if="actualBudget.configured"
+                        variant="outline"
+                        size="sm"
+                        :disabled="refreshingActualBudget"
+                        @click="refreshActual"
+                    >
+                        <RefreshCw
+                            :class="
+                                cn(
+                                    'size-4',
+                                    refreshingActualBudget && 'animate-spin',
+                                )
+                            "
+                        />
+                        {{
+                            refreshingActualBudget
+                                ? 'Osvežujem …'
+                                : 'Osveži Actual'
+                        }}
+                    </Button>
+                    <Button as-child variant="outline" size="sm">
+                        <Link :href="advisorChatIndex.url()">
+                            <Plus class="size-4" />
+                            Nov pogovor
+                        </Link>
+                    </Button>
+                </div>
+                <span
+                    v-if="actualBudgetLabel"
+                    class="text-xs text-muted-foreground"
+                >
+                    {{ actualBudgetLabel }}
+                </span>
+            </div>
         </div>
+
+        <p
+            v-if="page.props.flash.status"
+            class="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300"
+        >
+            {{ page.props.flash.status }}
+        </p>
+        <p
+            v-if="page.props.flash.error"
+            class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
+            {{ page.props.flash.error }}
+        </p>
 
         <div class="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
             <!-- Conversation list -->

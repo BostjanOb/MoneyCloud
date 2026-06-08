@@ -43,6 +43,7 @@ type Report = {
     priporocila: Recommendation[];
     davcni_nasveti: TaxTip[];
     naslednji_koraki: string[];
+    opozorila?: string[];
 };
 
 type ReportPayload = {
@@ -225,6 +226,21 @@ function categoryLabel(key: string): string {
 
         <!-- Report -->
         <template v-else>
+            <Card v-if="report.report.opozorila?.length">
+                <CardContent class="flex gap-3 py-4">
+                    <TriangleAlert class="mt-0.5 size-4 text-amber-500" />
+                    <div class="space-y-1">
+                        <p
+                            v-for="(warning, index) in report.report.opozorila"
+                            :key="index"
+                            class="text-sm text-muted-foreground"
+                        >
+                            {{ warning }}
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
+
             <Card>
                 <CardHeader>
                     <CardTitle>Povzetek</CardTitle>
