@@ -137,7 +137,11 @@ class FinancialAdvisorReportService
     private function buildActualBudgetPrompt(): string
     {
         return $this->buildPrompt()."\n\n".<<<'PROMPT'
-        Uporabi tudi Actual Budget proračun, kategorije in transakcije, če so na voljo.
+        Actual Budget je nastavljen za to poročilo. Pred končno analizo uporabi Actual Budget
+        orodja za pregled proračuna, 90-dnevno porabo po kategorijah in raw transakcije.
+        Porabe, proračuna, kategorij in konkretnih odstopanj ne analiziraj samo iz MoneyCloud
+        podatkov. Če Actual Budget ni dosegljiv in so uporabljeni predpomnjeni podatki, opozorilo
+        obravnavaj kot pomembno omejitev poročila.
         PROMPT;
     }
 }

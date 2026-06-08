@@ -101,3 +101,21 @@ test('advisor agents only expose actual budget tools when configured', function 
         ->and($configuredAnalystTools)->toContain(GetActualTransactions::class)
         ->and($configuredAnalystTools)->not->toContain(RefreshActualChatContext::class);
 });
+
+test('financial analyst instructions require actual budget data when configured', function () {
+    expect((string) (new FinancialAnalyst)->instructions())->not->toContain('ACTUAL BUDGET PRI POROČILU');
+
+    config([
+        'services.actual_budget.api_key' => 'test-key',
+        'services.actual_budget.budget_sync_id' => 'budget-sync-id',
+    ]);
+
+    $instructions = (string) (new FinancialAnalyst)->instructions();
+
+    expect($instructions)->toContain('ACTUAL BUDGET PRI POROČILU')
+        ->and($instructions)->toContain('obvezno uporabi Actual Budget orodja')
+        ->and($instructions)->toContain('GetActualBudgetOverview')
+        ->and($instructions)->toContain('GetActualSpendingByCategory')
+        ->and($instructions)->toContain('GetActualTransactions')
+        ->and($instructions)->toContain('Ne zaključi poročila samo iz MoneyCloud podatkov');
+});

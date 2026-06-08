@@ -133,4 +133,9 @@ test('report stores stale actual budget warning when live data is unavailable', 
     $payload = app(FinancialAdvisorReportService::class)->generate();
 
     expect($payload['report']['opozorila'])->toContain(ActualBudgetContextService::STALE_WARNING);
+
+    FinancialAnalyst::assertPrompted(fn (AgentPrompt $prompt) => $prompt
+        ->contains('Actual Budget je nastavljen za to poročilo')
+        && $prompt->contains('raw transakcije')
+        && $prompt->contains('ne analiziraj samo iz MoneyCloud'));
 });
