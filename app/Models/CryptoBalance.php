@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['investment_provider_id', 'investment_symbol_id', 'manual_quantity'])]
+#[Fillable(['investment_provider_id', 'investment_symbol_id', 'manual_quantity', 'apy'])]
 class CryptoBalance extends Model
 {
     /** @use HasFactory<CryptoBalanceFactory> */
@@ -20,6 +20,7 @@ class CryptoBalance extends Model
             'investment_provider_id' => 'integer',
             'investment_symbol_id' => 'integer',
             'manual_quantity' => 'decimal:8',
+            'apy' => 'decimal:2',
         ];
     }
 

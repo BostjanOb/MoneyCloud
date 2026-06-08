@@ -23,6 +23,7 @@ class CryptoBalanceFactory extends Factory
             'investment_provider_id' => InvestmentProvider::factory(),
             'investment_symbol_id' => InvestmentSymbol::factory(),
             'manual_quantity' => fake()->randomFloat(8, 0, 25),
+            'apy' => null,
         ];
     }
 }

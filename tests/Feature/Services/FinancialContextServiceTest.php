@@ -40,7 +40,7 @@ function makeSecurity(InvestmentSymbolType $type, string $symbol, string $curren
     ]);
 }
 
-function makeCryptoBalance(string $symbol, string $currentPrice, string $quantity): CryptoBalance
+function makeCryptoBalance(string $symbol, string $currentPrice, string $quantity, ?string $apy = null): CryptoBalance
 {
     return CryptoBalance::factory()->create([
         'investment_provider_id' => InvestmentProvider::factory()->crypto()->create()->id,
@@ -48,6 +48,7 @@ function makeCryptoBalance(string $symbol, string $currentPrice, string $quantit
             'current_price' => $currentPrice,
         ])->id,
         'manual_quantity' => $quantity,
+        'apy' => $apy,
     ]);
 }
 
@@ -136,12 +137,17 @@ test('investment holdings compute profit and loss', function () {
 });
 
 test('investment holdings include crypto by symbol', function () {
-    makeCryptoBalance('BTC', '30000.00', '0.50000000');
+    makeCryptoBalance('BTC', '30000.00', '0.50000000', '6.00');
 
     $holdings = financialContext()->investmentHoldings();
     $btc = collect($holdings['crypto'])->firstWhere('symbol', 'BTC');
 
     expect($btc['current_value'])->toBe('15000.00')
+        ->and($btc['weighted_apy'])->toBe('6.00')
+        ->and($btc['annual_interest'])->toBe('900.00')
+        ->and($btc['monthly_interest'])->toBe('75.00')
+        ->and($btc['balances'][0]['apy'])->toBe('6.00')
+        ->and($btc['balances'][0]['annual_interest'])->toBe('900.00')
         ->and($holdings['totals']['crypto_value'])->toBe('15000.00');
 });
 

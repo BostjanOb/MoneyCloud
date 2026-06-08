@@ -31,6 +31,7 @@ class StoreCryptoBalanceRequest extends FormRequest
             ],
             'investment_symbol_id' => ['required', 'integer', Rule::exists('investment_symbols', 'id')],
             'manual_quantity' => ['required', 'numeric', 'min:0'],
+            'apy' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ];
     }
 
@@ -43,6 +44,7 @@ class StoreCryptoBalanceRequest extends FormRequest
             'investment_symbol_id' => $this->filled('investment_symbol_id')
                 ? $this->integer('investment_symbol_id')
                 : null,
+            'apy' => $this->filled('apy') ? $this->input('apy') : null,
         ]);
     }
 

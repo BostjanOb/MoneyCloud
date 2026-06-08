@@ -89,15 +89,35 @@ class CryptoPortfolioService
                 $quantity = (float) $balances->sum(
                     fn (CryptoBalance $balance): float => (float) $balance->manual_quantity,
                 );
+                $currentValueInCents = $this->quantityValueInCents($quantity, $firstBalance->symbol->current_price);
+                $annualInterestInCents = $balances->sum(
+                    fn (CryptoBalance $balance): int => $this->cryptoInterestInCents($balance),
+                );
+                $weightedApySum = $balances->sum(function (CryptoBalance $balance): float {
+                    $valueInCents = $this->quantityValueInCents(
+                        $balance->manual_quantity,
+                        $balance->symbol->current_price,
+                    );
+
+                    return $valueInCents * (float) ($balance->apy ?? 0);
+                });
 
                 return [
                     'symbol' => $firstBalance->symbol->symbol,
                     'quantity' => $this->formatQuantity($quantity),
                     'current_price' => $firstBalance->symbol->current_price,
-                    'current_value' => $this->fromCents(
-                        $this->quantityValueInCents($quantity, $firstBalance->symbol->current_price),
-                    ),
+                    'current_value' => $this->fromCents($currentValueInCents),
                     'provider_count' => $balances->count(),
+                    'weighted_apy' => $currentValueInCents === 0
+                        ? '0.00'
+                        : $this->formatPercentage($weightedApySum / $currentValueInCents),
+                    'annual_interest' => $this->fromCents($annualInterestInCents),
+                    'monthly_interest' => $this->fromCents((int) round($annualInterestInCents / 12)),
+                    'balances' => $balances
+                        ->sortBy('provider.name')
+                        ->values()
+                        ->map(fn (CryptoBalance $balance): array => $this->makeBalanceRow($balance))
+                        ->all(),
                 ];
             })
             ->sortBy('symbol')
@@ -209,6 +229,9 @@ class CryptoPortfolioService
             'current_value' => $this->fromCents(
                 $this->quantityValueInCents($manualQuantity, $balance->symbol->current_price),
             ),
+            'apy' => $balance->apy,
+            'annual_interest' => $this->fromCents($this->cryptoInterestInCents($balance)),
+            'monthly_interest' => $this->fromCents((int) round($this->cryptoInterestInCents($balance) / 12)),
         ];
     }
 
@@ -271,6 +294,15 @@ class CryptoPortfolioService
     private function quantityValueInCents(string|int|float $quantity, string|int|float $pricePerUnit): int
     {
         return (int) round(((float) $quantity) * ((float) $pricePerUnit) * 100);
+    }
+
+    private function cryptoInterestInCents(CryptoBalance $balance): int
+    {
+        return (int) round(
+            $this->quantityValueInCents($balance->manual_quantity, $balance->symbol->current_price)
+            * (float) ($balance->apy ?? 0)
+            / 100,
+        );
     }
 
     private function toCents(string|int|float|null $amount): int

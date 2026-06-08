@@ -35,6 +35,7 @@ test('authenticated user can view crypto balances and symbol summary without dca
         'investment_provider_id' => $provider->id,
         'investment_symbol_id' => $symbol->id,
         'manual_quantity' => '0.50000000',
+        'apy' => '6.00',
     ]);
     CryptoBalance::factory()->create([
         'investment_provider_id' => $ledger->id,
@@ -65,10 +66,14 @@ test('authenticated user can view crypto balances and symbol summary without dca
             ->where('balanceRows.0.symbol', 'BTC')
             ->where('balanceRows.1.manual_quantity', '0.50000000')
             ->where('balanceRows.1.current_value', '25000.00')
+            ->where('balanceRows.1.apy', '6.00')
+            ->where('balanceRows.1.annual_interest', '1500.00')
             ->has('symbolSummary', 1)
             ->where('symbolSummary.0.symbol', 'BTC')
             ->where('symbolSummary.0.quantity', '0.75000000')
             ->where('symbolSummary.0.current_value', '37500.00')
+            ->where('symbolSummary.0.weighted_apy', '4.00')
+            ->where('symbolSummary.0.annual_interest', '1500.00')
             ->where('symbolSummary.0.provider_count', 2)
         );
 });
@@ -106,28 +111,49 @@ test('can store update and delete a manual crypto balance', function () {
             'investment_provider_id' => $provider->id,
             'investment_symbol_id' => $symbol->id,
             'manual_quantity' => '1.25000000',
+            'apy' => '6.00',
         ])
         ->assertRedirect();
 
     $balance = CryptoBalance::query()->firstOrFail();
 
-    expect($balance->manual_quantity)->toBe('1.25000000');
+    expect($balance->manual_quantity)->toBe('1.25000000')
+        ->and($balance->apy)->toBe('6.00');
 
     $this->actingAs($user)
         ->put(route('crypto.balances.update', $balance), [
             'investment_provider_id' => $provider->id,
             'investment_symbol_id' => $symbol->id,
             'manual_quantity' => '2.00000000',
+            'apy' => '4.50',
         ])
         ->assertRedirect();
 
-    expect($balance->fresh()->manual_quantity)->toBe('2.00000000');
+    expect($balance->fresh()->manual_quantity)->toBe('2.00000000')
+        ->and($balance->fresh()->apy)->toBe('4.50');
 
     $this->actingAs($user)
         ->delete(route('crypto.balances.destroy', $balance))
         ->assertRedirect();
 
     $this->assertDatabaseMissing('crypto_balances', ['id' => $balance->id]);
+});
+
+test('manual crypto balance accepts empty interest rate', function () {
+    $user = User::factory()->create();
+    $provider = InvestmentProvider::factory()->crypto()->create();
+    $symbol = InvestmentSymbol::factory()->crypto('USDC')->create();
+
+    $this->actingAs($user)
+        ->post(route('crypto.balances.store'), [
+            'investment_provider_id' => $provider->id,
+            'investment_symbol_id' => $symbol->id,
+            'manual_quantity' => '1000.00000000',
+            'apy' => '',
+        ])
+        ->assertRedirect();
+
+    expect(CryptoBalance::query()->firstOrFail()->apy)->toBeNull();
 });
 
 test('manual crypto balance rejects duplicate provider symbol pairs', function () {

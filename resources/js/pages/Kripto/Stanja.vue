@@ -78,6 +78,9 @@ type BalanceRow = {
     current_price: string;
     manual_quantity: string;
     current_value: string;
+    apy: string | null;
+    annual_interest: string;
+    monthly_interest: string;
 };
 
 type SymbolSummaryRow = {
@@ -86,6 +89,9 @@ type SymbolSummaryRow = {
     current_price: string;
     current_value: string;
     provider_count: number;
+    weighted_apy: string;
+    annual_interest: string;
+    monthly_interest: string;
 };
 
 type Props = {
@@ -126,6 +132,7 @@ const balanceForm = useForm({
     investment_provider_id: '',
     investment_symbol_id: '',
     manual_quantity: '0',
+    apy: '',
 });
 
 const totals = computed(() => ({
@@ -146,6 +153,14 @@ function formatQuantity(value: string | number): string {
     }).format(Number(value));
 }
 
+function formatPercentage(value: string | number | null): string {
+    if (value === null || value === '') {
+        return 'Brez';
+    }
+
+    return `${formatSlovenianNumber(value)} %`;
+}
+
 function resetBalanceForm(): void {
     balanceForm.defaults({
         investment_provider_id:
@@ -157,6 +172,7 @@ function resetBalanceForm(): void {
                 ? String(props.symbolOptions[0].id)
                 : '',
         manual_quantity: '0',
+        apy: '',
     });
     balanceForm.reset();
     balanceForm.clearErrors();
@@ -180,6 +196,7 @@ function openEditBalance(row: BalanceRow): void {
     balanceForm.investment_provider_id = String(row.provider_id);
     balanceForm.investment_symbol_id = String(row.symbol_id);
     balanceForm.manual_quantity = row.manual_quantity;
+    balanceForm.apy = row.apy ?? '';
     showBalanceModal.value = true;
 }
 
@@ -200,6 +217,7 @@ function submitBalance(): void {
         investment_provider_id: Number(data.investment_provider_id),
         investment_symbol_id: Number(data.investment_symbol_id),
         manual_quantity: data.manual_quantity,
+        apy: data.apy,
     }));
 
     if (editingBalance.value) {
@@ -224,11 +242,15 @@ function submitBalance(): void {
 }
 
 function submitSync(providerId: number): void {
-    router.post(balanceSync.url(), {
-        investment_provider_id: providerId,
-    }, {
-        preserveScroll: true,
-    });
+    router.post(
+        balanceSync.url(),
+        {
+            investment_provider_id: providerId,
+        },
+        {
+            preserveScroll: true,
+        },
+    );
 }
 
 function deleteBalance(row: BalanceRow): void {
@@ -316,6 +338,12 @@ function deleteBalance(row: BalanceRow): void {
                                 >Vrednost</TableHead
                             >
                             <TableHead numeric class="text-right"
+                                >Letna obrestna mera</TableHead
+                            >
+                            <TableHead numeric class="text-right"
+                                >Letne obresti</TableHead
+                            >
+                            <TableHead numeric class="text-right"
                                 >Platforme</TableHead
                             >
                         </TableRow>
@@ -336,6 +364,12 @@ function deleteBalance(row: BalanceRow): void {
                             </TableCell>
                             <TableCell numeric class="text-right">
                                 {{ formatMoney(row.current_value) }}
+                            </TableCell>
+                            <TableCell numeric class="text-right">
+                                {{ formatPercentage(row.weighted_apy) }}
+                            </TableCell>
+                            <TableCell numeric class="text-right">
+                                {{ formatMoney(row.annual_interest) }}
                             </TableCell>
                             <TableCell numeric class="text-right">
                                 {{ row.provider_count }}
@@ -386,6 +420,12 @@ function deleteBalance(row: BalanceRow): void {
                             <TableHead numeric class="text-right"
                                 >Vrednost</TableHead
                             >
+                            <TableHead numeric class="text-right"
+                                >Letna obrestna mera</TableHead
+                            >
+                            <TableHead numeric class="text-right"
+                                >Letne obresti</TableHead
+                            >
                             <TableHead class="text-right">Akcije</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -406,6 +446,12 @@ function deleteBalance(row: BalanceRow): void {
                             </TableCell>
                             <TableCell numeric class="text-right">
                                 {{ formatMoney(row.current_value) }}
+                            </TableCell>
+                            <TableCell numeric class="text-right">
+                                {{ formatPercentage(row.apy) }}
+                            </TableCell>
+                            <TableCell numeric class="text-right">
+                                {{ formatMoney(row.annual_interest) }}
                             </TableCell>
                             <TableCell class="text-right">
                                 <div class="flex justify-end gap-1">
@@ -450,7 +496,8 @@ function deleteBalance(row: BalanceRow): void {
                     }}
                 </DialogTitle>
                 <DialogDescription>
-                    Vnesite trenutno količino kripta za izbrano platformo.
+                    Vnesite trenutno količino kripta in morebitno obrestno mero
+                    za izbrano platformo.
                 </DialogDescription>
             </DialogHeader>
 
@@ -513,6 +560,20 @@ function deleteBalance(row: BalanceRow): void {
                         step="0.00000001"
                     />
                     <InputError :message="balanceForm.errors.manual_quantity" />
+                </div>
+
+                <div class="space-y-1.5">
+                    <Label for="crypto-apy">Letna obrestna mera (%)</Label>
+                    <Input
+                        id="crypto-apy"
+                        v-model="balanceForm.apy"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        placeholder="npr. 6"
+                    />
+                    <InputError :message="balanceForm.errors.apy" />
                 </div>
 
                 <DialogFooter>

@@ -23,6 +23,7 @@ test('it syncs only tracked binance symbols and leaves missing tracked symbols u
         'investment_provider_id' => $provider->id,
         'investment_symbol_id' => $btc->id,
         'manual_quantity' => '0.10000000',
+        'apy' => '6.00',
     ]);
     $ethBalance = CryptoBalance::factory()->create([
         'investment_provider_id' => $provider->id,
@@ -51,6 +52,7 @@ test('it syncs only tracked binance symbols and leaves missing tracked symbols u
         'skipped_count' => 1,
     ])
         ->and($btcBalance->fresh()->manual_quantity)->toBe('0.75000000')
+        ->and($btcBalance->fresh()->apy)->toBe('6.00')
         ->and($ethBalance->fresh()->manual_quantity)->toBe('2.50000000')
         ->and($xrpBalance->fresh()->manual_quantity)->toBe('5.00000000');
 });

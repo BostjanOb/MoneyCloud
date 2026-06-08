@@ -16,7 +16,8 @@ class GetInvestmentHoldings implements Tool
     {
         return 'Vrne naložbe: vrednostne papirje (ETF, delnice, obveznice) z nabavno vrednostjo, '
             .'trenutno vrednostjo, dobičkom/izgubo (pred in po davku) ter donosom v odstotkih, '
-            .'in ločeno kripto imetja po simbolih. Uporabi za analizo posameznih pozicij in uspešnosti naložb.';
+            .'in ločeno kripto imetja po simbolih, vključno z APY in ocenjenimi obrestmi po denarnicah. '
+            .'Uporabi za analizo posameznih pozicij, obrestovanih kripto stanj in uspešnosti naložb.';
     }
 
     public function handle(Request $request): Stringable|string

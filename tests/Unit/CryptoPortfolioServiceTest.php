@@ -23,6 +23,7 @@ test('it returns only manual crypto balances in balance rows', function () {
         'investment_provider_id' => $provider->id,
         'investment_symbol_id' => $symbol->id,
         'manual_quantity' => '0.50000000',
+        'apy' => '6.00',
     ]);
     InvestmentPurchase::factory()->create([
         'investment_provider_id' => $provider->id,
@@ -36,7 +37,10 @@ test('it returns only manual crypto balances in balance rows', function () {
 
     expect($rows)->toHaveCount(1)
         ->and($rows[0]['manual_quantity'])->toBe('0.50000000')
-        ->and($rows[0]['current_value'])->toBe('25000.00');
+        ->and($rows[0]['current_value'])->toBe('25000.00')
+        ->and($rows[0]['apy'])->toBe('6.00')
+        ->and($rows[0]['annual_interest'])->toBe('1500.00')
+        ->and($rows[0]['monthly_interest'])->toBe('125.00');
 });
 
 test('it groups balance totals by symbol', function () {
@@ -59,6 +63,7 @@ test('it groups balance totals by symbol', function () {
         'investment_provider_id' => $nexo->id,
         'investment_symbol_id' => $btc->id,
         'manual_quantity' => '0.25000000',
+        'apy' => '6.00',
     ]);
     CryptoBalance::factory()->create([
         'investment_provider_id' => $ledger->id,
@@ -72,6 +77,10 @@ test('it groups balance totals by symbol', function () {
         ->and($summary[0]['symbol'])->toBe('BTC')
         ->and($summary[0]['quantity'])->toBe('0.75000000')
         ->and($summary[0]['current_value'])->toBe('37500.00')
+        ->and($summary[0]['weighted_apy'])->toBe('2.00')
+        ->and($summary[0]['annual_interest'])->toBe('750.00')
+        ->and($summary[0]['monthly_interest'])->toBe('62.50')
+        ->and($summary[0]['balances'])->toHaveCount(2)
         ->and($summary[0]['provider_count'])->toBe(2)
         ->and($summary[1]['symbol'])->toBe('ETH')
         ->and($summary[1]['quantity'])->toBe('2.00000000')

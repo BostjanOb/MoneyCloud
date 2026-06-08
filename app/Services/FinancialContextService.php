@@ -260,7 +260,7 @@ class FinancialContextService
 
     /**
      * Investment holdings: securities (ETF/stock/bond) with cost basis and P/L,
-     * plus crypto holdings aggregated by symbol.
+     * plus crypto holdings aggregated by symbol, including configured wallet APY.
      *
      * @return array{
      *     currency: string,
