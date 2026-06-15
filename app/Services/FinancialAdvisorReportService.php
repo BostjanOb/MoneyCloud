@@ -32,7 +32,7 @@ class FinancialAdvisorReportService
         try {
             $response = $this->actualBudget->isConfigured()
                 ? $this->generateWithActualBudgetContext($provider)
-                : (new FinancialAnalyst)->prompt($this->buildPrompt(), provider: $provider->toLab())->toArray();
+                : (new FinancialAnalyst)->prompt($this->buildPrompt(), provider: $provider->promptTarget())->toArray();
 
             $report = FinancialAdvisorReport::create([
                 'generated_at' => CarbonImmutable::now('Europe/Ljubljana'),
@@ -153,7 +153,7 @@ class FinancialAdvisorReportService
     {
         $actualBudgetContext = $this->actualBudget->reportContext();
         $response = Context::scope(
-            fn () => (new FinancialAnalyst)->prompt($this->buildActualBudgetPrompt(), provider: $provider->toLab())->toArray(),
+            fn () => (new FinancialAnalyst)->prompt($this->buildActualBudgetPrompt(), provider: $provider->promptTarget())->toArray(),
             hidden: [ActualBudgetContextService::REPORT_CONTEXT_KEY => $actualBudgetContext],
         );
 
