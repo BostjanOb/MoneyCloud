@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\AdvisorProvider;
 use App\Jobs\GenerateFinancialAdvisorReport;
 use App\Models\FinancialAdvisorReport;
 use App\Models\User;
@@ -60,6 +61,31 @@ test('the latest stored report is passed to the page', function () {
         );
 });
 
+test('the history list and a specific report can be requested', function () {
+    $older = FinancialAdvisorReport::factory()->create([
+        'generated_at' => CarbonImmutable::parse('2026-05-01 08:00:00'),
+        'provider' => AdvisorProvider::Anthropic,
+        'report' => ['povzetek' => 'Stara analiza'] + FinancialAdvisorReport::factory()->raw()['report'],
+    ]);
+    FinancialAdvisorReport::factory()->create([
+        'generated_at' => CarbonImmutable::parse('2026-06-04 08:00:00'),
+        'provider' => AdvisorProvider::OpenAI,
+        'report' => ['povzetek' => 'Nova analiza'] + FinancialAdvisorReport::factory()->raw()['report'],
+    ]);
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('advisor.index', ['report' => $older->id]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Svetovalec')
+            ->where('report.id', $older->id)
+            ->where('report.report.povzetek', 'Stara analiza')
+            ->where('report.provider', 'anthropic')
+            ->has('history', 2)
+            ->where('history.0.provider', 'openai')
+        );
+});
+
 test('generating dispatches the job and flags generation in progress', function () {
     Queue::fake();
 
@@ -67,9 +93,35 @@ test('generating dispatches the job and flags generation in progress', function 
         ->post(route('advisor.generate'))
         ->assertRedirect();
 
-    Queue::assertPushed(GenerateFinancialAdvisorReport::class);
+    Queue::assertPushed(
+        GenerateFinancialAdvisorReport::class,
+        fn (GenerateFinancialAdvisorReport $job) => $job->provider === AdvisorProvider::Anthropic,
+    );
 
     expect(app(FinancialAdvisorReportService::class)->isGenerating())->toBeTrue();
+});
+
+test('generating uses the selected provider', function () {
+    Queue::fake();
+
+    $this->actingAs(User::factory()->create())
+        ->post(route('advisor.generate'), ['provider' => 'openai'])
+        ->assertRedirect();
+
+    Queue::assertPushed(
+        GenerateFinancialAdvisorReport::class,
+        fn (GenerateFinancialAdvisorReport $job) => $job->provider === AdvisorProvider::OpenAI,
+    );
+});
+
+test('generating rejects an invalid provider', function () {
+    Queue::fake();
+
+    $this->actingAs(User::factory()->create())
+        ->post(route('advisor.generate'), ['provider' => 'gemini'])
+        ->assertSessionHasErrors('provider');
+
+    Queue::assertNotPushed(GenerateFinancialAdvisorReport::class);
 });
 
 test('generating is skipped when already in progress', function () {

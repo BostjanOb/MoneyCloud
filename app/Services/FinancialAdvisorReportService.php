@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Ai\Agents\FinancialAnalyst;
+use App\Enums\AdvisorProvider;
 use App\Models\FinancialAdvisorReport;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
@@ -24,17 +25,18 @@ class FinancialAdvisorReportService
     /**
      * Generate a fresh analysis, persist it, and return it.
      *
-     * @return array{generated_at: string, report: array<string, mixed>}
+     * @return array{id: int, generated_at: string, provider: string|null, report: array<string, mixed>}
      */
-    public function generate(): array
+    public function generate(AdvisorProvider $provider = AdvisorProvider::Anthropic): array
     {
         try {
             $response = $this->actualBudget->isConfigured()
-                ? $this->generateWithActualBudgetContext()
-                : (new FinancialAnalyst)->prompt($this->buildPrompt())->toArray();
+                ? $this->generateWithActualBudgetContext($provider)
+                : (new FinancialAnalyst)->prompt($this->buildPrompt(), provider: $provider->toLab())->toArray();
 
             $report = FinancialAdvisorReport::create([
                 'generated_at' => CarbonImmutable::now('Europe/Ljubljana'),
+                'provider' => $provider,
                 'report' => $response,
             ]);
 
@@ -64,13 +66,42 @@ class FinancialAdvisorReportService
     /**
      * The most recently generated report, if one exists.
      *
-     * @return array{generated_at: string, report: array<string, mixed>}|null
+     * @return array{id: int, generated_at: string, provider: string|null, report: array<string, mixed>}|null
      */
     public function latest(): ?array
     {
         $report = FinancialAdvisorReport::latestFirst()->first();
 
         return $report ? $this->toPayload($report) : null;
+    }
+
+    /**
+     * A specific report by id, falling back to the latest if it does not exist.
+     *
+     * @return array{id: int, generated_at: string, provider: string|null, report: array<string, mixed>}|null
+     */
+    public function find(int $id): ?array
+    {
+        $report = FinancialAdvisorReport::find($id);
+
+        return $report ? $this->toPayload($report) : $this->latest();
+    }
+
+    /**
+     * A lightweight list of every report for the history selector.
+     *
+     * @return array<int, array{id: int, generated_at: string, provider: string|null}>
+     */
+    public function history(): array
+    {
+        return FinancialAdvisorReport::latestFirst()
+            ->get()
+            ->map(fn (FinancialAdvisorReport $report): array => [
+                'id' => $report->id,
+                'generated_at' => $report->generated_at->toIso8601String(),
+                'provider' => $report->provider?->value,
+            ])
+            ->all();
     }
 
     public function clear(): void
@@ -81,12 +112,14 @@ class FinancialAdvisorReportService
     /**
      * Shape a stored report into the payload the frontend expects.
      *
-     * @return array{generated_at: string, report: array<string, mixed>}
+     * @return array{id: int, generated_at: string, provider: string|null, report: array<string, mixed>}
      */
     private function toPayload(FinancialAdvisorReport $report): array
     {
         return [
+            'id' => $report->id,
             'generated_at' => $report->generated_at->toIso8601String(),
+            'provider' => $report->provider?->value,
             'report' => $report->report,
         ];
     }
@@ -116,11 +149,11 @@ class FinancialAdvisorReportService
     /**
      * @return array<string, mixed>
      */
-    private function generateWithActualBudgetContext(): array
+    private function generateWithActualBudgetContext(AdvisorProvider $provider): array
     {
         $actualBudgetContext = $this->actualBudget->reportContext();
         $response = Context::scope(
-            fn () => (new FinancialAnalyst)->prompt($this->buildActualBudgetPrompt())->toArray(),
+            fn () => (new FinancialAnalyst)->prompt($this->buildActualBudgetPrompt(), provider: $provider->toLab())->toArray(),
             hidden: [ActualBudgetContextService::REPORT_CONTEXT_KEY => $actualBudgetContext],
         );
 

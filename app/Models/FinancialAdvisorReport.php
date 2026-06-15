@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\AdvisorProvider;
 use Database\Factories\FinancialAdvisorReportFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 
 #[Fillable([
     'generated_at',
+    'provider',
     'report',
 ])]
 class FinancialAdvisorReport extends Model
@@ -22,6 +24,7 @@ class FinancialAdvisorReport extends Model
     {
         return [
             'generated_at' => 'immutable_datetime',
+            'provider' => AdvisorProvider::class,
             'report' => 'array',
         ];
     }

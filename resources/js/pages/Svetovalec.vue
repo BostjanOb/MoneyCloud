@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { Head, Link, router, usePoll } from '@inertiajs/vue3';
-import { MessageCircle, RefreshCw, Sparkles, TriangleAlert } from '@lucide/vue';
-import { computed, watch } from 'vue';
-import { index as advisorChatIndex } from '@/actions/App/Http/Controllers/FinancialAdvisorChatController';
+import { Head, router, usePoll } from '@inertiajs/vue3';
+import { RefreshCw, Sparkles, TriangleAlert } from '@lucide/vue';
+import { computed, ref, watch } from 'vue';
 import {
     generate as advisorGenerate,
     index as advisorIndex,
@@ -11,6 +10,13 @@ import Heading from '@/components/Heading.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 
@@ -46,13 +52,24 @@ type Report = {
     opozorila?: string[];
 };
 
+type Provider = 'anthropic' | 'openai';
+
 type ReportPayload = {
+    id: number;
     generated_at: string;
+    provider: Provider | null;
     report: Report;
+};
+
+type HistoryEntry = {
+    id: number;
+    generated_at: string;
+    provider: Provider | null;
 };
 
 const props = defineProps<{
     report: ReportPayload | null;
+    history: HistoryEntry[];
     isGenerating: boolean;
 }>();
 
@@ -97,6 +114,11 @@ const CATEGORY_LABEL: Record<string, string> = {
     obveznice: 'Obveznice',
 };
 
+const PROVIDER_LABEL: Record<Provider, string> = {
+    anthropic: 'Claude',
+    openai: 'OpenAI',
+};
+
 const dateFormatter = new Intl.DateTimeFormat('sl-SI', {
     dateStyle: 'long',
     timeStyle: 'short',
@@ -108,6 +130,33 @@ const generatedAtLabel = computed(() =>
         : null,
 );
 
+const providerLabel = computed(() =>
+    props.report?.provider ? PROVIDER_LABEL[props.report.provider] : null,
+);
+
+// Izbira providerja za novo analizo (privzeto Claude).
+const selectedProvider = ref<Provider>('anthropic');
+
+// Trenutno prikazano poročilo v izbirniku zgodovine.
+const selectedReportId = computed<string | undefined>(() =>
+    props.report ? String(props.report.id) : undefined,
+);
+
+function historyLabel(entry: HistoryEntry): string {
+    const date = dateFormatter.format(new Date(entry.generated_at));
+    const provider = entry.provider ? PROVIDER_LABEL[entry.provider] : null;
+
+    return provider ? `${date} · ${provider}` : date;
+}
+
+function selectReport(id: string): void {
+    router.get(
+        advisorIndex.url(),
+        { report: Number(id) },
+        { preserveScroll: true, preserveState: true },
+    );
+}
+
 const sortedRecommendations = computed<Recommendation[]>(() =>
     [...(props.report?.report.priporocila ?? [])].sort(
         (a, b) => SEVERITY_ORDER[a.prioriteta] - SEVERITY_ORDER[b.prioriteta],
@@ -116,7 +165,7 @@ const sortedRecommendations = computed<Recommendation[]>(() =>
 
 const { start, stop } = usePoll(
     5000,
-    { only: ['report', 'isGenerating'] },
+    { only: ['report', 'history', 'isGenerating'] },
     { autoStart: false },
 );
 
@@ -131,7 +180,11 @@ function generateReport(): void {
         return;
     }
 
-    router.post(advisorGenerate.url(), {}, { preserveScroll: true });
+    router.post(
+        advisorGenerate.url(),
+        { provider: selectedProvider.value },
+        { preserveScroll: true },
+    );
 }
 
 function categoryLabel(key: string): string {
@@ -150,14 +203,35 @@ function categoryLabel(key: string): string {
                 title="Finančni svetovalec"
                 description="AI analiza in priporočila za premoženje gospodinjstva"
             />
-            <div class="flex flex-col items-start gap-1 sm:items-end">
-                <div class="flex gap-2">
-                    <Button as-child variant="outline" size="sm">
-                        <Link :href="advisorChatIndex.url()">
-                            <MessageCircle class="size-4" />
-                            Klepet
-                        </Link>
-                    </Button>
+            <div class="flex flex-col items-start gap-2 sm:items-end">
+                <div class="flex flex-wrap items-center gap-2">
+                    <Select
+                        v-if="history.length > 1"
+                        :model-value="selectedReportId"
+                        @update:model-value="selectReport(String($event))"
+                    >
+                        <SelectTrigger size="sm" class="w-56">
+                            <SelectValue placeholder="Prejšnja poročila" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem
+                                v-for="entry in history"
+                                :key="entry.id"
+                                :value="String(entry.id)"
+                            >
+                                {{ historyLabel(entry) }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Select v-model="selectedProvider" :disabled="isGenerating">
+                        <SelectTrigger size="sm" class="w-32">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="anthropic">Claude</SelectItem>
+                            <SelectItem value="openai">OpenAI</SelectItem>
+                        </SelectContent>
+                    </Select>
                     <Button
                         size="sm"
                         :disabled="isGenerating"
@@ -175,6 +249,9 @@ function categoryLabel(key: string): string {
                     class="text-xs text-muted-foreground"
                 >
                     Posodobljeno: {{ generatedAtLabel }}
+                    <template v-if="providerLabel">
+                        · {{ providerLabel }}</template
+                    >
                 </span>
             </div>
         </div>

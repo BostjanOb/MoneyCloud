@@ -1,6 +1,7 @@
 <?php
 
 use App\Ai\Agents\FinancialAnalyst;
+use App\Enums\AdvisorProvider;
 use App\Jobs\GenerateFinancialAdvisorReport;
 use App\Models\FinancialAdvisorReport;
 use App\Models\SavingsAccount;
@@ -26,7 +27,8 @@ test('report service generates, persists, and returns a structured report', func
     $service = app(FinancialAdvisorReportService::class);
     $payload = $service->generate();
 
-    expect($payload)->toHaveKeys(['generated_at', 'report'])
+    expect($payload)->toHaveKeys(['id', 'generated_at', 'provider', 'report'])
+        ->and($payload['provider'])->toBe('anthropic')
         ->and($payload['report'])->toHaveKeys([
             'povzetek',
             'ocena_neto_premozenja',
@@ -88,6 +90,15 @@ test('the queued job generates and persists the report', function () {
     expect(app(FinancialAdvisorReportService::class)->latest())->not->toBeNull();
 });
 
+test('the report stores the chosen provider', function () {
+    FinancialAnalyst::fake();
+
+    app(FinancialAdvisorReportService::class)->generate(AdvisorProvider::OpenAI);
+
+    expect(FinancialAdvisorReport::latestFirst()->first()->provider)
+        ->toBe(AdvisorProvider::OpenAI);
+});
+
 test('the command generates the report synchronously', function () {
     FinancialAnalyst::fake();
 
@@ -95,6 +106,25 @@ test('the command generates the report synchronously', function () {
         ->assertSuccessful();
 
     expect(app(FinancialAdvisorReportService::class)->latest())->not->toBeNull();
+});
+
+test('the command generates with the selected provider', function () {
+    FinancialAnalyst::fake();
+
+    $this->artisan('advisor:generate-report', ['--sync' => true, '--provider' => 'openai'])
+        ->assertSuccessful();
+
+    expect(FinancialAdvisorReport::latestFirst()->first()->provider)
+        ->toBe(AdvisorProvider::OpenAI);
+});
+
+test('the command rejects an invalid provider', function () {
+    FinancialAnalyst::fake();
+
+    $this->artisan('advisor:generate-report', ['--sync' => true, '--provider' => 'gemini'])
+        ->assertFailed();
+
+    expect(FinancialAdvisorReport::count())->toBe(0);
 });
 
 test('the command queues report generation by default', function () {
