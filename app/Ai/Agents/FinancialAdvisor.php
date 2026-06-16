@@ -5,6 +5,7 @@ namespace App\Ai\Agents;
 use App\Ai\Concerns\AnalyzesHouseholdFinances;
 use Laravel\Ai\Attributes\MaxSteps;
 use Laravel\Ai\Attributes\MaxTokens;
+use Laravel\Ai\Attributes\Model;
 use Laravel\Ai\Attributes\Provider;
 use Laravel\Ai\Attributes\Timeout;
 use Laravel\Ai\Concerns\RemembersConversations;
@@ -21,6 +22,7 @@ use Stringable;
  * history per user via the {@see RemembersConversations} trait.
  */
 #[Provider(Lab::Anthropic)]
+#[Model('claude-sonnet-4-6')]
 #[MaxSteps(15)]
 #[MaxTokens(4000)]
 #[Timeout(180)]

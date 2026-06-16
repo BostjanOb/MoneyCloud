@@ -9,7 +9,6 @@ use Laravel\Ai\Attributes\MaxSteps;
 use Laravel\Ai\Attributes\MaxTokens;
 use Laravel\Ai\Attributes\Provider;
 use Laravel\Ai\Attributes\Timeout;
-use Laravel\Ai\Attributes\UseSmartestModel;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\HasProviderOptions;
 use Laravel\Ai\Contracts\HasStructuredOutput;
@@ -19,7 +18,6 @@ use Laravel\Ai\Promptable;
 use Stringable;
 
 #[Provider(Lab::Anthropic)]
-#[UseSmartestModel]
 #[MaxSteps(20)]
 #[MaxTokens(8000)]
 #[Timeout(180)]
@@ -33,7 +31,9 @@ class FinancialAnalyst implements Agent, HasProviderOptions, HasStructuredOutput
      *
      * OpenAI defaults to high reasoning effort, which makes this multi-step,
      * tool-heavy report exceed the request timeout. Cap it at medium so the
-     * report completes in time without sacrificing too much quality.
+     * report completes in time without sacrificing too much quality. Anthropic
+     * has no effort levels and extended thinking would break the forced
+     * structured output, so it is left at its default.
      *
      * @return array<string, mixed>
      */

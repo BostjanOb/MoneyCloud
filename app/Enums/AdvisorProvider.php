@@ -20,17 +20,17 @@ enum AdvisorProvider: string
     /**
      * The `provider` argument passed to an agent prompt.
      *
-     * Anthropic keeps the agent's `#[UseSmartestModel]` default, while OpenAI
-     * is pinned to a specific model (keyed by Lab value) so it does not fall
-     * back to the slow `gpt-5.4-pro` reasoning model.
+     * Each provider is pinned to a specific model (keyed by Lab value) so the
+     * report uses a fast, capable model rather than the provider's slow
+     * top-tier reasoning default.
      *
-     * @return Lab|array<string, string>
+     * @return array<string, string>
      */
-    public function promptTarget(): Lab|array
+    public function promptTarget(): array
     {
         return match ($this) {
-            self::Anthropic => Lab::Anthropic,
-            self::OpenAI => [Lab::OpenAI->value => 'gpt-5.5'],
+            self::Anthropic => [Lab::Anthropic->value => 'claude-sonnet-4-6'],
+            self::OpenAI => [Lab::OpenAI->value => 'gpt-5.4'],
         };
     }
 }
