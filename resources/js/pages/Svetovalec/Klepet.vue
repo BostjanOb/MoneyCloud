@@ -244,6 +244,11 @@ async function consumeStream(
                     typeof event.delta === 'string'
                 ) {
                     assistant.value.content += event.delta;
+                } else if (
+                    event.type === 'error' &&
+                    typeof event.message === 'string'
+                ) {
+                    throw new Error(event.message);
                 }
             } catch {
                 // Ignore non-JSON keepalive lines.

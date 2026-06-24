@@ -4,8 +4,12 @@ use App\Ai\Agents\FinancialAdvisor;
 use App\Models\User;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
+use Laravel\Ai\Contracts\ConversationStore;
 use Laravel\Ai\Models\Conversation;
 use Laravel\Ai\Models\ConversationMessage;
+use Laravel\Ai\Prompts\AgentPrompt;
+use Laravel\Ai\Responses\AgentResponse;
+use Laravel\Ai\Storage\DatabaseConversationStore;
 
 function makeConversation(User $user, string $title = 'Pogovor'): Conversation
 {
@@ -121,4 +125,51 @@ test('streaming requires a message', function () {
     $this->actingAs(User::factory()->create())
         ->post(route('advisor.chat.stream'), [])
         ->assertSessionHasErrors('message');
+});
+
+test('streaming persists replies larger than the legacy TEXT column limit', function () {
+    // > 64 KB; would truncate (and throw) against the original TEXT columns.
+    $largeReply = str_repeat('Premoženje gospodinjstva. ', 3000);
+    FinancialAdvisor::fake([$largeReply]);
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->post(route('advisor.chat.stream'), [
+        'message' => 'Povzemi vse.',
+    ]);
+
+    $response->assertOk();
+    $response->streamedContent();
+
+    $stored = ConversationMessage::query()
+        ->where('user_id', $user->id)
+        ->where('role', 'assistant')
+        ->first();
+
+    expect($stored)->not->toBeNull()
+        ->and(strlen((string) $stored->content))->toBeGreaterThan(65535);
+});
+
+test('a persistence failure yields a graceful error event instead of a fatal', function () {
+    FinancialAdvisor::fake(['Pozdravljeni.']);
+    $user = User::factory()->create();
+
+    // Force the assistant message persistence (which runs after the SSE body is
+    // flushed) to fail, mirroring the production "Data too long" exception.
+    $this->app->bind(ConversationStore::class, fn () => new class extends DatabaseConversationStore
+    {
+        public function storeAssistantMessage(string $conversationId, string|int|null $userId, AgentPrompt $prompt, AgentResponse $response): string
+        {
+            throw new RuntimeException('Persistence boom.');
+        }
+    });
+
+    $response = $this->actingAs($user)->post(route('advisor.chat.stream'), [
+        'message' => 'Kako mi gre?',
+    ]);
+
+    $response->assertOk();
+
+    expect($response->streamedContent())
+        ->toContain('"type":"error"')
+        ->toContain('[DONE]');
 });

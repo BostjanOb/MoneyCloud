@@ -74,10 +74,30 @@ class FinancialAdvisorChatController extends Controller
             $user->id,
         );
 
-        $response = (new FinancialAdvisor)
+        $stream = (new FinancialAdvisor)
             ->continue($conversationId, as: $user)
-            ->stream($validated['message'])
-            ->toResponse($request);
+            ->stream($validated['message']);
+
+        // The conversation is persisted while the generator is consumed (after the
+        // SSE body has already been flushed). Any failure there would otherwise
+        // bubble up and trigger an unrenderable "headers already sent" fatal, so
+        // we catch it, log the real cause, and emit a graceful error event.
+        $response = response()->stream(function () use ($stream) {
+            try {
+                foreach ($stream as $event) {
+                    yield 'data: '.((string) $event)."\n\n";
+                }
+            } catch (\Throwable $exception) {
+                report($exception);
+
+                yield 'data: '.json_encode([
+                    'type' => 'error',
+                    'message' => 'Pogovora ni bilo mogoče shraniti.',
+                ])."\n\n";
+            }
+
+            yield "data: [DONE]\n\n";
+        }, headers: ['Content-Type' => 'text/event-stream']);
 
         $response->headers->set('X-Conversation-Id', $conversationId);
         $response->headers->set('X-Accel-Buffering', 'no');
