@@ -3,11 +3,12 @@
 namespace App\Services;
 
 use App\Ai\Agents\FinancialAnalyst;
-use App\Enums\AdvisorProvider;
+use App\Enums\AdvisorModel;
 use App\Models\FinancialAdvisorReport;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Context;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Generates and persists the periodic structured analysis produced by the
@@ -25,19 +26,22 @@ class FinancialAdvisorReportService
     /**
      * Generate a fresh analysis, persist it, and return it.
      *
-     * @return array{id: int, generated_at: string, provider: string|null, report: array<string, mixed>}
+     * @return array{id: int, generated_at: string, model: array{value: string, label: string}|null, usage: array<string, int>|null, report: array<string, mixed>}
      */
-    public function generate(AdvisorProvider $provider = AdvisorProvider::Anthropic): array
+    public function generate(AdvisorModel $model = AdvisorModel::ClaudeSonnet46): array
     {
         try {
-            $response = $this->actualBudget->isConfigured()
-                ? $this->generateWithActualBudgetContext($provider)
-                : (new FinancialAnalyst)->prompt($this->buildPrompt(), provider: $provider->promptTarget())->toArray();
+            [$data, $usage] = $this->actualBudget->isConfigured()
+                ? $this->generateWithActualBudgetContext($model)
+                : $this->generateWithDefaultContext($model);
+
+            Log::info('advisor.report.usage', ['model' => $model->value, 'usage' => $usage]);
 
             $report = FinancialAdvisorReport::create([
                 'generated_at' => CarbonImmutable::now('Europe/Ljubljana'),
-                'provider' => $provider,
-                'report' => $response,
+                'model' => $model,
+                'usage' => $usage,
+                'report' => $data,
             ]);
 
             return $this->toPayload($report);
@@ -66,7 +70,7 @@ class FinancialAdvisorReportService
     /**
      * The most recently generated report, if one exists.
      *
-     * @return array{id: int, generated_at: string, provider: string|null, report: array<string, mixed>}|null
+     * @return array{id: int, generated_at: string, model: array{value: string, label: string}|null, usage: array<string, int>|null, report: array<string, mixed>}|null
      */
     public function latest(): ?array
     {
@@ -78,7 +82,7 @@ class FinancialAdvisorReportService
     /**
      * A specific report by id, falling back to the latest if it does not exist.
      *
-     * @return array{id: int, generated_at: string, provider: string|null, report: array<string, mixed>}|null
+     * @return array{id: int, generated_at: string, model: array{value: string, label: string}|null, usage: array<string, int>|null, report: array<string, mixed>}|null
      */
     public function find(int $id): ?array
     {
@@ -90,7 +94,7 @@ class FinancialAdvisorReportService
     /**
      * A lightweight list of every report for the history selector.
      *
-     * @return array<int, array{id: int, generated_at: string, provider: string|null}>
+     * @return array<int, array{id: int, generated_at: string, model: string|null}>
      */
     public function history(): array
     {
@@ -99,7 +103,7 @@ class FinancialAdvisorReportService
             ->map(fn (FinancialAdvisorReport $report): array => [
                 'id' => $report->id,
                 'generated_at' => $report->generated_at->toIso8601String(),
-                'provider' => $report->provider?->value,
+                'model' => $report->model?->label(),
             ])
             ->all();
     }
@@ -112,14 +116,17 @@ class FinancialAdvisorReportService
     /**
      * Shape a stored report into the payload the frontend expects.
      *
-     * @return array{id: int, generated_at: string, provider: string|null, report: array<string, mixed>}
+     * @return array{id: int, generated_at: string, model: array{value: string, label: string}|null, usage: array<string, int>|null, report: array<string, mixed>}
      */
     private function toPayload(FinancialAdvisorReport $report): array
     {
         return [
             'id' => $report->id,
             'generated_at' => $report->generated_at->toIso8601String(),
-            'provider' => $report->provider?->value,
+            'model' => $report->model
+                ? ['value' => $report->model->value, 'label' => $report->model->label()]
+                : null,
+            'usage' => $report->usage,
             'report' => $report->report,
         ];
     }
@@ -147,24 +154,40 @@ class FinancialAdvisorReportService
     }
 
     /**
-     * @return array<string, mixed>
+     * Generate the report from MoneyCloud data only.
+     *
+     * @return array{0: array<string, mixed>, 1: array<string, int>}
      */
-    private function generateWithActualBudgetContext(AdvisorProvider $provider): array
+    private function generateWithDefaultContext(AdvisorModel $model): array
+    {
+        $response = (new FinancialAnalyst)->prompt($this->buildPrompt(), provider: $model->promptTarget());
+
+        return [$response->toArray(), $response->usage->toArray()];
+    }
+
+    /**
+     * Generate the report enriched with Actual Budget context.
+     *
+     * @return array{0: array<string, mixed>, 1: array<string, int>}
+     */
+    private function generateWithActualBudgetContext(AdvisorModel $model): array
     {
         $actualBudgetContext = $this->actualBudget->reportContext();
         $response = Context::scope(
-            fn () => (new FinancialAnalyst)->prompt($this->buildActualBudgetPrompt(), provider: $provider->promptTarget())->toArray(),
+            fn () => (new FinancialAnalyst)->prompt($this->buildActualBudgetPrompt(), provider: $model->promptTarget()),
             hidden: [ActualBudgetContextService::REPORT_CONTEXT_KEY => $actualBudgetContext],
         );
 
+        $data = $response->toArray();
+
         if ($actualBudgetContext['warnings'] ?? []) {
-            $response['opozorila'] = array_values(array_unique([
-                ...($response['opozorila'] ?? []),
+            $data['opozorila'] = array_values(array_unique([
+                ...($data['opozorila'] ?? []),
                 ...$actualBudgetContext['warnings'],
             ]));
         }
 
-        return $response;
+        return [$data, $response->usage->toArray()];
     }
 
     private function buildActualBudgetPrompt(): string

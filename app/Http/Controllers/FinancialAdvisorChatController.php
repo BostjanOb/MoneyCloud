@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Ai\Agents\FinancialAdvisor;
+use App\Enums\AdvisorModel;
 use App\Services\ActualBudgetContextService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 use Laravel\Ai\Contracts\ConversationStore;
@@ -40,6 +42,8 @@ class FinancialAdvisorChatController extends Controller
             'activeConversationId' => $activeConversationId,
             'messages' => $this->messagesFor($activeConversationId, $user->id),
             'actualBudget' => $actualBudget->metadata(),
+            'models' => AdvisorModel::options(),
+            'defaultModel' => AdvisorModel::ClaudeSonnet46->value,
         ]);
     }
 
@@ -65,9 +69,11 @@ class FinancialAdvisorChatController extends Controller
         $validated = $request->validate([
             'message' => ['required', 'string', 'max:4000'],
             'conversation_id' => ['nullable', 'string'],
+            'model' => ['nullable', Rule::enum(AdvisorModel::class)],
         ]);
 
         $user = $request->user();
+        $model = AdvisorModel::tryFrom($validated['model'] ?? '') ?? AdvisorModel::ClaudeSonnet46;
         $conversationId = $this->resolveOrCreateConversation(
             $validated['conversation_id'] ?? null,
             $validated['message'],
@@ -76,7 +82,7 @@ class FinancialAdvisorChatController extends Controller
 
         $stream = (new FinancialAdvisor)
             ->continue($conversationId, as: $user)
-            ->stream($validated['message']);
+            ->stream($validated['message'], provider: $model->promptTarget());
 
         // The conversation is persisted while the generator is consumed (after the
         // SSE body has already been flushed). Any failure there would otherwise
@@ -119,7 +125,7 @@ class FinancialAdvisorChatController extends Controller
     }
 
     /**
-     * @return array<int, array{id: string, role: string, content: string, html: string|null}>
+     * @return array<int, array{id: string, role: string, content: string, html: string|null, usage: array<string, int>|null, model: string|null}>
      */
     private function messagesFor(?string $conversationId, int $userId): array
     {
@@ -133,7 +139,7 @@ class FinancialAdvisorChatController extends Controller
             ->whereIn('role', ['user', 'assistant'])
             ->orderBy('created_at')
             ->orderBy('id')
-            ->get(['id', 'role', 'content'])
+            ->get(['id', 'role', 'content', 'usage', 'meta'])
             ->map(fn (ConversationMessage $message): array => [
                 'id' => $message->id,
                 'role' => $message->role,
@@ -141,8 +147,36 @@ class FinancialAdvisorChatController extends Controller
                 'html' => $message->role === 'assistant'
                     ? $this->renderMarkdown($message->content)
                     : null,
+                'usage' => $message->role === 'assistant' ? $this->usageFrom($message) : null,
+                'model' => $message->role === 'assistant' ? $this->modelLabelFrom($message) : null,
             ])
             ->all();
+    }
+
+    /**
+     * Extract the token usage stored by the AI SDK on an assistant message.
+     *
+     * @return array<string, int>|null
+     */
+    private function usageFrom(ConversationMessage $message): ?array
+    {
+        $usage = $message->usage;
+
+        return is_array($usage) && $usage !== [] ? $usage : null;
+    }
+
+    /**
+     * Resolve the human-friendly model label from an assistant message's meta.
+     */
+    private function modelLabelFrom(ConversationMessage $message): ?string
+    {
+        $model = is_array($message->meta) ? ($message->meta['model'] ?? null) : null;
+
+        if (! is_string($model)) {
+            return null;
+        }
+
+        return AdvisorModel::tryFrom($model)?->label() ?? $model;
     }
 
     private function renderMarkdown(string $content): string

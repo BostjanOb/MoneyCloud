@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Enums\AdvisorProvider;
+use App\Enums\AdvisorModel;
 use App\Services\FinancialAdvisorReportService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -17,11 +17,11 @@ class GenerateFinancialAdvisorReport implements ShouldQueue
     public int $timeout = 300;
 
     public function __construct(
-        public AdvisorProvider $provider = AdvisorProvider::Anthropic,
+        public AdvisorModel $model = AdvisorModel::ClaudeSonnet46,
     ) {}
 
     public function handle(FinancialAdvisorReportService $reports): void
     {
-        $reports->generate($this->provider);
+        $reports->generate($this->model);
     }
 }

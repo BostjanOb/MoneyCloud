@@ -17,6 +17,15 @@ export function formatSlovenianNumber(value: string | number): string {
     return slovenianNumberFormatter.format(Number(value));
 }
 
+const slovenianIntegerFormatter = new Intl.NumberFormat('sl-SI', {
+    maximumFractionDigits: 0,
+    useGrouping: 'always',
+});
+
+export function formatSlovenianInteger(value: string | number): string {
+    return slovenianIntegerFormatter.format(Number(value));
+}
+
 const slovenianUnitPriceFormatter = new Intl.NumberFormat('sl-SI', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 3,

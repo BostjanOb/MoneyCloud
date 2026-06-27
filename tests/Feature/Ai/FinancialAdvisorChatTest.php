@@ -20,7 +20,11 @@ function makeConversation(User $user, string $title = 'Pogovor'): Conversation
     ]);
 }
 
-function addMessage(Conversation $conversation, string $role, string $content, int $secondsOffset = 0): void
+/**
+ * @param  array<string, int>  $usage
+ * @param  array<string, mixed>  $meta
+ */
+function addMessage(Conversation $conversation, string $role, string $content, int $secondsOffset = 0, array $usage = [], array $meta = []): void
 {
     ConversationMessage::query()->create([
         'id' => (string) Str::uuid(),
@@ -32,8 +36,8 @@ function addMessage(Conversation $conversation, string $role, string $content, i
         'attachments' => [],
         'tool_calls' => [],
         'tool_results' => [],
-        'usage' => [],
-        'meta' => [],
+        'usage' => $usage,
+        'meta' => $meta,
         'created_at' => now()->addSeconds($secondsOffset),
         'updated_at' => now()->addSeconds($secondsOffset),
     ]);
@@ -125,6 +129,54 @@ test('streaming requires a message', function () {
     $this->actingAs(User::factory()->create())
         ->post(route('advisor.chat.stream'), [])
         ->assertSessionHasErrors('message');
+});
+
+test('streaming accepts a model selection', function () {
+    FinancialAdvisor::fake(['Odgovor s konkretnim modelom.']);
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->post(route('advisor.chat.stream'), [
+        'message' => 'Kako mi gre?',
+        'model' => 'gpt-5.4',
+    ]);
+
+    $response->assertOk();
+    $response->streamedContent();
+
+    expect($response->headers->get('X-Conversation-Id'))->not->toBeNull();
+});
+
+test('streaming rejects an invalid model', function () {
+    $this->actingAs(User::factory()->create())
+        ->post(route('advisor.chat.stream'), [
+            'message' => 'Kako mi gre?',
+            'model' => 'gemini',
+        ])
+        ->assertSessionHasErrors('model');
+});
+
+test('assistant messages expose token usage and model label', function () {
+    $user = User::factory()->create();
+    $conversation = makeConversation($user);
+    addMessage($conversation, 'user', 'Vprašanje', 0);
+    addMessage(
+        $conversation,
+        'assistant',
+        'Odgovor',
+        1,
+        usage: ['prompt_tokens' => 100, 'completion_tokens' => 40],
+        meta: ['model' => 'claude-sonnet-4-6'],
+    );
+
+    $this->actingAs($user)
+        ->get(route('advisor.chat', ['conversation' => $conversation->id]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('messages.1.usage.prompt_tokens', 100)
+            ->where('messages.1.usage.completion_tokens', 40)
+            ->where('messages.1.model', 'Claude Sonnet 4.6')
+            ->etc()
+        );
 });
 
 test('streaming persists replies larger than the legacy TEXT column limit', function () {

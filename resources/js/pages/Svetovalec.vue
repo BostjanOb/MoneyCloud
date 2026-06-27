@@ -7,6 +7,7 @@ import {
     index as advisorIndex,
 } from '@/actions/App/Http/Controllers/FinancialAdvisorController';
 import Heading from '@/components/Heading.vue';
+import ModelSelect from '@/components/ModelSelect.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,6 +20,11 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
+import {
+    type AdvisorModelGroup,
+    formatTokenUsage,
+    type TokenUsage,
+} from '@/lib/advisor';
 
 type Severity = 'nizka' | 'srednja' | 'visoka';
 
@@ -52,25 +58,31 @@ type Report = {
     opozorila?: string[];
 };
 
-type Provider = 'anthropic' | 'openai';
+type ModelInfo = {
+    value: string;
+    label: string;
+};
 
 type ReportPayload = {
     id: number;
     generated_at: string;
-    provider: Provider | null;
+    model: ModelInfo | null;
+    usage: TokenUsage | null;
     report: Report;
 };
 
 type HistoryEntry = {
     id: number;
     generated_at: string;
-    provider: Provider | null;
+    model: string | null;
 };
 
 const props = defineProps<{
     report: ReportPayload | null;
     history: HistoryEntry[];
     isGenerating: boolean;
+    models: AdvisorModelGroup[];
+    defaultModel: string;
 }>();
 
 defineOptions({
@@ -114,11 +126,6 @@ const CATEGORY_LABEL: Record<string, string> = {
     obveznice: 'Obveznice',
 };
 
-const PROVIDER_LABEL: Record<Provider, string> = {
-    anthropic: 'Claude',
-    openai: 'OpenAI',
-};
-
 const dateFormatter = new Intl.DateTimeFormat('sl-SI', {
     dateStyle: 'long',
     timeStyle: 'short',
@@ -130,12 +137,12 @@ const generatedAtLabel = computed(() =>
         : null,
 );
 
-const providerLabel = computed(() =>
-    props.report?.provider ? PROVIDER_LABEL[props.report.provider] : null,
-);
+const modelLabelText = computed(() => props.report?.model?.label ?? null);
 
-// Izbira providerja za novo analizo (privzeto Claude).
-const selectedProvider = ref<Provider>('anthropic');
+const usageLabel = computed(() => formatTokenUsage(props.report?.usage));
+
+// Izbira modela za novo analizo (privzeto iz strežnika).
+const selectedModel = ref<string>(props.defaultModel);
 
 // Trenutno prikazano poročilo v izbirniku zgodovine.
 const selectedReportId = computed<string | undefined>(() =>
@@ -144,9 +151,8 @@ const selectedReportId = computed<string | undefined>(() =>
 
 function historyLabel(entry: HistoryEntry): string {
     const date = dateFormatter.format(new Date(entry.generated_at));
-    const provider = entry.provider ? PROVIDER_LABEL[entry.provider] : null;
 
-    return provider ? `${date} · ${provider}` : date;
+    return entry.model ? `${date} · ${entry.model}` : date;
 }
 
 function selectReport(id: string): void {
@@ -182,7 +188,7 @@ function generateReport(): void {
 
     router.post(
         advisorGenerate.url(),
-        { provider: selectedProvider.value },
+        { model: selectedModel.value },
         { preserveScroll: true },
     );
 }
@@ -223,15 +229,11 @@ function categoryLabel(key: string): string {
                             </SelectItem>
                         </SelectContent>
                     </Select>
-                    <Select v-model="selectedProvider" :disabled="isGenerating">
-                        <SelectTrigger size="sm" class="w-32">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="anthropic">Claude</SelectItem>
-                            <SelectItem value="openai">OpenAI</SelectItem>
-                        </SelectContent>
-                    </Select>
+                    <ModelSelect
+                        v-model="selectedModel"
+                        :models="models"
+                        :disabled="isGenerating"
+                    />
                     <Button
                         size="sm"
                         :disabled="isGenerating"
@@ -244,15 +246,18 @@ function categoryLabel(key: string): string {
                         }}
                     </Button>
                 </div>
-                <span
+                <div
                     v-if="generatedAtLabel"
-                    class="text-xs text-muted-foreground"
+                    class="flex flex-col gap-0.5 text-xs text-muted-foreground sm:items-end"
                 >
-                    Posodobljeno: {{ generatedAtLabel }}
-                    <template v-if="providerLabel">
-                        · {{ providerLabel }}</template
-                    >
-                </span>
+                    <span>
+                        Posodobljeno: {{ generatedAtLabel }}
+                        <template v-if="modelLabelText">
+                            · {{ modelLabelText }}</template
+                        >
+                    </span>
+                    <span v-if="usageLabel">{{ usageLabel }}</span>
+                </div>
             </div>
         </div>
 

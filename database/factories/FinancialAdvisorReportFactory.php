@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Enums\AdvisorProvider;
+use App\Enums\AdvisorModel;
 use App\Models\FinancialAdvisorReport;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -23,7 +23,11 @@ class FinancialAdvisorReportFactory extends Factory
             'generated_at' => CarbonImmutable::instance(
                 fake()->dateTimeBetween('-3 months', 'now'),
             ),
-            'provider' => AdvisorProvider::Anthropic,
+            'model' => AdvisorModel::ClaudeSonnet46,
+            'usage' => [
+                'prompt_tokens' => fake()->numberBetween(1000, 5000),
+                'completion_tokens' => fake()->numberBetween(500, 3000),
+            ],
             'report' => [
                 'povzetek' => fake()->sentence(),
                 'ocena_neto_premozenja' => fake()->sentence(),

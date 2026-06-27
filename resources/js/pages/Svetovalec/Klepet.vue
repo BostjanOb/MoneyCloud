@@ -9,7 +9,14 @@ import {
 } from '@/actions/App/Http/Controllers/FinancialAdvisorChatController';
 import { index as advisorIndex } from '@/actions/App/Http/Controllers/FinancialAdvisorController';
 import Heading from '@/components/Heading.vue';
+import ModelSelect from '@/components/ModelSelect.vue';
 import { Button } from '@/components/ui/button';
+import {
+    type AdvisorModelGroup,
+    formatTokenUsage,
+    modelLabel,
+    type TokenUsage,
+} from '@/lib/advisor';
 import { cn } from '@/lib/utils';
 
 type Conversation = {
@@ -23,6 +30,8 @@ type ChatMessage = {
     role: 'user' | 'assistant';
     content: string;
     html?: string | null;
+    usage?: TokenUsage | null;
+    model?: string | null;
 };
 
 type ActualBudgetMetadata = {
@@ -39,6 +48,8 @@ const props = defineProps<{
     activeConversationId: string | null;
     messages: ChatMessage[];
     actualBudget: ActualBudgetMetadata;
+    models: AdvisorModelGroup[];
+    defaultModel: string;
 }>();
 
 const page = usePage<{
@@ -73,6 +84,7 @@ const localConversations = ref<Conversation[]>(
     props.conversations.map((conversation) => ({ ...conversation })),
 );
 const currentConversationId = ref<string | null>(props.activeConversationId);
+const selectedModel = ref<string>(props.defaultModel);
 const input = ref('');
 const streaming = ref(false);
 const refreshingActualBudget = ref(false);
@@ -146,6 +158,7 @@ async function send(): Promise<void> {
         id: nextLocalId(),
         role: 'assistant',
         content: '',
+        model: modelLabel(props.models, selectedModel.value) ?? null,
     });
     localMessages.value.push(assistant.value);
     await scrollToBottom();
@@ -163,6 +176,7 @@ async function send(): Promise<void> {
             body: JSON.stringify({
                 message,
                 conversation_id: currentConversationId.value,
+                model: selectedModel.value,
             }),
         });
 
@@ -187,11 +201,7 @@ async function send(): Promise<void> {
                 }),
                 {},
                 {
-                    only: [
-                        'messages',
-                        'conversations',
-                        'activeConversationId',
-                    ],
+                    only: ['messages', 'conversations', 'activeConversationId'],
                     preserveScroll: true,
                     preserveState: true,
                     replace: true,
@@ -244,6 +254,8 @@ async function consumeStream(
                     typeof event.delta === 'string'
                 ) {
                     assistant.value.content += event.delta;
+                } else if (event.type === 'stream_end' && event.usage) {
+                    assistant.value.usage = event.usage as TokenUsage;
                 } else if (
                     event.type === 'error' &&
                     typeof event.message === 'string'
@@ -306,7 +318,12 @@ function refreshActual(): void {
                 description="Vprašaj karkoli o premoženju, prejemkih in naložbah gospodinjstva"
             />
             <div class="flex flex-col items-start gap-2 sm:items-end">
-                <div class="flex flex-wrap gap-2">
+                <div class="flex flex-wrap items-center gap-2">
+                    <ModelSelect
+                        v-model="selectedModel"
+                        :models="models"
+                        :disabled="streaming"
+                    />
                     <Button
                         v-if="actualBudget.configured"
                         variant="outline"
@@ -413,10 +430,10 @@ function refreshActual(): void {
                         :key="message.id"
                         :class="
                             cn(
-                                'flex',
+                                'flex flex-col gap-1',
                                 message.role === 'user'
-                                    ? 'justify-end'
-                                    : 'justify-start',
+                                    ? 'items-end'
+                                    : 'items-start',
                             )
                         "
                     >
@@ -432,7 +449,7 @@ function refreshActual(): void {
                         >
                             <div
                                 v-if="message.html"
-                                class="prose prose-sm dark:prose-invert max-w-none prose-pre:bg-foreground/10 prose-pre:text-foreground"
+                                class="prose prose-sm max-w-none dark:prose-invert prose-pre:bg-foreground/10 prose-pre:text-foreground"
                                 v-html="message.html"
                             />
                             <span v-else class="whitespace-pre-wrap">{{
@@ -449,6 +466,18 @@ function refreshActual(): void {
                                 …
                             </span>
                         </div>
+                        <p
+                            v-if="
+                                message.role === 'assistant' &&
+                                formatTokenUsage(message.usage)
+                            "
+                            class="px-1 text-xs text-muted-foreground"
+                        >
+                            {{ formatTokenUsage(message.usage) }}
+                            <template v-if="message.model">
+                                · {{ message.model }}</template
+                            >
+                        </p>
                     </div>
                 </div>
 

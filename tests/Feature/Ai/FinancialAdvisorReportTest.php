@@ -1,7 +1,7 @@
 <?php
 
 use App\Ai\Agents\FinancialAnalyst;
-use App\Enums\AdvisorProvider;
+use App\Enums\AdvisorModel;
 use App\Jobs\GenerateFinancialAdvisorReport;
 use App\Models\FinancialAdvisorReport;
 use App\Models\SavingsAccount;
@@ -27,8 +27,9 @@ test('report service generates, persists, and returns a structured report', func
     $service = app(FinancialAdvisorReportService::class);
     $payload = $service->generate();
 
-    expect($payload)->toHaveKeys(['id', 'generated_at', 'provider', 'report'])
-        ->and($payload['provider'])->toBe('anthropic')
+    expect($payload)->toHaveKeys(['id', 'generated_at', 'model', 'usage', 'report'])
+        ->and($payload['model']['value'])->toBe('claude-sonnet-4-6')
+        ->and($payload['model']['label'])->toBe('Claude Sonnet 4.6')
         ->and($payload['report'])->toHaveKeys([
             'povzetek',
             'ocena_neto_premozenja',
@@ -90,13 +91,24 @@ test('the queued job generates and persists the report', function () {
     expect(app(FinancialAdvisorReportService::class)->latest())->not->toBeNull();
 });
 
-test('the report stores the chosen provider', function () {
+test('the report stores the chosen model', function () {
     FinancialAnalyst::fake();
 
-    app(FinancialAdvisorReportService::class)->generate(AdvisorProvider::OpenAI);
+    app(FinancialAdvisorReportService::class)->generate(AdvisorModel::Gpt54);
 
-    expect(FinancialAdvisorReport::latestFirst()->first()->provider)
-        ->toBe(AdvisorProvider::OpenAI);
+    expect(FinancialAdvisorReport::latestFirst()->first()->model)
+        ->toBe(AdvisorModel::Gpt54);
+});
+
+test('the report stores token usage from the response', function () {
+    FinancialAnalyst::fake();
+
+    app(FinancialAdvisorReportService::class)->generate();
+
+    $report = FinancialAdvisorReport::latestFirst()->first();
+
+    expect($report->usage)->toBeArray()
+        ->toHaveKeys(['prompt_tokens', 'completion_tokens']);
 });
 
 test('the command generates the report synchronously', function () {
@@ -108,20 +120,20 @@ test('the command generates the report synchronously', function () {
     expect(app(FinancialAdvisorReportService::class)->latest())->not->toBeNull();
 });
 
-test('the command generates with the selected provider', function () {
+test('the command generates with the selected model', function () {
     FinancialAnalyst::fake();
 
-    $this->artisan('advisor:generate-report', ['--sync' => true, '--provider' => 'openai'])
+    $this->artisan('advisor:generate-report', ['--sync' => true, '--model' => 'gpt-5.4'])
         ->assertSuccessful();
 
-    expect(FinancialAdvisorReport::latestFirst()->first()->provider)
-        ->toBe(AdvisorProvider::OpenAI);
+    expect(FinancialAdvisorReport::latestFirst()->first()->model)
+        ->toBe(AdvisorModel::Gpt54);
 });
 
-test('the command rejects an invalid provider', function () {
+test('the command rejects an invalid model', function () {
     FinancialAnalyst::fake();
 
-    $this->artisan('advisor:generate-report', ['--sync' => true, '--provider' => 'gemini'])
+    $this->artisan('advisor:generate-report', ['--sync' => true, '--model' => 'gemini'])
         ->assertFailed();
 
     expect(FinancialAdvisorReport::count())->toBe(0);

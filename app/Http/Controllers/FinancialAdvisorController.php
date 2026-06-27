@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\AdvisorProvider;
+use App\Enums\AdvisorModel;
 use App\Jobs\GenerateFinancialAdvisorReport;
 use App\Services\FinancialAdvisorReportService;
 use Illuminate\Http\RedirectResponse;
@@ -21,21 +21,23 @@ class FinancialAdvisorController extends Controller
             'report' => $reportId ? $reports->find($reportId) : $reports->latest(),
             'history' => $reports->history(),
             'isGenerating' => $reports->isGenerating(),
+            'models' => AdvisorModel::options(),
+            'defaultModel' => AdvisorModel::ClaudeSonnet46->value,
         ]);
     }
 
     public function generate(Request $request, FinancialAdvisorReportService $reports): RedirectResponse
     {
         $validated = $request->validate([
-            'provider' => ['nullable', Rule::enum(AdvisorProvider::class)],
+            'model' => ['nullable', Rule::enum(AdvisorModel::class)],
         ]);
 
         if (! $reports->isGenerating()) {
-            $provider = AdvisorProvider::tryFrom($validated['provider'] ?? '') ?? AdvisorProvider::Anthropic;
+            $model = AdvisorModel::tryFrom($validated['model'] ?? '') ?? AdvisorModel::ClaudeSonnet46;
 
             $reports->markGenerating();
 
-            GenerateFinancialAdvisorReport::dispatch($provider);
+            GenerateFinancialAdvisorReport::dispatch($model);
         }
 
         return back();
