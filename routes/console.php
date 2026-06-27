@@ -1,7 +1,6 @@
 <?php
 
 use App\Console\Commands\CaptureMonthlyPortfolioSnapshotCommand;
-use App\Console\Commands\GenerateFinancialAdvisorReportCommand;
 use App\Console\Commands\RefreshCryptoPricesCommand;
 use App\Console\Commands\RefreshLjsePricesCommand;
 use App\Console\Commands\RefreshYfApiPricesCommand;
