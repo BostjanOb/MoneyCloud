@@ -8,6 +8,7 @@ use App\Models\CryptoBalance;
 use App\Models\InvestmentPurchase;
 use App\Models\InvestmentSymbol;
 use Carbon\CarbonImmutable;
+use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -214,7 +215,11 @@ class CryptoDcaPurchaseService
         $price = trim((string) ($row[8] ?? ''));
         $status = trim((string) ($row[12] ?? ''));
 
-        $purchasedAt = CarbonImmutable::createFromFormat('y-m-d H:i:s', $createTime);
+        try {
+            $purchasedAt = CarbonImmutable::createFromFormat('Y-m-d H:i:s', $createTime);
+        } catch (InvalidFormatException) {
+            throw new RuntimeException("Vrstica {$lineNumber}: neveljaven datum [{$createTime}].");
+        }
 
         if ($purchasedAt === false) {
             throw new RuntimeException("Vrstica {$lineNumber}: neveljaven datum [{$createTime}].");
