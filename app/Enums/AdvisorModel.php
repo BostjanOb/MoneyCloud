@@ -11,6 +11,7 @@ use Laravel\Ai\Enums\Lab;
  */
 enum AdvisorModel: string
 {
+    case ClaudeSonnet5 = 'claude-sonnet-5';
     case ClaudeSonnet46 = 'claude-sonnet-4-6';
     case ClaudeOpus48 = 'claude-opus-4-8';
     case Gpt54 = 'gpt-5.4';
@@ -22,7 +23,7 @@ enum AdvisorModel: string
     public function lab(): Lab
     {
         return match ($this) {
-            self::ClaudeSonnet46, self::ClaudeOpus48 => Lab::Anthropic,
+            self::ClaudeSonnet5, self::ClaudeSonnet46, self::ClaudeOpus48 => Lab::Anthropic,
             self::Gpt54, self::Gpt55 => Lab::OpenAI,
         };
     }
@@ -33,6 +34,7 @@ enum AdvisorModel: string
     public function label(): string
     {
         return match ($this) {
+            self::ClaudeSonnet5 => 'Claude Sonnet 5',
             self::ClaudeSonnet46 => 'Claude Sonnet 4.6',
             self::ClaudeOpus48 => 'Claude Opus 4.8',
             self::Gpt54 => 'GPT-5.4',
