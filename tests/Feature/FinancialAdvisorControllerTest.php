@@ -135,3 +135,13 @@ test('generating is skipped when already in progress', function () {
 
     Queue::assertNotPushed(GenerateFinancialAdvisorReport::class);
 });
+
+test('generating dispatches the job only once for repeated requests', function () {
+    Queue::fake();
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->post(route('advisor.generate'))->assertRedirect();
+    $this->actingAs($user)->post(route('advisor.generate'))->assertRedirect();
+
+    Queue::assertPushed(GenerateFinancialAdvisorReport::class, 1);
+});

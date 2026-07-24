@@ -59,6 +59,18 @@ class FinancialAdvisorReportService
     }
 
     /**
+     * Atomically flag that a report generation is starting.
+     *
+     * Returns false when a generation is already in progress, so two racing
+     * requests can never dispatch the job (and burn tokens) twice. Self-expires
+     * so a failed job never leaves the UI stuck in a generating state.
+     */
+    public function tryMarkGenerating(): bool
+    {
+        return Cache::add(self::GENERATING_KEY, true, now()->addMinutes(15));
+    }
+
+    /**
      * Flag that a report generation has been queued. Self-expires so a failed
      * job never leaves the UI stuck in a generating state.
      */

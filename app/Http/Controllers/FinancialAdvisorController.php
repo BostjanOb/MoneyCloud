@@ -32,11 +32,9 @@ class FinancialAdvisorController extends Controller
             'model' => ['nullable', Rule::enum(AdvisorModel::class)],
         ]);
 
-        if (! $reports->isGenerating()) {
-            $model = AdvisorModel::tryFrom($validated['model'] ?? '') ?? AdvisorModel::ClaudeSonnet46;
+        $model = AdvisorModel::tryFrom($validated['model'] ?? '') ?? AdvisorModel::ClaudeSonnet46;
 
-            $reports->markGenerating();
-
+        if ($reports->tryMarkGenerating()) {
             GenerateFinancialAdvisorReport::dispatch($model);
         }
 
