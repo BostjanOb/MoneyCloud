@@ -13,9 +13,10 @@ use Laravel\Ai\Storage\DatabaseConversationStore;
 
 function makeConversation(User $user, string $title = 'Pogovor'): Conversation
 {
-    return Conversation::query()->create([
+    return Conversation::create([
         'id' => (string) Str::uuid(),
-        'user_id' => $user->id,
+        'participant_type' => $user->getMorphClass(),
+        'participant_id' => $user->getKey(),
         'title' => $title,
     ]);
 }
@@ -26,10 +27,11 @@ function makeConversation(User $user, string $title = 'Pogovor'): Conversation
  */
 function addMessage(Conversation $conversation, string $role, string $content, int $secondsOffset = 0, array $usage = [], array $meta = []): void
 {
-    ConversationMessage::query()->create([
+    ConversationMessage::create([
         'id' => (string) Str::uuid(),
         'conversation_id' => $conversation->id,
-        'user_id' => $conversation->user_id,
+        'participant_type' => $conversation->participant_type,
+        'participant_id' => $conversation->participant_id,
         'agent' => FinancialAdvisor::class,
         'role' => $role,
         'content' => $content,
@@ -105,7 +107,7 @@ test('streaming a message creates a conversation and returns its id', function (
 
     expect($response->headers->get('X-Conversation-Id'))->not->toBeNull()
         ->and($content)->toContain('text_delta')
-        ->and(Conversation::query()->where('user_id', $user->id)->count())->toBe(1);
+        ->and($user->conversations()->count())->toBe(1);
 });
 
 test('streaming continues an existing conversation without creating a new one', function () {
@@ -122,7 +124,7 @@ test('streaming continues an existing conversation without creating a new one', 
     $response->streamedContent();
 
     expect($response->headers->get('X-Conversation-Id'))->toBe($conversation->id)
-        ->and(Conversation::query()->where('user_id', $user->id)->count())->toBe(1);
+        ->and($user->conversations()->count())->toBe(1);
 });
 
 test('streaming requires a message', function () {
@@ -192,8 +194,8 @@ test('streaming persists replies larger than the legacy TEXT column limit', func
     $response->assertOk();
     $response->streamedContent();
 
-    $stored = ConversationMessage::query()
-        ->where('user_id', $user->id)
+    $stored = ConversationMessage::where('participant_type', $user->getMorphClass())
+        ->where('participant_id', $user->getKey())
         ->where('role', 'assistant')
         ->first();
 
@@ -209,7 +211,7 @@ test('a persistence failure yields a graceful error event instead of a fatal', f
     // flushed) to fail, mirroring the production "Data too long" exception.
     $this->app->bind(ConversationStore::class, fn () => new class extends DatabaseConversationStore
     {
-        public function storeAssistantMessage(string $conversationId, string|int|null $userId, AgentPrompt $prompt, AgentResponse $response): string
+        public function storeAssistantMessage(string $conversationId, ?string $participantType, string|int|null $participantId, AgentPrompt $prompt, AgentResponse $response): ?string
         {
             throw new RuntimeException('Persistence boom.');
         }

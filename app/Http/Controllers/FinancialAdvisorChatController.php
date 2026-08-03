@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Ai\Agents\FinancialAdvisor;
 use App\Enums\AdvisorModel;
+use App\Models\User;
 use App\Services\ActualBudgetContextService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -40,7 +41,7 @@ class FinancialAdvisorChatController extends Controller
         return Inertia::render('Svetovalec/Klepet', [
             'conversations' => $conversations,
             'activeConversationId' => $activeConversationId,
-            'messages' => $this->messagesFor($activeConversationId, $user->id),
+            'messages' => $this->messagesFor($activeConversationId, $user),
             'actualBudget' => $actualBudget->metadata(),
             'models' => AdvisorModel::options(),
             'defaultModel' => AdvisorModel::ClaudeSonnet46->value,
@@ -77,7 +78,7 @@ class FinancialAdvisorChatController extends Controller
         $conversationId = $this->resolveOrCreateConversation(
             $validated['conversation_id'] ?? null,
             $validated['message'],
-            $user->id,
+            $user,
         );
 
         $stream = (new FinancialAdvisor)
@@ -127,15 +128,15 @@ class FinancialAdvisorChatController extends Controller
     /**
      * @return array<int, array{id: string, role: string, content: string, html: string|null, usage: array<string, int>|null, model: string|null}>
      */
-    private function messagesFor(?string $conversationId, int $userId): array
+    private function messagesFor(?string $conversationId, User $user): array
     {
         if ($conversationId === null) {
             return [];
         }
 
-        return ConversationMessage::query()
-            ->where('conversation_id', $conversationId)
-            ->where('user_id', $userId)
+        return ConversationMessage::where('conversation_id', $conversationId)
+            ->where('participant_type', $user->getMorphClass())
+            ->where('participant_id', $user->getKey())
             ->whereIn('role', ['user', 'assistant'])
             ->orderBy('created_at')
             ->orderBy('id')
@@ -187,19 +188,19 @@ class FinancialAdvisorChatController extends Controller
         ]);
     }
 
-    private function resolveOrCreateConversation(?string $conversationId, string $message, int $userId): string
+    private function resolveOrCreateConversation(?string $conversationId, string $message, User $user): string
     {
         $ownsConversation = $conversationId !== null
-            && Conversation::query()
-                ->whereKey($conversationId)
-                ->where('user_id', $userId)
-                ->exists();
+            && $user->conversations()->whereKey($conversationId)->exists();
 
         if ($ownsConversation) {
             return $conversationId;
         }
 
-        return resolve(ConversationStore::class)
-            ->storeConversation($userId, Str::limit($message, 60, ''));
+        return resolve(ConversationStore::class)->storeConversation(
+            Conversation::participantType($user),
+            Conversation::participantKey($user),
+            Str::limit($message, 60, ''),
+        );
     }
 }

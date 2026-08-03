@@ -22,7 +22,7 @@ test('guests are redirected to the login page', function () {
 
 test('opening the chat defaults to a new conversation', function () {
     $user = User::factory()->create();
-    resolve(ConversationStore::class)->storeConversation($user->id, 'Obstojeci pogovor');
+    resolve(ConversationStore::class)->storeConversation($user->getMorphClass(), $user->getKey(), 'Obstojeci pogovor');
 
     $this->actingAs($user)
         ->get(route('advisor.chat'))
@@ -40,7 +40,7 @@ test('opening the chat defaults to a new conversation', function () {
 test('an explicitly requested conversation is selected', function () {
     $user = User::factory()->create();
     $conversationId = resolve(ConversationStore::class)
-        ->storeConversation($user->id, 'Obstojeci pogovor');
+        ->storeConversation($user->getMorphClass(), $user->getKey(), 'Obstojeci pogovor');
 
     $this->actingAs($user)
         ->get(route('advisor.chat', ['conversation' => $conversationId]))
@@ -54,12 +54,13 @@ test('an explicitly requested conversation is selected', function () {
 test('assistant messages are rendered from markdown to html', function () {
     $user = User::factory()->create();
     $conversationId = resolve(ConversationStore::class)
-        ->storeConversation($user->id, 'Pogovor');
+        ->storeConversation($user->getMorphClass(), $user->getKey(), 'Pogovor');
 
-    ConversationMessage::query()->create([
+    ConversationMessage::create([
         'id' => (string) Str::uuid(),
         'conversation_id' => $conversationId,
-        'user_id' => $user->id,
+        'participant_type' => $user->getMorphClass(),
+        'participant_id' => $user->getKey(),
         'agent' => 'financial-advisor',
         'role' => 'assistant',
         'content' => "Predlogi:\n\n- **Diverzificiraj**\n- Zmanjšaj gotovino",
@@ -82,7 +83,7 @@ test('assistant messages are rendered from markdown to html', function () {
 
 test('an unknown conversation falls back to a new conversation', function () {
     $user = User::factory()->create();
-    resolve(ConversationStore::class)->storeConversation($user->id, 'Obstojeci pogovor');
+    resolve(ConversationStore::class)->storeConversation($user->getMorphClass(), $user->getKey(), 'Obstojeci pogovor');
 
     $this->actingAs($user)
         ->get(route('advisor.chat', ['conversation' => 'unknown-id']))
