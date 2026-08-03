@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\RevolutXService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -108,6 +109,160 @@ test('it rejects a private key that is not an ed25519 pkcs8 key', function () {
         ->toThrow(RuntimeException::class, 'Zasebni ključ Revolut X ni veljaven Ed25519 PKCS#8 ključ.');
 
     Http::assertNothingSent();
+});
+
+test('it normalises filled orders to net quantity and a fee in the quote currency', function () {
+    fakeRevolutXCredentials();
+
+    Http::fake([
+        'https://revx.revolut.com/api/1.0/orders/historical*' => Http::response([
+            'data' => [
+                [
+                    'id' => '8d179909-bbed-4487-9d65-5b8c9ec48514',
+                    'symbol' => 'BTC/EUR',
+                    'side' => 'buy',
+                    'type' => 'market',
+                    'filled_quantity' => '0.0005465',
+                    'filled_amount' => '30',
+                    'average_fill_price' => '54895.02',
+                    'status' => 'filled',
+                    'created_date' => 1785700965066,
+                ],
+                [
+                    'id' => 'cancelled-order',
+                    'symbol' => 'ETH/EUR',
+                    'side' => 'buy',
+                    'filled_quantity' => '0',
+                    'average_fill_price' => '0',
+                    'status' => 'cancelled',
+                    'created_date' => 1785700965089,
+                ],
+            ],
+            'metadata' => ['next_cursor' => ''],
+        ], 200),
+        'https://revx.revolut.com/api/1.0/orders/8d179909-bbed-4487-9d65-5b8c9ec48514' => Http::response([
+            'data' => ['total_fee' => '0.0000005', 'fee_currency' => 'BTC'],
+        ], 200),
+    ]);
+
+    $orders = app(RevolutXService::class)->getFilledOrders(
+        CarbonImmutable::parse('2026-07-27 00:00:00'),
+        CarbonImmutable::parse('2026-08-03 00:00:00'),
+    );
+
+    expect($orders)->toBe([[
+        'external_id' => '8d179909-bbed-4487-9d65-5b8c9ec48514',
+        'base_asset' => 'BTC',
+        'quote_asset' => 'EUR',
+        'side' => 'buy',
+        // 1785700965066 is 20:02:45 UTC, stored as 22:02:45 Europe/Ljubljana.
+        'executed_at' => '2026-08-02 22:02:45',
+        // 0.0005465 filled less the 0.0000005 BTC fee, matching the exchange balance.
+        'quantity' => '0.00054600',
+        'price_per_unit' => '54895.020',
+        // 0.0000005 BTC * 54895.02 EUR
+        'fee' => '0.03',
+    ]]);
+});
+
+test('it keeps the filled quantity when the fee is charged in the quote currency', function () {
+    fakeRevolutXCredentials();
+
+    Http::fake([
+        'https://revx.revolut.com/api/1.0/orders/historical*' => Http::response([
+            'data' => [[
+                'id' => 'eur-fee-order',
+                'symbol' => 'ETH/EUR',
+                'side' => 'sell',
+                'filled_quantity' => '2',
+                'average_fill_price' => '1500',
+                'status' => 'filled',
+                'created_date' => 1785700965000,
+            ]],
+            'metadata' => ['next_cursor' => ''],
+        ], 200),
+        'https://revx.revolut.com/api/1.0/orders/eur-fee-order' => Http::response([
+            'data' => ['total_fee' => '2.55', 'fee_currency' => 'EUR'],
+        ], 200),
+    ]);
+
+    $orders = app(RevolutXService::class)->getFilledOrders(
+        CarbonImmutable::parse('2026-08-01 00:00:00'),
+        CarbonImmutable::parse('2026-08-03 00:00:00'),
+    );
+
+    expect($orders[0]['quantity'])->toBe('2.00000000')
+        ->and($orders[0]['fee'])->toBe('2.55')
+        ->and($orders[0]['side'])->toBe('sell');
+});
+
+test('it splits long periods into windows the api accepts', function () {
+    fakeRevolutXCredentials();
+
+    Http::fake([
+        'https://revx.revolut.com/api/1.0/orders/historical*' => Http::response([
+            'data' => [],
+            'metadata' => ['next_cursor' => ''],
+        ], 200),
+    ]);
+
+    $from = CarbonImmutable::parse('2026-05-25 00:00:00');
+    $to = CarbonImmutable::parse('2026-08-03 00:00:00');
+
+    app(RevolutXService::class)->getFilledOrders($from, $to);
+
+    $windows = [];
+
+    Http::assertSent(function (Request $request) use (&$windows): bool {
+        parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+        $windows[] = [(int) $query['start_date'], (int) $query['end_date']];
+
+        return true;
+    });
+
+    // 70 days cannot be requested at once; the API caps a query at 30 days.
+    expect($windows)->toHaveCount(3);
+
+    foreach ($windows as [$start, $end]) {
+        expect(($end - $start) / 86400000)->toBeLessThanOrEqual(30);
+    }
+
+    expect($windows[0][0])->toBe($from->getTimestampMs())
+        ->and($windows[1][0])->toBe($windows[0][1])
+        ->and($windows[2][0])->toBe($windows[1][1])
+        ->and($windows[2][1])->toBe($to->getTimestampMs());
+});
+
+test('it follows the cursor until the api stops returning one', function () {
+    fakeRevolutXCredentials();
+
+    Http::fake([
+        'https://revx.revolut.com/api/1.0/orders/historical*' => Http::sequence()
+            ->push(['data' => [], 'metadata' => ['next_cursor' => 'page-2']], 200)
+            ->push(['data' => [], 'metadata' => ['next_cursor' => '']], 200),
+    ]);
+
+    app(RevolutXService::class)->getFilledOrders(
+        CarbonImmutable::parse('2026-08-01 00:00:00'),
+        CarbonImmutable::parse('2026-08-03 00:00:00'),
+    );
+
+    Http::assertSentCount(2);
+    Http::assertSent(fn (Request $request): bool => str_contains($request->url(), 'cursor=page-2'));
+});
+
+test('it retries once the rate limit window has passed', function () {
+    fakeRevolutXCredentials();
+
+    Http::fake([
+        'https://revx.revolut.com/api/1.0/balances' => Http::sequence()
+            ->push(['message' => 'Rate limit exceeded'], 429, ['Retry-After' => '10'])
+            ->push([['currency' => 'BTC', 'total' => '0.5']], 200),
+    ]);
+
+    expect(app(RevolutXService::class)->getBalanceOverview())->toBe(['BTC' => 0.5]);
+
+    Http::assertSentCount(2);
 });
 
 test('it throws when the api rejects the request', function () {

@@ -15,6 +15,7 @@ import {
     importMethod as dcaImport,
     index as dcaIndex,
     store as dcaStore,
+    sync as dcaSync,
     update as dcaUpdate,
 } from '@/actions/App/Http/Controllers/CryptoDcaPurchaseController';
 import Heading from '@/components/Heading.vue';
@@ -23,6 +24,12 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
     Dialog,
     DialogContent,
@@ -103,6 +110,7 @@ type SymbolGroup = {
 
 type Props = {
     providerOptions: ProviderOption[];
+    syncProviderOptions: ProviderOption[];
     symbolOptions: SymbolOption[];
     symbolGroups: SymbolGroup[];
 };
@@ -444,6 +452,14 @@ function submitImport(): void {
     });
 }
 
+function submitSync(providerId: number): void {
+    router.post(
+        dcaSync.url(),
+        { investment_provider_id: providerId },
+        { preserveScroll: true },
+    );
+}
+
 function deletePurchase(purchase: DcaPurchase): void {
     if (
         !confirm(
@@ -480,6 +496,22 @@ function deletePurchase(purchase: DcaPurchase): void {
                 >
                     Uvozi CSV
                 </Button>
+                <DropdownMenu v-if="syncProviderOptions.length > 0">
+                    <DropdownMenuTrigger as-child>
+                        <Button variant="outline" size="sm">
+                            Sinhroniziraj
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                            v-for="provider in syncProviderOptions"
+                            :key="provider.id"
+                            @click="submitSync(provider.id)"
+                        >
+                            {{ provider.name }}
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
                 <Button
                     size="sm"
                     :disabled="
@@ -494,7 +526,7 @@ function deletePurchase(purchase: DcaPurchase): void {
         </div>
 
         <Alert v-if="flash.status">
-            <AlertTitle>Uvoz</AlertTitle>
+            <AlertTitle>Obvestilo</AlertTitle>
             <AlertDescription>{{ flash.status }}</AlertDescription>
         </Alert>
         <Alert v-if="flash.error" variant="destructive">

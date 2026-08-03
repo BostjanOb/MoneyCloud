@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\BalanceSyncProvider;
 use App\Enums\InvestmentSymbolType;
 use App\Models\CryptoBalance;
 use App\Models\InvestmentProvider;
@@ -7,6 +8,7 @@ use App\Models\InvestmentPurchase;
 use App\Models\InvestmentSymbol;
 use App\Models\SavingsAccount;
 use App\Models\User;
+use App\Services\RevolutXService;
 use Illuminate\Http\UploadedFile;
 
 beforeEach(function () {
@@ -63,6 +65,7 @@ test('crypto dca page returns symbol split data', function () {
             ->where('symbolGroups.0.purchases.0.transaction_type', 'sell')
             ->has('symbolOptions', 2)
             ->where('symbolOptions.1.symbol', $eth->symbol)
+            ->has('syncProviderOptions', 0)
         );
 });
 
@@ -510,4 +513,86 @@ test('crypto dca update and delete require a crypto purchase', function () {
     $this->actingAs($user)
         ->delete(route('crypto.dca.destroy', $stockPurchase))
         ->assertNotFound();
+});
+
+test('dca sync imports purchases from the exchange and flashes a summary', function () {
+    $user = User::factory()->create();
+    $provider = InvestmentProvider::factory()->crypto('revolutx', 'RevolutX')->create([
+        'balance_sync_provider' => BalanceSyncProvider::RevolutX->value,
+    ]);
+    InvestmentSymbol::factory()->crypto('BTC')->create();
+
+    $mock = Mockery::mock(RevolutXService::class);
+    $mock->shouldReceive('isConfigured')->andReturnTrue();
+    $mock->shouldReceive('getFilledOrders')->once()->andReturn([[
+        'external_id' => '8d179909-bbed-4487-9d65-5b8c9ec48514',
+        'base_asset' => 'BTC',
+        'quote_asset' => 'EUR',
+        'side' => 'buy',
+        'executed_at' => '2026-08-02 22:02:45',
+        'quantity' => '0.00054600',
+        'price_per_unit' => '54895.020',
+        'fee' => '0.03',
+    ]]);
+    app()->instance(RevolutXService::class, $mock);
+
+    $this->actingAs($user)
+        ->post(route('crypto.dca.sync'), ['investment_provider_id' => $provider->id])
+        ->assertRedirect()
+        ->assertSessionHas('status', 'RevolutX: uvoženih 1 transakcij.');
+
+    $this->assertDatabaseHas('investment_purchases', [
+        'investment_provider_id' => $provider->id,
+        'external_id' => '8d179909-bbed-4487-9d65-5b8c9ec48514',
+        'quantity' => '0.00054600',
+    ]);
+});
+
+test('dca sync page lists only providers with an importable trade history', function () {
+    $user = User::factory()->create();
+    InvestmentProvider::factory()->crypto('binance', 'Binance')->create([
+        'balance_sync_provider' => BalanceSyncProvider::Binance->value,
+    ]);
+    $revolutX = InvestmentProvider::factory()->crypto('revolutx', 'RevolutX')->create([
+        'balance_sync_provider' => BalanceSyncProvider::RevolutX->value,
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('crypto.dca.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Kripto/Dca')
+            ->has('syncProviderOptions', 1)
+            ->where('syncProviderOptions.0.id', $revolutX->id)
+        );
+});
+
+test('dca sync rejects providers without an importable trade history', function () {
+    $user = User::factory()->create();
+    $provider = InvestmentProvider::factory()->crypto('binance', 'Binance')->create([
+        'balance_sync_provider' => BalanceSyncProvider::Binance->value,
+    ]);
+
+    $this->actingAs($user)
+        ->post(route('crypto.dca.sync'), ['investment_provider_id' => $provider->id])
+        ->assertSessionHasErrors('investment_provider_id');
+
+    expect(InvestmentPurchase::count())->toBe(0);
+});
+
+test('dca sync flashes the error when the exchange call fails', function () {
+    $user = User::factory()->create();
+    $provider = InvestmentProvider::factory()->crypto('revolutx', 'RevolutX')->create([
+        'balance_sync_provider' => BalanceSyncProvider::RevolutX->value,
+    ]);
+
+    $mock = Mockery::mock(RevolutXService::class);
+    $mock->shouldReceive('isConfigured')->andReturnTrue();
+    $mock->shouldReceive('getFilledOrders')->andThrow(new RuntimeException('Revolut X API error: Unauthorized'));
+    app()->instance(RevolutXService::class, $mock);
+
+    $this->actingAs($user)
+        ->post(route('crypto.dca.sync'), ['investment_provider_id' => $provider->id])
+        ->assertRedirect()
+        ->assertSessionHas('error', 'Revolut X API error: Unauthorized');
 });

@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'investment_provider_id',
     'investment_symbol_id',
+    'external_id',
     'purchased_at',
     'transaction_type',
     'quantity',

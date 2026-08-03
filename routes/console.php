@@ -5,6 +5,7 @@ use App\Console\Commands\RefreshCryptoPricesCommand;
 use App\Console\Commands\RefreshLjsePricesCommand;
 use App\Console\Commands\RefreshYfApiPricesCommand;
 use App\Console\Commands\SyncCryptoBalancesCommand;
+use App\Console\Commands\SyncCryptoPurchasesCommand;
 use Illuminate\Support\Facades\Schedule;
 
 Schedule::command(CaptureMonthlyPortfolioSnapshotCommand::class)
@@ -25,4 +26,8 @@ Schedule::command(RefreshLjsePricesCommand::class)
 
 Schedule::command(SyncCryptoBalancesCommand::class)
     ->everySixHours()
+    ->withoutOverlapping();
+
+Schedule::command(SyncCryptoPurchasesCommand::class)
+    ->weeklyOn(1, '02:00')
     ->withoutOverlapping();

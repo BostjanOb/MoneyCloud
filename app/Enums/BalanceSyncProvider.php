@@ -15,4 +15,15 @@ enum BalanceSyncProvider: string
             self::RevolutX => 'Revolut X',
         };
     }
+
+    /**
+     * Whether the exchange exposes a trade history the app can import from.
+     */
+    public function supportsPurchaseSync(): bool
+    {
+        return match ($this) {
+            self::Binance => false,
+            self::RevolutX => true,
+        };
+    }
 }

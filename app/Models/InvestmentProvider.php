@@ -107,6 +107,12 @@ class InvestmentProvider extends Model
         return $this->supportsCrypto() && $this->balanceSyncProvider() !== null;
     }
 
+    public function canSyncPurchases(): bool
+    {
+        return $this->supportsCrypto()
+            && $this->balanceSyncProvider()?->supportsPurchaseSync() === true;
+    }
+
     public function balanceSyncProvider(): ?BalanceSyncProvider
     {
         return is_string($this->balance_sync_provider)
