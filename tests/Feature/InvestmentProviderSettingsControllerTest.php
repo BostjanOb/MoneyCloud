@@ -69,8 +69,10 @@ test('authenticated user can view the investment provider settings pages', funct
             ->component('Investicije/PonudnikiForm')
             ->where('provider', null)
             ->has('typeOptions', 4)
-            ->has('syncProviderOptions', 1)
+            ->has('syncProviderOptions', 2)
             ->where('syncProviderOptions.0.value', BalanceSyncProvider::Binance->value)
+            ->where('syncProviderOptions.1.value', BalanceSyncProvider::RevolutX->value)
+            ->where('syncProviderOptions.1.label', 'Revolut X')
             ->has('savingsAccountOptions', 1)
             ->where('savingsAccountOptions.0.label', 'Banka / Rezerva')
         );

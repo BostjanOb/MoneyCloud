@@ -60,4 +60,11 @@ return [
         'encryption_password' => env('ACTUAL_BUDGET_ENCRYPTION_PASSWORD'),
         'transaction_page_size' => (int) env('ACTUAL_BUDGET_TRANSACTION_PAGE_SIZE', 200),
     ],
+
+    'revolutx' => [
+        'api_key' => env('REVOLUTX_API_KEY'),
+        'private_key_path' => env('REVOLUTX_PRIVATE_KEY_PATH'),
+        'public_key_path' => env('REVOLUTX_PUBLIC_KEY_PATH'),
+        'base_url' => env('REVOLUTX_BASE_URL', 'https://revx.revolut.com/api'),
+    ],
 ];

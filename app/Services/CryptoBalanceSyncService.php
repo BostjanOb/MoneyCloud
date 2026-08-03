@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Contracts\CryptoExchangeClient;
 use App\Enums\BalanceSyncProvider;
 use App\Enums\InvestmentSymbolType;
 use App\Models\CryptoBalance;
@@ -11,7 +12,10 @@ use InvalidArgumentException;
 
 class CryptoBalanceSyncService
 {
-    public function __construct(private BinanceService $binanceService) {}
+    public function __construct(
+        private BinanceService $binanceService,
+        private RevolutXService $revolutXService,
+    ) {}
 
     /**
      * @return array{
@@ -27,22 +31,32 @@ class CryptoBalanceSyncService
             throw new InvalidArgumentException('Ponudnik nima konfigurirane sinhronizacije kripto stanj.');
         }
 
-        return match ($syncProvider) {
-            BalanceSyncProvider::Binance => $this->syncBinanceBalances($provider),
+        $client = match ($syncProvider) {
+            BalanceSyncProvider::Binance => $this->binanceService,
+            BalanceSyncProvider::RevolutX => $this->revolutXService,
         };
+
+        if (! $client->isConfigured()) {
+            throw new InvalidArgumentException("Sinhronizacija za {$syncProvider->label()} ni konfigurirana.");
+        }
+
+        return $this->syncBalances($provider, $client);
     }
 
     /**
+     * Write the exchange overview onto the locally tracked crypto balances.
+     *
+     * Only balances that already exist for the provider are updated; assets
+     * missing from the overview keep their stored quantity.
+     *
      * @return array{
      *     updated_count: int,
      *     skipped_count: int
      * }
      */
-    private function syncBinanceBalances(InvestmentProvider $provider): array
+    private function syncBalances(InvestmentProvider $provider, CryptoExchangeClient $client): array
     {
-        $this->binanceService->syncServerTime();
-
-        $overview = collect($this->binanceService->getBalanceOverview())
+        $overview = collect($client->getBalanceOverview())
             ->mapWithKeys(fn (float|int $quantity, string $symbol): array => [
                 strtoupper($symbol) => $this->formatQuantity($quantity),
             ])

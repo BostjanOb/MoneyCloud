@@ -2,10 +2,11 @@
 
 namespace App\Services;
 
+use App\Contracts\CryptoExchangeClient;
 use Exception;
 use Illuminate\Support\Facades\Http;
 
-class BinanceService
+class BinanceService implements CryptoExchangeClient
 {
     protected string $apiKey;
 
@@ -21,11 +22,16 @@ class BinanceService
 
     public function __construct()
     {
-        $this->apiKey = config('services.binance.api_key');
-        $this->apiSecret = config('services.binance.api_secret');
-        $this->baseUrl = config('services.binance.base_url');
-        $this->fapiUrl = config('services.binance.fapi_url');
-        $this->sapiUrl = config('services.binance.sapi_url');
+        $this->apiKey = (string) config('services.binance.api_key');
+        $this->apiSecret = (string) config('services.binance.api_secret');
+        $this->baseUrl = (string) config('services.binance.base_url');
+        $this->fapiUrl = (string) config('services.binance.fapi_url');
+        $this->sapiUrl = (string) config('services.binance.sapi_url');
+    }
+
+    public function isConfigured(): bool
+    {
+        return filled($this->apiKey) && filled($this->apiSecret);
     }
 
     /**
@@ -131,6 +137,8 @@ class BinanceService
      */
     public function getBalanceOverview(): array
     {
+        $this->syncServerTime();
+
         $overview = [];
 
         foreach ($this->getSpotBalances() as $asset => $balance) {

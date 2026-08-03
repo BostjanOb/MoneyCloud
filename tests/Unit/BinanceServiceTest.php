@@ -102,6 +102,9 @@ test('it returns merged spot and simple earn balance overview by asset', functio
     ]);
 
     Http::fake([
+        'https://api.binance.com/api/v3/time' => Http::response([
+            'serverTime' => 1785700965000,
+        ], 200),
         'https://api.binance.com/api/v3/account*' => Http::response([
             'balances' => [
                 [
@@ -146,5 +149,5 @@ test('it returns merged spot and simple earn balance overview by asset', functio
         'ETH' => 2.5,
     ])->not->toHaveKey('XRP');
 
-    Http::assertSentCount(2);
+    Http::assertSentCount(3);
 });

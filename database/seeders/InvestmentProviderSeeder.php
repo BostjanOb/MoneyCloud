@@ -45,6 +45,13 @@ class InvestmentProviderSeeder extends Seeder
                 'requires_linked_savings_account' => false,
                 'supported_symbol_types' => ['crypto'],
             ],
+            [
+                'slug' => 'revolutx',
+                'name' => 'Revolut X',
+                'sort_order' => 14,
+                'requires_linked_savings_account' => false,
+                'supported_symbol_types' => ['crypto'],
+            ],
         ])->each(function (array $provider): void {
             InvestmentProvider::query()->updateOrCreate(
                 ['slug' => $provider['slug']],
