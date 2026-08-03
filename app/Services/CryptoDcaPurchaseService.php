@@ -215,15 +215,7 @@ class CryptoDcaPurchaseService
         $price = trim((string) ($row[8] ?? ''));
         $status = trim((string) ($row[12] ?? ''));
 
-        try {
-            $purchasedAt = CarbonImmutable::createFromFormat('Y-m-d H:i:s', $createTime);
-        } catch (InvalidFormatException) {
-            throw new RuntimeException("Vrstica {$lineNumber}: neveljaven datum [{$createTime}].");
-        }
-
-        if ($purchasedAt === false) {
-            throw new RuntimeException("Vrstica {$lineNumber}: neveljaven datum [{$createTime}].");
-        }
+        $purchasedAt = $this->parseBinanceDateTime($createTime, $lineNumber);
 
         return [
             'purchased_at' => $purchasedAt->format('Y-m-d H:i:s'),
@@ -233,6 +225,29 @@ class CryptoDcaPurchaseService
             'price_per_unit' => number_format((float) $price, 3, '.', ''),
             'status' => $status,
         ];
+    }
+
+    /**
+     * Binance exports the create time either with a four digit year
+     * (`2026-06-21 21:18:20`) or a two digit one (`26-06-21 21:18:20`).
+     */
+    private function parseBinanceDateTime(string $createTime, int $lineNumber): CarbonImmutable
+    {
+        $format = preg_match('/^\d{4}-/', $createTime) === 1
+            ? 'Y-m-d H:i:s'
+            : 'y-m-d H:i:s';
+
+        try {
+            $purchasedAt = CarbonImmutable::createFromFormat($format, $createTime);
+        } catch (InvalidFormatException) {
+            $purchasedAt = false;
+        }
+
+        if ($purchasedAt === false) {
+            throw new RuntimeException("Vrstica {$lineNumber}: neveljaven datum [{$createTime}].");
+        }
+
+        return $purchasedAt;
     }
 
     /**
