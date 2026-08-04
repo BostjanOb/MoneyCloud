@@ -17,10 +17,23 @@ use Laravel\Ai\Enums\Lab;
 use Laravel\Ai\Promptable;
 use Stringable;
 
+/**
+ * The token budget is per step, so the ceiling only costs what is actually
+ * generated. It must cover the whole structured report in one final step plus
+ * any reasoning the model spends before writing it — Claude Opus 5 thinks by
+ * default, and thinking counts against the same budget. At 8000 the report was
+ * truncated mid-JSON (`finish_reason: length`) and the structured payload was
+ * lost entirely.
+ *
+ * The timeout is per request, and the request is not streamed: nothing comes
+ * back until the model has finished thinking and writing. A reasoning model
+ * composing the full analysis needs minutes, so the timeout has to be measured
+ * against the whole final step, not against time-to-first-byte.
+ */
 #[Provider(Lab::Anthropic)]
 #[MaxSteps(20)]
-#[MaxTokens(8000)]
-#[Timeout(180)]
+#[MaxTokens(32000)]
+#[Timeout(600)]
 class FinancialAnalyst implements Agent, HasProviderOptions, HasStructuredOutput, HasTools
 {
     use AnalyzesHouseholdFinances;
@@ -31,9 +44,12 @@ class FinancialAnalyst implements Agent, HasProviderOptions, HasStructuredOutput
      *
      * OpenAI defaults to high reasoning effort, which makes this multi-step,
      * tool-heavy report exceed the request timeout. Cap it at medium so the
-     * report completes in time without sacrificing too much quality. Anthropic
-     * has no effort levels and extended thinking would break the forced
-     * structured output, so it is left at its default.
+     * report completes in time without sacrificing too much quality.
+     *
+     * Anthropic is left at its default. Do not set `output_config` here: the
+     * SDK builds that key itself for native structured output and merges
+     * provider options over the request body, so setting it would drop the
+     * schema and the report would come back empty.
      *
      * @return array<string, mixed>
      */

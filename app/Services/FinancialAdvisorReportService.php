@@ -23,6 +23,13 @@ class FinancialAdvisorReportService
 {
     public const GENERATING_KEY = 'financial_advisor.generating';
 
+    /**
+     * How long the generating flag lives. It self-expires so a failed job never
+     * leaves the UI stuck, but it must outlive the job's own timeout or the
+     * flag clears mid-generation and a second run can be dispatched over it.
+     */
+    public const GENERATING_TTL_MINUTES = 35;
+
     public function __construct(
         private readonly FinancialContextService $context,
         private readonly ActualBudgetContextService $actualBudget,
@@ -87,7 +94,7 @@ class FinancialAdvisorReportService
      */
     public function tryMarkGenerating(): bool
     {
-        return Cache::add(self::GENERATING_KEY, true, now()->addMinutes(15));
+        return Cache::add(self::GENERATING_KEY, true, now()->addMinutes(self::GENERATING_TTL_MINUTES));
     }
 
     /**
@@ -96,7 +103,7 @@ class FinancialAdvisorReportService
      */
     public function markGenerating(): void
     {
-        Cache::put(self::GENERATING_KEY, true, now()->addMinutes(15));
+        Cache::put(self::GENERATING_KEY, true, now()->addMinutes(self::GENERATING_TTL_MINUTES));
     }
 
     /**

@@ -12,9 +12,11 @@ class GenerateFinancialAdvisorReport implements ShouldQueue
     use Queueable;
 
     /**
-     * The number of seconds the job may run before timing out.
+     * The number of seconds the job may run before timing out. Must stay well
+     * above the agent's own request timeout so a slow generation is cut off by
+     * the agent, not by the queue worker.
      */
-    public int $timeout = 300;
+    public int $timeout = 1800;
 
     public function __construct(
         public AdvisorModel $model = AdvisorModel::ClaudeSonnet46,
