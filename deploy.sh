@@ -4,3 +4,4 @@ pnpm install --production
 
 php artisan optimize
 npm run build
+php artisan queue:restart
