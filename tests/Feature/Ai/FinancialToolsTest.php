@@ -47,7 +47,7 @@ test('tool returns valid json containing expected key', function (string $toolCl
         'available' => true,
         'source' => 'cache',
         'generated_at' => now()->toIso8601String(),
-        'window' => ['days' => 90, 'since' => now()->subDays(90)->toDateString(), 'until' => now()->toDateString()],
+        'window' => ['days' => 365, 'since' => now()->subDays(365)->toDateString(), 'until' => now()->toDateString()],
         'warnings' => [],
         'budget_months' => [],
         'transactions' => [],

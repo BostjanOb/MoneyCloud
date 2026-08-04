@@ -69,7 +69,7 @@ trait AnalyzesHouseholdFinances
         $actualBudgetInstructions = $this->actualBudgetEnabled()
             ? <<<'PROMPT'
         - Pri vsakodnevni porabi, proračunu, kategorijah in transakcijah uporabi tudi Actual Budget orodja.
-        - Actual Budget orodja vračajo zadnjih 90 dni, vključujejo skrite kategorije in off-budget račune.
+        - Actual Budget orodja vračajo zadnjih 365 dni, vključujejo skrite kategorije in off-budget račune.
         - Če Actual Budget orodje vrne opozorilo o predpomnilniku ali nedostopnosti, to jasno upoštevaj.
         PROMPT
             : '';

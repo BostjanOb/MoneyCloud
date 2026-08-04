@@ -68,7 +68,7 @@ class FinancialAnalyst implements Agent, HasProviderOptions, HasStructuredOutput
 
         ACTUAL BUDGET PRI POROČILU:
         - Za porabo, proračun, kategorije in transakcijsko razlago obvezno uporabi Actual Budget orodja.
-        - Pokliči GetActualBudgetOverview za mesečni proračun, GetActualSpendingByCategory za 90-dnevno porabo po kategorijah in GetActualTransactions za konkretne transakcije, prejemnike in odstopanja.
+        - Pokliči GetActualBudgetOverview za mesečni proračun, GetActualSpendingByCategory za 365-dnevno porabo po kategorijah in GetActualTransactions za konkretne transakcije, prejemnike in odstopanja.
         - Ne zaključi poročila samo iz MoneyCloud podatkov, kadar so Actual Budget orodja na voljo.
         - Če Actual Budget vrne opozorilo, predpomnjene podatke ali nedostopnost, to jasno upoštevaj pri sklepih.
         PROMPT

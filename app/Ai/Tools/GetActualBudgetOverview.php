@@ -14,7 +14,7 @@ class GetActualBudgetOverview implements Tool
 
     public function description(): Stringable|string
     {
-        return 'Vrne Actual Budget pregled za zadnjih 90 dni: mesečne proračune, '
+        return 'Vrne Actual Budget pregled za zadnjih 365 dni: mesečne proračune, '
             .'porabo, stanje po kategorijah in opozorila o svežini podatkov. '
             .'Vključuje skrite kategorije in off-budget račune.';
     }

@@ -37,8 +37,8 @@ test('it refreshes and enriches actual budget context', function () {
     $hiddenCategoryTransaction = $transactions->firstWhere('id', 'transaction-hidden');
 
     expect($context['window'])->toMatchArray([
-        'days' => 90,
-        'since' => '2026-03-10',
+        'days' => 365,
+        'since' => '2025-06-08',
         'until' => '2026-06-08',
     ])
         ->and($context['accounts'])->toHaveCount(3)
@@ -77,7 +77,7 @@ test('chat transaction tool uses cache without calling actual api', function () 
         'available' => true,
         'source' => 'cache',
         'generated_at' => '2026-06-08T12:00:00+02:00',
-        'window' => ['days' => 90, 'since' => '2026-03-10', 'until' => '2026-06-08'],
+        'window' => ['days' => 365, 'since' => '2025-06-08', 'until' => '2026-06-08'],
         'warnings' => [],
         'transactions' => [
             ['id' => 'cached-transaction', 'date' => '2026-06-01', 'account_id' => 'account-1', 'category_id' => 'category-1'],
@@ -96,7 +96,7 @@ test('report context falls back to stale chat cache when actual api is unavailab
         'available' => true,
         'source' => 'cache',
         'generated_at' => '2026-06-08T12:00:00+02:00',
-        'window' => ['days' => 90, 'since' => '2026-03-10', 'until' => '2026-06-08'],
+        'window' => ['days' => 365, 'since' => '2025-06-08', 'until' => '2026-06-08'],
         'warnings' => [],
         'accounts' => [],
         'category_groups' => [],

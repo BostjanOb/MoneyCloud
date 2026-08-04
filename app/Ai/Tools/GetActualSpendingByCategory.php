@@ -15,7 +15,7 @@ class GetActualSpendingByCategory implements Tool
     public function description(): Stringable|string
     {
         return 'Vrne porabo, prihodke, neto tok in glavne prejemnike po Actual '
-            .'kategorijah za zadnjih 90 dni. Transferji so izločeni iz porabe, '
+            .'kategorijah za zadnjih 365 dni. Transferji so izločeni iz porabe, '
             .'skrite kategorije pa so vključene.';
     }
 

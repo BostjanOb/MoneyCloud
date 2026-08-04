@@ -14,7 +14,7 @@ class GetActualTransactions implements Tool
 
     public function description(): Stringable|string
     {
-        return 'Vrne obogatene raw transakcije iz Actual Budget za zadnjih 90 dni. '
+        return 'Vrne obogatene raw transakcije iz Actual Budget za zadnjih 365 dni. '
             .'Podpira omejitev po računu, kategoriji in datumu. Vsaka transakcija '
             .'vsebuje originalna polja Actual, EUR znesek, ime računa, prejemnika, '
             .'kategorije in oznako za transfer.';
@@ -41,8 +41,8 @@ class GetActualTransactions implements Tool
         return [
             'account_id' => $schema->string()->description('Neobvezen Actual account id.'),
             'category_id' => $schema->string()->description('Neobvezen Actual category id.'),
-            'since' => $schema->string()->description('Neobvezen začetni datum znotraj 90-dnevnega okna, YYYY-MM-DD.'),
-            'until' => $schema->string()->description('Neobvezen končni datum znotraj 90-dnevnega okna, YYYY-MM-DD.'),
+            'since' => $schema->string()->description('Neobvezen začetni datum znotraj 365-dnevnega okna, YYYY-MM-DD.'),
+            'until' => $schema->string()->description('Neobvezen končni datum znotraj 365-dnevnega okna, YYYY-MM-DD.'),
             'limit' => $schema->integer()->min(1)->description('Največ vrnjenih transakcij, največ 1000.'),
         ];
     }

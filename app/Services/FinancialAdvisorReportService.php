@@ -278,7 +278,7 @@ class FinancialAdvisorReportService
     {
         return $this->buildPrompt()."\n\n".<<<'PROMPT'
         Actual Budget je nastavljen za to poročilo. Pred končno analizo uporabi Actual Budget
-        orodja za pregled proračuna, 90-dnevno porabo po kategorijah in raw transakcije.
+        orodja za pregled proračuna, 365-dnevno porabo po kategorijah in raw transakcije.
         Porabe, proračuna, kategorij in konkretnih odstopanj ne analiziraj samo iz MoneyCloud
         podatkov. Če Actual Budget ni dosegljiv in so uporabljeni predpomnjeni podatki, opozorilo
         obravnavaj kot pomembno omejitev poročila.
