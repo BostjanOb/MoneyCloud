@@ -68,7 +68,8 @@ type ReportPayload = {
     generated_at: string;
     model: ModelInfo | null;
     usage: TokenUsage | null;
-    report: Report;
+    // Delno, ker lahko model vrne nepopolno (ali prazno) strukturo.
+    report: Partial<Report>;
 };
 
 type HistoryEntry = {
@@ -162,6 +163,11 @@ function selectReport(id: string): void {
         { preserveScroll: true, preserveState: true },
     );
 }
+
+// Star ali neuspel zapis lahko vsebuje prazno analizo; takrat ne izrisujemo kartic.
+const hasReportContent = computed<boolean>(
+    () => !!props.report && !!props.report.report.povzetek,
+);
 
 const sortedRecommendations = computed<Recommendation[]>(() =>
     [...(props.report?.report.priporocila ?? [])].sort(
@@ -306,6 +312,26 @@ function categoryLabel(key: string): string {
             </CardContent>
         </Card>
 
+        <!-- Prazna analiza (model ni vrnil strukturiranega odgovora) -->
+        <Card v-else-if="!hasReportContent">
+            <CardContent
+                class="flex flex-col items-center gap-4 py-12 text-center"
+            >
+                <TriangleAlert class="size-8 text-amber-500" />
+                <div class="space-y-1">
+                    <p class="font-medium">Analiza je prazna</p>
+                    <p class="max-w-md text-sm text-muted-foreground">
+                        Model ni vrnil strukturirane analize. Poskusi znova, po
+                        možnosti z drugim modelom.
+                    </p>
+                </div>
+                <Button :disabled="isGenerating" @click="generateReport">
+                    <RefreshCw class="size-4" />
+                    Poskusi znova
+                </Button>
+            </CardContent>
+        </Card>
+
         <!-- Report -->
         <template v-else>
             <Card v-if="report.report.opozorila?.length">
@@ -338,7 +364,7 @@ function categoryLabel(key: string): string {
             </Card>
 
             <div class="grid gap-6 lg:grid-cols-2">
-                <Card v-if="report.report.mocne_tocke.length">
+                <Card v-if="report.report.mocne_tocke?.length">
                     <CardHeader>
                         <CardTitle>Močne točke</CardTitle>
                     </CardHeader>
@@ -346,7 +372,7 @@ function categoryLabel(key: string): string {
                         <ul class="space-y-2">
                             <li
                                 v-for="(point, index) in report.report
-                                    .mocne_tocke"
+                                    .mocne_tocke ?? []"
                                 :key="index"
                                 class="flex gap-2 text-sm"
                             >
@@ -359,7 +385,7 @@ function categoryLabel(key: string): string {
                     </CardContent>
                 </Card>
 
-                <Card v-if="report.report.tveganja.length">
+                <Card v-if="report.report.tveganja?.length">
                     <CardHeader>
                         <CardTitle class="flex items-center gap-2">
                             <TriangleAlert class="size-4 text-amber-500" />
@@ -368,7 +394,8 @@ function categoryLabel(key: string): string {
                     </CardHeader>
                     <CardContent class="space-y-4">
                         <div
-                            v-for="(risk, index) in report.report.tveganja"
+                            v-for="(risk, index) in report.report.tveganja ??
+                            []"
                             :key="index"
                             class="space-y-1"
                         >
@@ -429,13 +456,14 @@ function categoryLabel(key: string): string {
             </Card>
 
             <div class="grid gap-6 lg:grid-cols-2">
-                <Card v-if="report.report.davcni_nasveti.length">
+                <Card v-if="report.report.davcni_nasveti?.length">
                     <CardHeader>
                         <CardTitle>Davčni nasveti</CardTitle>
                     </CardHeader>
                     <CardContent class="space-y-4">
                         <div
-                            v-for="(tip, index) in report.report.davcni_nasveti"
+                            v-for="(tip, index) in report.report
+                                .davcni_nasveti ?? []"
                             :key="index"
                             class="space-y-1"
                         >
@@ -447,7 +475,7 @@ function categoryLabel(key: string): string {
                     </CardContent>
                 </Card>
 
-                <Card v-if="report.report.naslednji_koraki.length">
+                <Card v-if="report.report.naslednji_koraki?.length">
                     <CardHeader>
                         <CardTitle>Naslednji koraki</CardTitle>
                     </CardHeader>
@@ -455,7 +483,7 @@ function categoryLabel(key: string): string {
                         <ol class="space-y-2">
                             <li
                                 v-for="(step, index) in report.report
-                                    .naslednji_koraki"
+                                    .naslednji_koraki ?? []"
                                 :key="index"
                                 class="flex gap-3 text-sm"
                             >

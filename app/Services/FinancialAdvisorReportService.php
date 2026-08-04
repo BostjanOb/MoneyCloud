@@ -9,6 +9,11 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Log;
+use Laravel\Ai\Responses\AgentResponse;
+use Laravel\Ai\Responses\Data\Step;
+use Laravel\Ai\Responses\Data\ToolCall;
+use Laravel\Ai\Responses\StructuredAgentResponse;
+use RuntimeException;
 
 /**
  * Generates and persists the periodic structured analysis produced by the
@@ -31,11 +36,26 @@ class FinancialAdvisorReportService
     public function generate(AdvisorModel $model = AdvisorModel::ClaudeSonnet46): array
     {
         try {
-            [$data, $usage] = $this->actualBudget->isConfigured()
-                ? $this->generateWithActualBudgetContext($model)
-                : $this->generateWithDefaultContext($model);
+            [$response, $actualBudgetContext] = $this->actualBudget->isConfigured()
+                ? $this->promptWithActualBudgetContext($model)
+                : [$this->promptWithDefaultContext($model), null];
 
-            Log::info('advisor.report.usage', ['model' => $model->value, 'usage' => $usage]);
+            $usage = $response->usage->toArray();
+
+            Log::info('advisor.report.response', [
+                'model' => $model->value,
+                'usage' => $usage,
+                ...$this->responseDiagnostics($response),
+            ]);
+
+            $data = $this->structuredReport($response, $model);
+
+            if ($warnings = $actualBudgetContext['warnings'] ?? []) {
+                $data['opozorila'] = array_values(array_unique([
+                    ...($data['opozorila'] ?? []),
+                    ...$warnings,
+                ]));
+            }
 
             $report = FinancialAdvisorReport::create([
                 'generated_at' => CarbonImmutable::now('Europe/Ljubljana'),
@@ -166,40 +186,85 @@ class FinancialAdvisorReportService
     }
 
     /**
-     * Generate the report from MoneyCloud data only.
-     *
-     * @return array{0: array<string, mixed>, 1: array<string, int>}
+     * Prompt the analyst with MoneyCloud data only.
      */
-    private function generateWithDefaultContext(AdvisorModel $model): array
+    private function promptWithDefaultContext(AdvisorModel $model): AgentResponse
     {
-        $response = (new FinancialAnalyst)->prompt($this->buildPrompt(), provider: $model->promptTarget());
-
-        return [$response->toArray(), $response->usage->toArray()];
+        return (new FinancialAnalyst)->prompt($this->buildPrompt(), provider: $model->promptTarget());
     }
 
     /**
-     * Generate the report enriched with Actual Budget context.
+     * Prompt the analyst with the Actual Budget context injected, returning the
+     * response together with the context so its warnings can be merged in.
      *
-     * @return array{0: array<string, mixed>, 1: array<string, int>}
+     * @return array{0: AgentResponse, 1: array<string, mixed>}
      */
-    private function generateWithActualBudgetContext(AdvisorModel $model): array
+    private function promptWithActualBudgetContext(AdvisorModel $model): array
     {
         $actualBudgetContext = $this->actualBudget->reportContext();
+
         $response = Context::scope(
             fn () => (new FinancialAnalyst)->prompt($this->buildActualBudgetPrompt(), provider: $model->promptTarget()),
             hidden: [ActualBudgetContextService::REPORT_CONTEXT_KEY => $actualBudgetContext],
         );
 
-        $data = $response->toArray();
+        return [$response, $actualBudgetContext];
+    }
 
-        if ($actualBudgetContext['warnings'] ?? []) {
-            $data['opozorila'] = array_values(array_unique([
-                ...($data['opozorila'] ?? []),
-                ...$actualBudgetContext['warnings'],
-            ]));
+    /**
+     * Pull the structured analysis out of the agent response.
+     *
+     * A model that spends its whole step budget on tool calls, gets truncated by
+     * the token limit, or answers with prose never emits the structured payload.
+     * The SDK then hands back an empty array, which would be persisted as an
+     * unrenderable report, so fail loudly with the full response logged instead.
+     *
+     * @return array<string, mixed>
+     */
+    private function structuredReport(AgentResponse $response, AdvisorModel $model): array
+    {
+        $data = $response instanceof StructuredAgentResponse ? $response->toArray() : [];
+
+        if (blank($data['povzetek'] ?? null)) {
+            Log::error('advisor.report.empty', [
+                'model' => $model->value,
+                'usage' => $response->usage->toArray(),
+                'text' => $response->text,
+                'structured' => $data,
+                ...$this->responseDiagnostics($response),
+            ]);
+
+            throw new RuntimeException(sprintf(
+                'Model %s ni vrnil strukturirane analize (korakov: %d, zaključek: %s).',
+                $model->value,
+                $response->steps->count(),
+                $response->steps->last()?->finishReason->value ?? 'neznano',
+            ));
         }
 
-        return [$data, $response->usage->toArray()];
+        return $data;
+    }
+
+    /**
+     * A compact per-step trace of what the model actually did, so an empty or
+     * partial report can be diagnosed from the log alone.
+     *
+     * @return array{steps: int, finish_reason: string, text_length: int, step_trace: array<int, array{finish_reason: string, tools: array<int, string>, text_length: int}>}
+     */
+    private function responseDiagnostics(AgentResponse $response): array
+    {
+        return [
+            'steps' => $response->steps->count(),
+            'finish_reason' => $response->steps->last()?->finishReason->value ?? 'neznano',
+            'text_length' => mb_strlen($response->text),
+            'step_trace' => $response->steps
+                ->map(fn (Step $step): array => [
+                    'finish_reason' => $step->finishReason->value,
+                    'tools' => array_map(fn (ToolCall $call): string => $call->name, $step->toolCalls),
+                    'text_length' => mb_strlen($step->text),
+                ])
+                ->all(),
+        ];
     }
 
     private function buildActualBudgetPrompt(): string

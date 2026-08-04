@@ -10,6 +10,7 @@ use App\Services\FinancialAdvisorReportService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Laravel\Ai\Prompts\AgentPrompt;
 
 beforeEach(function () {
@@ -43,6 +44,36 @@ test('report service generates, persists, and returns a structured report', func
         ->and($service->latest())->toBe($payload);
 
     FinancialAnalyst::assertPrompted(fn (AgentPrompt $prompt) => $prompt->contains('tedensko'));
+});
+
+test('an empty structured response is logged and never persisted', function () {
+    FinancialAnalyst::fake([[]]);
+    Log::spy();
+
+    expect(fn () => app(FinancialAdvisorReportService::class)->generate(AdvisorModel::ClaudeOpus5))
+        ->toThrow(RuntimeException::class, 'claude-opus-5');
+
+    expect(FinancialAdvisorReport::count())->toBe(0)
+        ->and(app(FinancialAdvisorReportService::class)->isGenerating())->toBeFalse();
+
+    Log::shouldHaveReceived('error')
+        ->withArgs(fn (string $message, array $context): bool => $message === 'advisor.report.empty'
+            && $context['model'] === 'claude-opus-5'
+            && array_key_exists('text', $context)
+            && array_key_exists('step_trace', $context));
+});
+
+test('the response diagnostics are logged for every generation', function () {
+    FinancialAnalyst::fake();
+    Log::spy();
+
+    app(FinancialAdvisorReportService::class)->generate();
+
+    Log::shouldHaveReceived('info')
+        ->withArgs(fn (string $message, array $context): bool => $message === 'advisor.report.response'
+            && $context['model'] === 'claude-sonnet-4-6'
+            && $context['steps'] === 1
+            && $context['finish_reason'] === 'stop');
 });
 
 test('report skips actual budget when it is not configured', function () {
