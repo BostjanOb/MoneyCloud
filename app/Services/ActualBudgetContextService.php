@@ -16,7 +16,7 @@ class ActualBudgetContextService
 
     public const STALE_WARNING = 'Podatki iz Actual Budget so iz predpomnilnika.';
 
-    private const TRANSACTION_WINDOW_DAYS = 90;
+    private const TRANSACTION_WINDOW_DAYS = 365;
 
     public function __construct(private readonly ActualBudgetClient $client) {}
 
