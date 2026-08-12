@@ -279,8 +279,12 @@ test('authenticated user can view yearly invested page', function () {
             ->component('Statistika/LetniVlozki')
             ->where('years', range(2024, $currentYear))
             ->has('symbols', 2)
+            ->has('types', 2)
             ->where("rows.0.symbols.{$btc->id}.amount", '500.00')
             ->where("rows.1.symbols.{$vwce->id}.amount", '5000.00')
+            ->where('rows.0.types.crypto', '500.00')
+            ->where('rows.1.types.etf', '5000.00')
+            ->where('totals.types.crypto', '500.00')
             ->where('totals.grand_total_amount', '5500.00')
         );
 });

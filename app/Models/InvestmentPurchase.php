@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Enums\InvestmentTransactionType;
 use Database\Factories\InvestmentPurchaseFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -53,6 +55,21 @@ class InvestmentPurchase extends Model
     public function symbol(): BelongsTo
     {
         return $this->belongsTo(InvestmentSymbol::class, 'investment_symbol_id');
+    }
+
+    /**
+     * Limit the query to buy transactions, treating legacy rows without a
+     * transaction type as buys.
+     *
+     * @param  Builder<$this>  $query
+     */
+    #[Scope]
+    protected function buys(Builder $query): void
+    {
+        $query->where(function (Builder $query): void {
+            $query->where('transaction_type', InvestmentTransactionType::Buy)
+                ->orWhereNull('transaction_type');
+        });
     }
 
     public function transactionType(): InvestmentTransactionType

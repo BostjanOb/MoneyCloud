@@ -18,6 +18,11 @@ type YearlySymbol = {
     type_label: string;
 };
 
+type YearlyType = {
+    value: string;
+    label: string;
+};
+
 type YearlySymbolCell = {
     amount: string;
     quantity: string;
@@ -27,15 +32,18 @@ type YearlyRow = {
     year: number;
     total_amount: string;
     symbols: Record<string, YearlySymbolCell>;
+    types: Record<string, string>;
 };
 
 type Props = {
     years: number[];
     symbols: YearlySymbol[];
+    types: YearlyType[];
     rows: YearlyRow[];
     totals: {
         grand_total_amount: string;
         symbols: Record<string, YearlySymbolCell>;
+        types: Record<string, string>;
     };
 };
 
@@ -249,6 +257,87 @@ function formatQuantity(value: string | number): string {
                         </tfoot>
                     </Table>
                 </div>
+            </CardContent>
+        </Card>
+
+        <Card v-if="props.rows.length > 0">
+            <CardHeader>
+                <CardTitle>Vložki po vrsti naložbe</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <Table class="min-w-max">
+                    <thead>
+                        <tr class="border-b">
+                            <th
+                                class="border-r bg-muted/30 px-3 py-2 text-left font-semibold whitespace-nowrap"
+                            >
+                                Leto
+                            </th>
+                            <th
+                                v-for="type in props.types"
+                                :key="type.value"
+                                class="border-r px-3 py-2 text-right font-semibold whitespace-nowrap"
+                            >
+                                {{ type.label }}
+                            </th>
+                            <th
+                                class="border-r bg-emerald-100 px-3 py-2 text-right font-semibold whitespace-nowrap text-emerald-950"
+                            >
+                                Skupaj znesek
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr
+                            v-for="row in yearlyRows"
+                            :key="`${row.year}-types`"
+                            class="border-b transition-colors hover:bg-muted/50"
+                        >
+                            <td
+                                class="border-r px-3 py-2 font-semibold whitespace-nowrap"
+                            >
+                                {{ row.year }}
+                            </td>
+                            <td
+                                v-for="type in props.types"
+                                :key="`${row.year}-${type.value}`"
+                                class="border-r px-3 py-2 text-right whitespace-nowrap"
+                            >
+                                {{ formatMoney(row.types[type.value]) }}
+                            </td>
+                            <td
+                                class="border-r px-3 py-2 text-right whitespace-nowrap"
+                            >
+                                {{ formatMoney(row.total_amount) }}
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="border-t bg-muted/50 font-medium">
+                            <td
+                                class="border-r px-3 py-2 font-bold whitespace-nowrap"
+                            >
+                                SKUPAJ
+                            </td>
+                            <td
+                                v-for="type in props.types"
+                                :key="`${type.value}-total`"
+                                class="border-r px-3 py-2 text-right font-bold whitespace-nowrap"
+                            >
+                                {{
+                                    formatMoney(props.totals.types[type.value])
+                                }}
+                            </td>
+                            <td
+                                class="border-r px-3 py-2 text-right font-bold whitespace-nowrap"
+                            >
+                                {{
+                                    formatMoney(props.totals.grand_total_amount)
+                                }}
+                            </td>
+                        </tr>
+                    </tfoot>
+                </Table>
             </CardContent>
         </Card>
     </div>
