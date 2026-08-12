@@ -280,8 +280,10 @@ class FinancialAdvisorReportService
         Actual Budget je nastavljen za to poročilo. Pred končno analizo uporabi Actual Budget
         orodja za pregled proračuna, 365-dnevno porabo po kategorijah in raw transakcije.
         Porabe, proračuna, kategorij in konkretnih odstopanj ne analiziraj samo iz MoneyCloud
-        podatkov. Če Actual Budget ni dosegljiv in so uporabljeni predpomnjeni podatki, opozorilo
-        obravnavaj kot pomembno omejitev poročila.
+        podatkov. Razdeljene (split) transakcije so že razbite na posamezne dele z lastnimi
+        kategorijami, zato "Brez kategorije" pomeni resnično nekategorizirano porabo in ne
+        razdeljene transakcije. Če Actual Budget ni dosegljiv in so uporabljeni predpomnjeni
+        podatki, opozorilo obravnavaj kot pomembno omejitev poročila.
         PROMPT;
     }
 }

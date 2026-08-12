@@ -175,7 +175,7 @@ class ActualBudgetContextService
     public function transactions(array $filters = []): array
     {
         $context = $this->contextForTools();
-        $transactions = collect($context['transactions'] ?? [])
+        $transactions = $this->expandedTransactions($context)
             ->filter(fn (array $transaction): bool => $this->matchesTransactionFilters($transaction, $filters))
             ->sortByDesc('date')
             ->values();
@@ -204,7 +204,7 @@ class ActualBudgetContextService
     public function spendingByCategory(): array
     {
         $context = $this->contextForTools();
-        $categories = collect($context['transactions'] ?? [])
+        $categories = $this->expandedTransactions($context)
             ->reject(fn (array $transaction): bool => (bool) ($transaction['is_transfer'] ?? false))
             ->groupBy(fn (array $transaction): string => (string) ($transaction['category_id'] ?? 'uncategorized'))
             ->map(fn (Collection $transactions): array => $this->summarizeCategoryTransactions($transactions))
@@ -527,6 +527,165 @@ class ActualBudgetContextService
         }
 
         return true;
+    }
+
+    /**
+     * Actual shrani deljeno transakcijo kot starševsko vrstico brez kategorije,
+     * prave kategorije pa nosijo gnezdene `subtransactions`. Grupiranje ali
+     * filtriranje po kategoriji zgolj po starših vrže vsak split med
+     * "Brez kategorije", zato starše zamenjamo z njihovimi deli.
+     *
+     * Razširjamo namenoma ob branju: konteksti se shranjujejo z `Cache::forever()`
+     * in osvežujejo samo ročno, zato to popravi tudi kontekste, shranjene pred
+     * obstojem te metode.
+     *
+     * @param  array<string, mixed>  $context
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function expandedTransactions(array $context): Collection
+    {
+        $rows = collect($context['transactions'] ?? [])
+            ->filter(fn (mixed $transaction): bool => is_array($transaction))
+            ->values();
+
+        $rowIds = $rows
+            ->map(fn (array $transaction): string => (string) ($transaction['id'] ?? ''))
+            ->flip();
+
+        $childRowsByParent = $rows
+            ->filter(fn (array $transaction): bool => $this->isSplitChildRow($transaction))
+            ->groupBy(fn (array $transaction): string => (string) ($transaction['raw']['parent_id'] ?? ''));
+
+        return $rows
+            ->flatMap(function (array $transaction) use ($rowIds, $childRowsByParent): array {
+                if ($this->isSplitChildRow($transaction)) {
+                    $parentId = (string) ($transaction['raw']['parent_id'] ?? '');
+
+                    return $rowIds->has($parentId) ? [] : [$transaction];
+                }
+
+                $children = $this->splitChildren($transaction);
+
+                if ($children === []) {
+                    $children = $childRowsByParent
+                        ->get((string) ($transaction['id'] ?? ''), collect())
+                        ->all();
+                }
+
+                return $children === []
+                    ? [$transaction]
+                    : $this->splitParts($transaction, $children);
+            })
+            ->values();
+    }
+
+    /**
+     * @param  array<string, mixed>  $transaction
+     */
+    private function isSplitChildRow(array $transaction): bool
+    {
+        return ($transaction['raw']['is_child'] ?? false) === true
+            || filled($transaction['raw']['parent_id'] ?? null)
+            || ($transaction['is_split_child'] ?? false) === true;
+    }
+
+    /**
+     * @param  array<string, mixed>  $transaction
+     * @return array<int, array<string, mixed>>
+     */
+    private function splitChildren(array $transaction): array
+    {
+        $children = $transaction['subtransactions'] ?? [];
+
+        return is_array($children)
+            ? array_values(array_filter($children, 'is_array'))
+            : [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $parent
+     * @param  array<int, array<string, mixed>>  $children
+     * @return array<int, array<string, mixed>>
+     */
+    private function splitParts(array $parent, array $children): array
+    {
+        $parts = array_map(fn (array $child): array => $this->splitPart($parent, $child), $children);
+
+        $remainderRaw = (int) ($parent['amount_raw'] ?? 0)
+            - array_sum(array_map(fn (array $part): int => (int) $part['amount_raw'], $parts));
+
+        if ($remainderRaw !== 0) {
+            $parts[] = $this->splitRemainder($parent, $remainderRaw);
+        }
+
+        return $parts;
+    }
+
+    /**
+     * Razširimo otroka in ne starša, ker starševski `raw` gnezdi vse otroke še
+     * enkrat. `is_transfer` se ne deduje: split starš ni transfer, otrok, ki to
+     * je, pa svojo oznako že nosi.
+     *
+     * @param  array<string, mixed>  $parent
+     * @param  array<string, mixed>  $child
+     * @return array<string, mixed>
+     */
+    private function splitPart(array $parent, array $child): array
+    {
+        $amountRaw = (int) ($child['amount_raw'] ?? 0);
+        $amountEur = $this->amountToEuro($amountRaw);
+
+        return [
+            ...$child,
+            'date' => $child['date'] ?? $parent['date'] ?? null,
+            'account_id' => $child['account_id'] ?? $parent['account_id'] ?? null,
+            'account_name' => $child['account_name'] ?? $parent['account_name'] ?? null,
+            'account_offbudget' => $child['account_offbudget'] ?? $parent['account_offbudget'] ?? null,
+            'account_closed' => $child['account_closed'] ?? $parent['account_closed'] ?? null,
+            'payee_id' => $child['payee_id'] ?? $parent['payee_id'] ?? null,
+            'payee_name' => $child['payee_name'] ?? $parent['payee_name'] ?? null,
+            'imported_payee' => $child['imported_payee'] ?? $parent['imported_payee'] ?? null,
+            'imported_id' => $child['imported_id'] ?? $parent['imported_id'] ?? null,
+            'notes' => $child['notes'] ?? $parent['notes'] ?? null,
+            'cleared' => $child['cleared'] ?? $parent['cleared'] ?? null,
+            'amount_raw' => $amountRaw,
+            'amount_eur' => $amountEur,
+            'amount_formatted' => $this->formatEuro($amountEur),
+            'is_split_child' => true,
+            'split_parent_id' => $parent['id'] ?? null,
+            'subtransactions' => [],
+        ];
+    }
+
+    /**
+     * Actual dovoli neuravnotežen split, zato deli lahko seštejejo manj od
+     * starša. Razliko izpostavimo kot nekategoriziran del, da razširitev ohrani
+     * skupni znesek.
+     *
+     * @param  array<string, mixed>  $parent
+     * @return array<string, mixed>
+     */
+    private function splitRemainder(array $parent, int $amountRaw): array
+    {
+        $amountEur = $this->amountToEuro($amountRaw);
+
+        return [
+            ...$parent,
+            'id' => ($parent['id'] ?? 'split').':remainder',
+            'amount_raw' => $amountRaw,
+            'amount_eur' => $amountEur,
+            'amount_formatted' => $this->formatEuro($amountEur),
+            'category_id' => null,
+            'category_name' => 'Brez kategorije',
+            'category_group_id' => null,
+            'category_group_name' => null,
+            'category_hidden' => null,
+            'is_split_child' => true,
+            'is_split_remainder' => true,
+            'split_parent_id' => $parent['id'] ?? null,
+            'subtransactions' => [],
+            'raw' => null,
+        ];
     }
 
     /**

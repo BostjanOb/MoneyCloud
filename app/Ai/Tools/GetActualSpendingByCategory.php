@@ -16,7 +16,9 @@ class GetActualSpendingByCategory implements Tool
     {
         return 'Vrne porabo, prihodke, neto tok in glavne prejemnike po Actual '
             .'kategorijah za zadnjih 365 dni. Transferji so izločeni iz porabe, '
-            .'skrite kategorije pa so vključene.';
+            .'skrite kategorije pa so vključene. Razdeljene (split) transakcije so '
+            .'razbite na posamezne dele, zato so razvrščene pod dejanske kategorije '
+            .'delov in ne pod "Brez kategorije".';
     }
 
     public function handle(Request $request): Stringable|string

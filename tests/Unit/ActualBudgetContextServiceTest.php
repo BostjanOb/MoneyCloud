@@ -72,6 +72,121 @@ test('it summarizes spending by category and excludes transfers', function () {
         ]);
 });
 
+test('it expands split transactions into their parts', function () {
+    fakeActualBudgetApi();
+
+    $service = app(ActualBudgetContextService::class);
+    $service->refreshChatContext();
+
+    $rows = collect($service->transactions()['transactions']);
+    $part = $rows->firstWhere('id', 'transaction-split-food');
+
+    expect($rows->pluck('id'))->not->toContain('transaction-split')
+        ->and($rows->pluck('id'))->toContain('transaction-split-food', 'transaction-split-rest')
+        ->and($part)->toMatchArray([
+            'category_id' => 'category-food',
+            'category_name' => 'Živila',
+            'category_group_name' => 'Hrana',
+            'payee_name' => 'Mercator',
+            'imported_payee' => 'MERCATOR SPLIT',
+            'notes' => 'Deljen nakup',
+            'account_name' => 'TRR',
+            'date' => '2026-06-04',
+            'amount_eur' => -60.0,
+            'amount_formatted' => '-60,00 €',
+            'is_split_child' => true,
+            'split_parent_id' => 'transaction-split',
+        ]);
+});
+
+test('split parts land in their own categories instead of uncategorized', function () {
+    fakeActualBudgetApi();
+
+    $service = app(ActualBudgetContextService::class);
+    $service->refreshChatContext();
+
+    $categories = collect($service->spendingByCategory()['categories']);
+    $food = $categories->firstWhere('category_id', 'category-food');
+    $uncategorized = $categories->firstWhere('category_name', 'Brez kategorije');
+
+    expect($food['spent_eur'])->toBe(91.0)
+        ->and($food['transaction_count'])->toBe(3)
+        ->and($uncategorized['spent_eur'])->toBe(60.0)
+        ->and($uncategorized['income_eur'])->toBe(1200.0)
+        ->and($uncategorized['transaction_count'])->toBe(3);
+});
+
+test('an unbalanced split keeps its difference as an uncategorized remainder', function () {
+    fakeActualBudgetApi();
+
+    $service = app(ActualBudgetContextService::class);
+    $context = $service->refreshChatContext();
+
+    $rows = collect($service->transactions()['transactions']);
+    $remainder = $rows->firstWhere('id', 'transaction-closed-split:remainder');
+
+    expect($remainder['amount_raw'])->toBe(-2000)
+        ->and($remainder['category_id'])->toBeNull()
+        ->and($remainder['category_name'])->toBe('Brez kategorije')
+        ->and($remainder['is_split_remainder'])->toBeTrue()
+        ->and($rows->sum('amount_raw'))->toBe(collect($context['transactions'])->sum('amount_raw'));
+});
+
+test('filtering by category finds split parts', function () {
+    fakeActualBudgetApi();
+
+    $service = app(ActualBudgetContextService::class);
+    $service->refreshChatContext();
+
+    $filtered = $service->transactions(['category_id' => 'category-food']);
+
+    expect(collect($filtered['transactions'])->pluck('id'))
+        ->toContain('transaction-split-food', 'transaction-closed-split-food')
+        ->and($filtered['total_matching'])->toBe(4);
+});
+
+test('splits in an already cached context are expanded without refreshing', function () {
+    Cache::forever(ActualBudgetContextService::CACHE_KEY, cachedSplitContext());
+    Http::fake();
+
+    $result = json_decode((string) app(GetActualTransactions::class)->handle(new Request), true);
+    $rows = collect($result['transactions']);
+
+    expect($rows->pluck('id'))->toContain('cached-child')
+        ->and($rows->pluck('id'))->not->toContain('cached-parent')
+        ->and($rows->firstWhere('id', 'cached-child')['payee_name'])->toBe('Mercator');
+
+    Http::assertNothingSent();
+});
+
+test('a split part echoed at top level is not counted twice', function () {
+    $context = cachedSplitContext();
+    $context['transactions'][] = $context['transactions'][0]['subtransactions'][0];
+
+    Cache::forever(ActualBudgetContextService::CACHE_KEY, $context);
+    Http::fake();
+
+    $rows = collect(app(ActualBudgetContextService::class)->transactions()['transactions']);
+
+    expect($rows->where('id', 'cached-child'))->toHaveCount(1)
+        ->and($rows)->toHaveCount(1);
+});
+
+test('a split part whose parent is outside the window is kept', function () {
+    $context = cachedSplitContext();
+    $orphan = $context['transactions'][0]['subtransactions'][0];
+    $orphan['id'] = 'orphan-child';
+    $orphan['raw']['parent_id'] = 'parent-outside-window';
+    $context['transactions'][] = $orphan;
+
+    Cache::forever(ActualBudgetContextService::CACHE_KEY, $context);
+    Http::fake();
+
+    $rows = collect(app(ActualBudgetContextService::class)->transactions()['transactions']);
+
+    expect($rows->pluck('id'))->toContain('orphan-child');
+});
+
 test('chat transaction tool uses cache without calling actual api', function () {
     Cache::forever(ActualBudgetContextService::CACHE_KEY, [
         'available' => true,
@@ -114,6 +229,50 @@ test('report context falls back to stale chat cache when actual api is unavailab
     expect($context['source'])->toBe('cache')
         ->and($context['warnings'])->toContain(ActualBudgetContextService::STALE_WARNING);
 });
+
+/**
+ * A context shaped like one written to the cache before split expansion existed:
+ * a parent row carrying the total with the real category nested underneath.
+ *
+ * @return array<string, mixed>
+ */
+function cachedSplitContext(): array
+{
+    return [
+        'available' => true,
+        'source' => 'cache',
+        'generated_at' => '2026-06-08T12:00:00+02:00',
+        'window' => ['days' => 365, 'since' => '2025-06-08', 'until' => '2026-06-08'],
+        'warnings' => [],
+        'transactions' => [
+            [
+                'id' => 'cached-parent',
+                'date' => '2026-06-01',
+                'account_id' => 'account-1',
+                'amount_raw' => -3000,
+                'category_id' => null,
+                'category_name' => 'Brez kategorije',
+                'payee_name' => 'Mercator',
+                'is_transfer' => false,
+                'raw' => ['is_parent' => true],
+                'subtransactions' => [
+                    [
+                        'id' => 'cached-child',
+                        'date' => '2026-06-01',
+                        'account_id' => 'account-1',
+                        'amount_raw' => -3000,
+                        'category_id' => 'category-1',
+                        'category_name' => 'Živila',
+                        'payee_name' => null,
+                        'is_transfer' => false,
+                        'raw' => ['is_child' => true, 'parent_id' => 'cached-parent'],
+                        'subtransactions' => [],
+                    ],
+                ],
+            ],
+        ],
+    ];
+}
 
 function fakeActualBudgetApi(): void
 {
@@ -209,6 +368,45 @@ function fakeActualBudgetApi(): void
                     'transfer_id' => 'transfer-1',
                     'subtransactions' => [],
                 ],
+                [
+                    'id' => 'transaction-split',
+                    'account' => 'account-checking',
+                    'date' => '2026-06-04',
+                    'amount' => -10000,
+                    'payee' => 'payee-mercator',
+                    'imported_payee' => 'MERCATOR SPLIT',
+                    'category' => null,
+                    'notes' => 'Deljen nakup',
+                    'transfer_id' => null,
+                    'cleared' => true,
+                    'is_parent' => true,
+                    'subtransactions' => [
+                        [
+                            'id' => 'transaction-split-food',
+                            'account' => 'account-checking',
+                            'date' => '2026-06-04',
+                            'amount' => -6000,
+                            'payee' => null,
+                            'category' => 'category-food',
+                            'transfer_id' => null,
+                            'is_child' => true,
+                            'parent_id' => 'transaction-split',
+                            'subtransactions' => [],
+                        ],
+                        [
+                            'id' => 'transaction-split-rest',
+                            'account' => 'account-checking',
+                            'date' => '2026-06-04',
+                            'amount' => -4000,
+                            'payee' => null,
+                            'category' => null,
+                            'transfer_id' => null,
+                            'is_child' => true,
+                            'parent_id' => 'transaction-split',
+                            'subtransactions' => [],
+                        ],
+                    ],
+                ],
             ]]);
         }
 
@@ -238,6 +436,30 @@ function fakeActualBudgetApi(): void
                     'category' => 'category-food',
                     'transfer_id' => null,
                     'subtransactions' => [],
+                ],
+                [
+                    'id' => 'transaction-closed-split',
+                    'account' => 'account-closed',
+                    'date' => '2026-05-02',
+                    'amount' => -5000,
+                    'payee' => 'payee-mercator',
+                    'category' => null,
+                    'transfer_id' => null,
+                    'is_parent' => true,
+                    'subtransactions' => [
+                        [
+                            'id' => 'transaction-closed-split-food',
+                            'account' => 'account-closed',
+                            'date' => '2026-05-02',
+                            'amount' => -3000,
+                            'payee' => null,
+                            'category' => 'category-food',
+                            'transfer_id' => null,
+                            'is_child' => true,
+                            'parent_id' => 'transaction-closed-split',
+                            'subtransactions' => [],
+                        ],
+                    ],
                 ],
             ]]);
         }

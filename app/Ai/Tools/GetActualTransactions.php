@@ -17,7 +17,9 @@ class GetActualTransactions implements Tool
         return 'Vrne obogatene raw transakcije iz Actual Budget za zadnjih 365 dni. '
             .'Podpira omejitev po računu, kategoriji in datumu. Vsaka transakcija '
             .'vsebuje originalna polja Actual, EUR znesek, ime računa, prejemnika, '
-            .'kategorije in oznako za transfer.';
+            .'kategorije in oznako za transfer. Razdeljene (split) transakcije so '
+            .'vrnjene kot posamezni deli (is_split_child, split_parent_id), '
+            .'starševska vrstica pa je izpuščena, da se zneski ne podvajajo.';
     }
 
     public function handle(Request $request): Stringable|string
@@ -40,7 +42,7 @@ class GetActualTransactions implements Tool
     {
         return [
             'account_id' => $schema->string()->description('Neobvezen Actual account id.'),
-            'category_id' => $schema->string()->description('Neobvezen Actual category id.'),
+            'category_id' => $schema->string()->description('Neobvezen Actual category id. Ujame tudi dele razdeljenih transakcij.'),
             'since' => $schema->string()->description('Neobvezen začetni datum znotraj 365-dnevnega okna, YYYY-MM-DD.'),
             'until' => $schema->string()->description('Neobvezen končni datum znotraj 365-dnevnega okna, YYYY-MM-DD.'),
             'limit' => $schema->integer()->min(1)->description('Največ vrnjenih transakcij, največ 1000.'),
