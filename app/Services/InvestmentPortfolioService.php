@@ -106,13 +106,17 @@ class InvestmentPortfolioService
 
     /**
      * @return array<int, array{
+     *     symbol_id: int,
      *     symbol: string,
      *     type_label: string,
+     *     current_price: string,
      *     current_value: string,
      *     return_percentage: string,
      *     quantity: string,
      *     total_invested: string,
-     *     profit_loss: string
+     *     profit_loss: string,
+     *     profit_loss_after_tax: string,
+     *     stats: array<string, string|int|null>
      * }>
      */
     public function summarizeProviderBySymbol(InvestmentProvider $provider): array
@@ -132,6 +136,7 @@ class InvestmentPortfolioService
                         $carry['current_value'] += $this->toCents($metrics['current_value']);
                         $carry['total_invested'] += $this->toCents($metrics['price']);
                         $carry['profit_loss'] += $this->toCents($metrics['profit_loss']);
+                        $carry['profit_loss_after_tax'] += $this->toCents($metrics['profit_loss_after_tax']);
                         $carry['quantity'] += $purchase->signedQuantity();
 
                         return $carry;
@@ -140,6 +145,7 @@ class InvestmentPortfolioService
                         'current_value' => 0,
                         'total_invested' => 0,
                         'profit_loss' => 0,
+                        'profit_loss_after_tax' => 0,
                         'quantity' => 0.0,
                     ],
                 );
@@ -149,18 +155,101 @@ class InvestmentPortfolioService
                     : ($totals['profit_loss'] / $totals['total_invested']) * 100;
 
                 return [
+                    'symbol_id' => $firstPurchase->symbol->id,
                     'symbol' => $firstPurchase->symbol->symbol,
                     'type_label' => $firstPurchase->symbol->type->label(),
+                    'current_price' => $this->formatPrice((float) $firstPurchase->symbol->current_price),
                     'current_value' => $this->fromCents($totals['current_value']),
                     'return_percentage' => $this->formatDecimal($returnPercentage),
                     'quantity' => number_format($totals['quantity'], 8, '.', ''),
                     'total_invested' => $this->fromCents($totals['total_invested']),
                     'profit_loss' => $this->fromCents($totals['profit_loss']),
+                    'profit_loss_after_tax' => $this->fromCents($totals['profit_loss_after_tax']),
+                    'stats' => $this->symbolStats($purchases),
                 ];
             })
             ->sortBy('symbol')
             ->values()
             ->all();
+    }
+
+    /**
+     * Build per-symbol purchase statistics such as lowest, highest and average
+     * buy price for a single symbol's transactions.
+     *
+     * @param  Collection<int, InvestmentPurchase>  $purchases
+     * @return array{
+     *     buy_count: int,
+     *     sell_count: int,
+     *     lowest_buy_price: string|null,
+     *     highest_buy_price: string|null,
+     *     average_buy_price: string|null,
+     *     break_even_price: string|null,
+     *     quantity_bought: string,
+     *     quantity_sold: string,
+     *     total_fees: string,
+     *     first_purchase_at: string|null,
+     *     last_purchase_at: string|null
+     * }
+     */
+    private function symbolStats(Collection $purchases): array
+    {
+        $buys = $purchases->filter(
+            fn (InvestmentPurchase $purchase): bool => $purchase->transactionType() === InvestmentTransactionType::Buy,
+        );
+        $sells = $purchases->filter(
+            fn (InvestmentPurchase $purchase): bool => $purchase->transactionType() === InvestmentTransactionType::Sell,
+        );
+
+        $quantityBought = $buys->sum(fn (InvestmentPurchase $purchase): float => (float) $purchase->quantity);
+        $buyValueInCents = $buys->sum(
+            fn (InvestmentPurchase $purchase): int => $this->quantityValueInCents(
+                $purchase->quantity,
+                $purchase->price_per_unit,
+            ),
+        );
+        $buyFeesInCents = $buys->sum(
+            fn (InvestmentPurchase $purchase): int => $this->toCents($purchase->fee),
+        );
+        $hasBuyQuantity = $quantityBought > 0.0;
+        $buyUnitPrices = $buys->map(
+            fn (InvestmentPurchase $purchase): float => (float) $purchase->price_per_unit,
+        );
+
+        $purchaseDates = $purchases
+            ->map(fn (InvestmentPurchase $purchase): ?CarbonInterface => $purchase->purchased_at)
+            ->filter()
+            ->sort()
+            ->values();
+
+        return [
+            'buy_count' => $buys->count(),
+            'sell_count' => $sells->count(),
+            'lowest_buy_price' => $buyUnitPrices->isEmpty()
+                ? null
+                : $this->formatPrice($buyUnitPrices->min()),
+            'highest_buy_price' => $buyUnitPrices->isEmpty()
+                ? null
+                : $this->formatPrice($buyUnitPrices->max()),
+            'average_buy_price' => $hasBuyQuantity
+                ? $this->formatPrice($buyValueInCents / 100 / $quantityBought)
+                : null,
+            'break_even_price' => $hasBuyQuantity
+                ? $this->formatPrice(($buyValueInCents + $buyFeesInCents) / 100 / $quantityBought)
+                : null,
+            'quantity_bought' => number_format($quantityBought, 8, '.', ''),
+            'quantity_sold' => number_format(
+                $sells->sum(fn (InvestmentPurchase $purchase): float => (float) $purchase->quantity),
+                8,
+                '.',
+                '',
+            ),
+            'total_fees' => $this->fromCents(
+                $purchases->sum(fn (InvestmentPurchase $purchase): int => $this->toCents($purchase->fee)),
+            ),
+            'first_purchase_at' => $purchaseDates->first()?->toISOString(),
+            'last_purchase_at' => $purchaseDates->last()?->toISOString(),
+        ];
     }
 
     /**
@@ -259,5 +348,13 @@ class InvestmentPortfolioService
     private function formatDecimal(float $value): string
     {
         return number_format($value, 2, '.', '');
+    }
+
+    /**
+     * Format a unit price with the same precision as the stored purchase price.
+     */
+    private function formatPrice(float $value): string
+    {
+        return number_format($value, 3, '.', '');
     }
 }

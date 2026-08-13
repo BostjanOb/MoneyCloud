@@ -61,14 +61,32 @@ type Summary = {
     purchase_count: number;
 };
 
+type SymbolStats = {
+    buy_count: number;
+    sell_count: number;
+    lowest_buy_price: string | null;
+    highest_buy_price: string | null;
+    average_buy_price: string | null;
+    break_even_price: string | null;
+    quantity_bought: string;
+    quantity_sold: string;
+    total_fees: string;
+    first_purchase_at: string | null;
+    last_purchase_at: string | null;
+};
+
 type SymbolSummaryRow = {
+    symbol_id: number;
     symbol: string;
     type_label: string;
+    current_price: string;
     current_value: string;
     return_percentage: string;
     quantity: string;
     total_invested: string;
     profit_loss: string;
+    profit_loss_after_tax: string;
+    stats: SymbolStats;
 };
 
 type SymbolOption = {
@@ -137,7 +155,9 @@ const NO_SAVINGS_ACCOUNT = '__none__';
 
 const showPurchaseModal = ref(false);
 const showSavingsModal = ref(false);
+const showSymbolStatsModal = ref(false);
 const editingPurchase = ref<Purchase | null>(null);
+const statsRow = ref<SymbolSummaryRow | null>(null);
 
 const purchaseForm = useForm({
     investment_symbol_id: '',
@@ -244,6 +264,122 @@ function valueTone(value: string | number): string {
     }
 
     return 'text-foreground';
+}
+
+function formatOptionalUnitPriceMoney(value: string | null): string {
+    return value === null ? '–' : formatUnitPriceMoney(value);
+}
+
+function formatOptionalDateTime(value: string | null): string {
+    return value === null ? '–' : formatDateTime(value);
+}
+
+type SymbolStatsSection = {
+    title: string;
+    items: { label: string; value: string; tone?: string }[];
+};
+
+const symbolStatsSections = computed<SymbolStatsSection[]>(() => {
+    const row = statsRow.value;
+
+    if (row === null) {
+        return [];
+    }
+
+    return [
+        {
+            title: 'Nakupne cene',
+            items: [
+                {
+                    label: 'Najnižja',
+                    value: formatOptionalUnitPriceMoney(
+                        row.stats.lowest_buy_price,
+                    ),
+                },
+                {
+                    label: 'Najvišja',
+                    value: formatOptionalUnitPriceMoney(
+                        row.stats.highest_buy_price,
+                    ),
+                },
+                {
+                    label: 'Povprečna',
+                    value: formatOptionalUnitPriceMoney(
+                        row.stats.average_buy_price,
+                    ),
+                },
+                {
+                    label: 'Prag donosa (s provizijami)',
+                    value: formatOptionalUnitPriceMoney(
+                        row.stats.break_even_price,
+                    ),
+                },
+            ],
+        },
+        {
+            title: 'Količina',
+            items: [
+                {
+                    label: 'Kupljeno',
+                    value: formatQuantity(row.stats.quantity_bought),
+                },
+                {
+                    label: 'Prodano',
+                    value: formatQuantity(row.stats.quantity_sold),
+                },
+                { label: 'Neto', value: formatQuantity(row.quantity) },
+            ],
+        },
+        {
+            title: 'Transakcije',
+            items: [
+                { label: 'Nakupov', value: String(row.stats.buy_count) },
+                { label: 'Prodaj', value: String(row.stats.sell_count) },
+                {
+                    label: 'Prvi nakup',
+                    value: formatOptionalDateTime(row.stats.first_purchase_at),
+                },
+                {
+                    label: 'Zadnji nakup',
+                    value: formatOptionalDateTime(row.stats.last_purchase_at),
+                },
+                {
+                    label: 'Skupne provizije',
+                    value: formatMoney(row.stats.total_fees),
+                },
+            ],
+        },
+        {
+            title: 'Vrednost',
+            items: [
+                { label: 'Vloženo', value: formatMoney(row.total_invested) },
+                {
+                    label: 'Trenutna vrednost',
+                    value: formatMoney(row.current_value),
+                },
+                {
+                    label: 'Donos',
+                    value: formatPercent(row.return_percentage),
+                    tone: valueTone(row.return_percentage),
+                },
+                {
+                    label: 'P/L',
+                    value: formatSignedMoney(row.profit_loss),
+                    tone: valueTone(row.profit_loss),
+                },
+                {
+                    label: 'P/L po davku',
+                    value: formatSignedMoney(row.profit_loss_after_tax),
+                    tone: valueTone(row.profit_loss_after_tax),
+                },
+            ],
+        },
+    ];
+});
+
+function openSymbolStats(row: SymbolSummaryRow): void {
+    statsRow.value = row;
+    showSymbolStatsModal.value = true;
 }
 
 function resetPurchaseForm(): void {
@@ -510,9 +646,24 @@ function deletePurchase(purchase: Purchase): void {
                         >
                             <TableCell>
                                 <div class="flex flex-col gap-1">
-                                    <span class="font-medium">{{
-                                        row.symbol
-                                    }}</span>
+                                    <div class="flex items-baseline gap-1">
+                                        <button
+                                            type="button"
+                                            class="font-medium hover:underline"
+                                            @click="openSymbolStats(row)"
+                                        >
+                                            {{ row.symbol }}
+                                        </button>
+                                        <span
+                                            class="text-xs text-muted-foreground"
+                                        >
+                                            ({{
+                                                formatUnitPriceMoney(
+                                                    row.current_price,
+                                                )
+                                            }})
+                                        </span>
+                                    </div>
                                     <span class="text-xs text-muted-foreground">
                                         {{ row.type_label }}
                                     </span>
@@ -607,7 +758,11 @@ function deletePurchase(purchase: Purchase): void {
                                 {{ formatQuantity(purchase.quantity) }}
                             </TableCell>
                             <TableCell numeric class="text-right">
-                                {{ formatUnitPriceMoney(purchase.price_per_unit) }}
+                                {{
+                                    formatUnitPriceMoney(
+                                        purchase.price_per_unit,
+                                    )
+                                }}
                             </TableCell>
                             <TableCell numeric class="text-right">
                                 {{ formatMoney(purchase.price) }}
@@ -843,6 +998,59 @@ function deletePurchase(purchase: Purchase): void {
                     </Button>
                 </DialogFooter>
             </form>
+        </DialogContent>
+    </Dialog>
+
+    <Dialog v-model:open="showSymbolStatsModal">
+        <DialogContent v-if="statsRow" class="sm:max-w-lg">
+            <DialogHeader>
+                <DialogTitle>{{ statsRow.symbol }}</DialogTitle>
+                <DialogDescription>
+                    {{ statsRow.type_label }} • Trenutna cena:
+                    {{ formatUnitPriceMoney(statsRow.current_price) }}
+                </DialogDescription>
+            </DialogHeader>
+
+            <div class="grid gap-5">
+                <div
+                    v-for="section in symbolStatsSections"
+                    :key="section.title"
+                    class="space-y-2"
+                >
+                    <p
+                        class="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+                    >
+                        {{ section.title }}
+                    </p>
+                    <dl class="grid gap-1 text-sm">
+                        <div
+                            v-for="item in section.items"
+                            :key="item.label"
+                            class="flex items-baseline justify-between gap-4"
+                        >
+                            <dt class="text-muted-foreground">
+                                {{ item.label }}
+                            </dt>
+                            <dd
+                                class="font-medium tabular-nums"
+                                :class="item.tone"
+                            >
+                                {{ item.value }}
+                            </dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+
+            <DialogFooter>
+                <Button
+                    type="button"
+                    variant="outline"
+                    @click="showSymbolStatsModal = false"
+                >
+                    Zapri
+                </Button>
+            </DialogFooter>
         </DialogContent>
     </Dialog>
 
