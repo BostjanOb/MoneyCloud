@@ -248,6 +248,94 @@ test('monthly summary cards keep percentage empty when latest snapshot bucket is
     ]);
 });
 
+test('monthly summary exposes the contributions versus market breakdown', function () {
+    $this->travelTo(CarbonImmutable::parse('2025-02-20 10:00:00'));
+
+    $user = User::factory()->create();
+    $vwce = InvestmentSymbol::factory()->create([
+        'type' => InvestmentSymbolType::ETF,
+        'symbol' => 'VWCE',
+        'current_price' => '110.00',
+    ]);
+    $provider = InvestmentProvider::factory()->ibkr()->create();
+
+    MonthlyPortfolioSnapshot::factory()->create([
+        'month_date' => '2025-01-01',
+        'savings_amount' => '0.00',
+        'bond_amount' => '0.00',
+        'etf_amount' => '1000.00',
+        'crypto_amount' => '0.00',
+        'stock_amount' => '0.00',
+        'total_amount' => '1000.00',
+        'source' => MonthlyPortfolioSnapshot::SOURCE_MANUAL,
+    ]);
+    MonthlyPortfolioSnapshot::factory()->create([
+        'month_date' => '2025-02-01',
+        'savings_amount' => '0.00',
+        'bond_amount' => '0.00',
+        'etf_amount' => '1450.00',
+        'crypto_amount' => '0.00',
+        'stock_amount' => '0.00',
+        'total_amount' => '1450.00',
+        'source' => MonthlyPortfolioSnapshot::SOURCE_SCHEDULED,
+    ]);
+
+    InvestmentPurchase::factory()->create([
+        'investment_provider_id' => $provider->id,
+        'investment_symbol_id' => $vwce->id,
+        'purchased_at' => '2025-01-15 12:00:00',
+        'quantity' => '5.00000000',
+        'price_per_unit' => '100.000',
+        'fee' => '1.50',
+    ]);
+    InvestmentPurchase::factory()->create([
+        'investment_provider_id' => $provider->id,
+        'investment_symbol_id' => $vwce->id,
+        'purchased_at' => '2025-02-10 12:00:00',
+        'quantity' => '2.00000000',
+        'price_per_unit' => '105.000',
+        'fee' => '1.50',
+    ]);
+
+    $response = $this->actingAs($user)
+        ->get(route('statistics.monthly-summary'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('rows.0.breakdown.available', false)
+            ->where('rows.1.breakdown.available', true)
+        );
+
+    $etfBreakdown = collect($response->inertiaProps('rows')[1]['breakdown']['types'])
+        ->firstWhere('key', 'etf_amount');
+
+    expect($etfBreakdown)->toMatchArray([
+        'label' => 'ETF',
+        'diff_amount' => '450.00',
+        'contribution_amount' => '500.00',
+        'market_amount' => '-50.00',
+        'fee_amount' => '1.50',
+    ]);
+
+    $cards = collect($response->inertiaProps('summary_cards'))->keyBy('key');
+
+    expect($cards->get('etf_amount'))->toMatchArray([
+        'current_amount' => '770.00',
+        'diff_amount' => '-680.00',
+        'contribution_amount' => '210.00',
+        'market_amount' => '-890.00',
+    ]);
+
+    expect($cards->get('savings_amount'))->toMatchArray([
+        'contribution_amount' => null,
+        'market_amount' => null,
+    ]);
+
+    expect($cards->get('total_amount'))->toMatchArray([
+        'contribution_amount' => null,
+        'market_amount' => null,
+    ]);
+});
+
 test('authenticated user can view yearly invested page', function () {
     $currentYear = now()->year;
     $user = User::factory()->create();

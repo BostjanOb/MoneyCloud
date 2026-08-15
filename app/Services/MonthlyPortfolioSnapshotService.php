@@ -13,6 +13,25 @@ use Carbon\CarbonInterface;
 class MonthlyPortfolioSnapshotService
 {
     /**
+     * Slovenian bucket labels, shared by the summary cards, the chart series
+     * and the growth breakdown so they stay in sync.
+     *
+     * @var array<string, string>
+     */
+    private const BUCKET_LABELS = [
+        'savings_amount' => 'Varčevanje',
+        'bond_amount' => 'Obveznice',
+        'etf_amount' => 'ETF',
+        'crypto_amount' => 'Kripto',
+        'stock_amount' => 'Delnice',
+        'total_amount' => 'Skupaj',
+    ];
+
+    public function __construct(
+        private PortfolioGrowthAttributionService $growthAttribution,
+    ) {}
+
+    /**
      * @return array{
      *     rows: array<int, array<string, mixed>>,
      *     chartSeries: array<int, array<string, mixed>>,
@@ -25,9 +44,10 @@ class MonthlyPortfolioSnapshotService
         $rows = [];
         $previousSnapshot = null;
         $snapshots = MonthlyPortfolioSnapshot::ordered()->get();
+        $flowsByMonth = $this->growthAttribution->flowsGroupedByMonth();
 
         foreach ($snapshots as $snapshot) {
-            $rows[] = $this->transformSnapshot($snapshot, $previousSnapshot);
+            $rows[] = $this->transformSnapshot($snapshot, $previousSnapshot, $flowsByMonth);
             $previousSnapshot = $snapshot;
         }
 
@@ -107,14 +127,6 @@ class MonthlyPortfolioSnapshotService
         array $currentStateTotals,
         ?MonthlyPortfolioSnapshot $latestSnapshot,
     ): array {
-        $cardLabels = [
-            'savings_amount' => 'Varčevanje',
-            'bond_amount' => 'Obveznice',
-            'etf_amount' => 'ETF',
-            'crypto_amount' => 'Kripto',
-            'stock_amount' => 'Delnice',
-            'total_amount' => 'Skupaj',
-        ];
         $currentTotals = [
             ...$currentStateTotals,
             'total_amount' => MonthlyPortfolioSnapshot::fromCents(
@@ -128,11 +140,16 @@ class MonthlyPortfolioSnapshotService
             )
             : 'Ni shranjenega mesečnega vnosa za primerjavo.';
 
-        return collect($cardLabels)
+        $liveFlows = $latestSnapshot instanceof MonthlyPortfolioSnapshot
+            ? $this->growthAttribution->flowsBetween($latestSnapshot->month_date, null)
+            : [];
+
+        return collect(self::BUCKET_LABELS)
             ->map(function (string $label, string $key) use (
                 $comparisonLabel,
                 $currentTotals,
                 $latestSnapshot,
+                $liveFlows,
             ): array {
                 $currentAmount = $currentTotals[$key] ?? '0.00';
 
@@ -143,6 +160,8 @@ class MonthlyPortfolioSnapshotService
                         'current_amount' => $currentAmount,
                         'diff_amount' => null,
                         'diff_percentage' => null,
+                        'contribution_amount' => null,
+                        'market_amount' => null,
                         'tone' => 'warning',
                         'comparison_label' => $comparisonLabel,
                     ];
@@ -152,6 +171,7 @@ class MonthlyPortfolioSnapshotService
                 $currentAmountInCents = MonthlyPortfolioSnapshot::toCents($currentAmount);
                 $previousAmountInCents = MonthlyPortfolioSnapshot::toCents($previousAmount);
                 $diffInCents = $currentAmountInCents - $previousAmountInCents;
+                $contributionInCents = $liveFlows[$key]['contribution'] ?? null;
 
                 return [
                     'key' => $key,
@@ -166,6 +186,12 @@ class MonthlyPortfolioSnapshotService
                             '.',
                             '',
                         ),
+                    'contribution_amount' => $contributionInCents === null
+                        ? null
+                        : MonthlyPortfolioSnapshot::fromCents($contributionInCents),
+                    'market_amount' => $contributionInCents === null
+                        ? null
+                        : MonthlyPortfolioSnapshot::fromCents($diffInCents - $contributionInCents),
                     'tone' => $diffInCents > 0
                         ? 'positive'
                         : ($diffInCents < 0 ? 'negative' : 'neutral'),
@@ -234,20 +260,20 @@ class MonthlyPortfolioSnapshotService
      */
     private function buildChartSeries(array $rows): array
     {
-        $seriesMeta = [
-            'savings_amount' => ['label' => 'Varčevanje', 'color' => '#2563eb'],
-            'bond_amount' => ['label' => 'Obveznice', 'color' => '#f97316'],
-            'etf_amount' => ['label' => 'ETF', 'color' => '#ef4444'],
-            'crypto_amount' => ['label' => 'Kripto', 'color' => '#f59e0b'],
-            'stock_amount' => ['label' => 'Delnice', 'color' => '#8b5cf6'],
-            'total_amount' => ['label' => 'Skupaj', 'color' => '#16a34a'],
+        $seriesColors = [
+            'savings_amount' => '#2563eb',
+            'bond_amount' => '#f97316',
+            'etf_amount' => '#ef4444',
+            'crypto_amount' => '#f59e0b',
+            'stock_amount' => '#8b5cf6',
+            'total_amount' => '#16a34a',
         ];
 
-        return collect($seriesMeta)
-            ->map(fn (array $meta, string $key): array => [
+        return collect($seriesColors)
+            ->map(fn (string $color, string $key): array => [
                 'key' => $key,
-                'label' => $meta['label'],
-                'color' => $meta['color'],
+                'label' => self::BUCKET_LABELS[$key],
+                'color' => $color,
                 'values' => array_map(fn (array $row): float => (float) $row[$key], $rows),
             ])
             ->values()
@@ -285,11 +311,13 @@ class MonthlyPortfolioSnapshotService
     }
 
     /**
+     * @param  array<string, array<string, array{contribution: int, fee: int}>>  $flowsByMonth
      * @return array<string, mixed>
      */
     private function transformSnapshot(
         MonthlyPortfolioSnapshot $snapshot,
         ?MonthlyPortfolioSnapshot $previousSnapshot,
+        array $flowsByMonth,
     ): array {
         $diffAmountInCents = $previousSnapshot instanceof MonthlyPortfolioSnapshot
             ? MonthlyPortfolioSnapshot::toCents($snapshot->total_amount)
@@ -320,6 +348,73 @@ class MonthlyPortfolioSnapshotService
             'diff_percentage' => $previousTotalInCents === null || $previousTotalInCents === 0
                 ? null
                 : number_format(($diffAmountInCents / $previousTotalInCents) * 100, 2, '.', ''),
+            'breakdown' => $this->buildGrowthBreakdown($snapshot, $previousSnapshot, $flowsByMonth),
+        ];
+    }
+
+    /**
+     * Split each investment bucket's month-over-month change into contributions
+     * (money paid in, valued at the transaction price) and market movement
+     * (everything else, including fees, dividends, coupons and staking).
+     *
+     * Savings is deliberately absent — there is no deposit ledger to derive it
+     * from.
+     *
+     * @param  array<string, array<string, array{contribution: int, fee: int}>>  $flowsByMonth
+     * @return array<string, mixed>
+     */
+    private function buildGrowthBreakdown(
+        MonthlyPortfolioSnapshot $snapshot,
+        ?MonthlyPortfolioSnapshot $previousSnapshot,
+        array $flowsByMonth,
+    ): array {
+        if (! $previousSnapshot instanceof MonthlyPortfolioSnapshot
+            || $previousSnapshot->month_date === null
+            || $snapshot->month_date === null
+        ) {
+            return ['available' => false, 'types' => [], 'investments' => null];
+        }
+
+        $flows = $this->growthAttribution->sumMonthlyFlows(
+            $flowsByMonth,
+            $previousSnapshot->month_date,
+            $snapshot->month_date,
+        );
+        $types = [];
+        $investmentsInCents = ['diff' => 0, 'contribution' => 0, 'market' => 0, 'fee' => 0];
+
+        foreach ($this->growthAttribution->bucketKeys() as $key) {
+            $diffInCents = MonthlyPortfolioSnapshot::toCents($snapshot->getAttribute($key))
+                - MonthlyPortfolioSnapshot::toCents($previousSnapshot->getAttribute($key));
+            $contributionInCents = $flows[$key]['contribution'] ?? 0;
+            $feeInCents = $flows[$key]['fee'] ?? 0;
+            $marketInCents = $diffInCents - $contributionInCents;
+
+            $types[] = [
+                'key' => $key,
+                'label' => self::BUCKET_LABELS[$key],
+                'diff_amount' => MonthlyPortfolioSnapshot::fromCents($diffInCents),
+                'contribution_amount' => MonthlyPortfolioSnapshot::fromCents($contributionInCents),
+                'market_amount' => MonthlyPortfolioSnapshot::fromCents($marketInCents),
+                'fee_amount' => MonthlyPortfolioSnapshot::fromCents($feeInCents),
+            ];
+
+            $investmentsInCents['diff'] += $diffInCents;
+            $investmentsInCents['contribution'] += $contributionInCents;
+            $investmentsInCents['market'] += $marketInCents;
+            $investmentsInCents['fee'] += $feeInCents;
+        }
+
+        return [
+            'available' => true,
+            'types' => $types,
+            'investments' => [
+                'label' => 'Naložbe skupaj',
+                'diff_amount' => MonthlyPortfolioSnapshot::fromCents($investmentsInCents['diff']),
+                'contribution_amount' => MonthlyPortfolioSnapshot::fromCents($investmentsInCents['contribution']),
+                'market_amount' => MonthlyPortfolioSnapshot::fromCents($investmentsInCents['market']),
+                'fee_amount' => MonthlyPortfolioSnapshot::fromCents($investmentsInCents['fee']),
+            ],
         ];
     }
 

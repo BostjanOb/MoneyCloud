@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { VisAxis, VisLine, VisScatter, VisXYContainer } from '@unovis/vue';
 import { Head, setLayoutProps, useForm } from '@inertiajs/vue3';
+import { ChevronDown, ChevronRight } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import {
     store as snapshotStore,
@@ -12,7 +13,6 @@ import {
 } from '@/actions/App/Http/Controllers/StatisticsController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -42,6 +42,21 @@ import {
 } from '@/lib/monthlySummary';
 import { formatSlovenianNumber } from '@/lib/utils';
 
+type GrowthBreakdownEntry = {
+    key?: string;
+    label: string;
+    diff_amount: string;
+    contribution_amount: string;
+    market_amount: string;
+    fee_amount: string;
+};
+
+type GrowthBreakdown = {
+    available: boolean;
+    types: GrowthBreakdownEntry[];
+    investments: GrowthBreakdownEntry | null;
+};
+
 type MonthlyRow = {
     id: number;
     month_date: string;
@@ -56,6 +71,7 @@ type MonthlyRow = {
     source_label: string;
     diff_amount: string | null;
     diff_percentage: string | null;
+    breakdown: GrowthBreakdown;
 };
 
 type MonthlyChartSeries = {
@@ -71,6 +87,8 @@ type SummaryCard = {
     current_amount: string;
     diff_amount: string | null;
     diff_percentage: string | null;
+    contribution_amount: string | null;
+    market_amount: string | null;
     tone: 'positive' | 'negative' | 'neutral' | 'warning';
     comparison_label: string;
 };
@@ -99,6 +117,7 @@ setLayoutProps({
 
 const showSnapshotModal = ref(false);
 const editingSnapshot = ref<MonthlyRow | null>(null);
+const expandedRowId = ref<number | null>(null);
 
 const snapshotForm = useForm({
     month_date: currentMonthInput(),
@@ -246,6 +265,10 @@ function summaryCardToneClass(tone: SummaryCard['tone']): string {
     return 'text-foreground';
 }
 
+function toggleBreakdown(row: MonthlyRow): void {
+    expandedRowId.value = expandedRowId.value === row.id ? null : row.id;
+}
+
 function resetSnapshotForm(): void {
     snapshotForm.defaults({
         month_date: currentMonthInput(),
@@ -347,6 +370,25 @@ function submitSnapshot(): void {
                             {{ formatPercent(card.diff_percentage) }}
                         </span>
                     </div>
+                    <p
+                        v-if="card.contribution_amount !== null"
+                        class="text-xs text-muted-foreground"
+                    >
+                        Vplačila
+                        <span
+                            class="font-medium"
+                            :class="valueTone(card.contribution_amount)"
+                        >
+                            {{ formatSignedMoney(card.contribution_amount) }}
+                        </span>
+                        · Trg
+                        <span
+                            class="font-medium"
+                            :class="valueTone(card.market_amount)"
+                        >
+                            {{ formatSignedMoney(card.market_amount) }}
+                        </span>
+                    </p>
                     <p class="text-xs text-muted-foreground">
                         {{ card.comparison_label }}
                     </p>
@@ -455,6 +497,9 @@ function submitSnapshot(): void {
                 <Table v-else>
                     <thead>
                         <tr class="border-b">
+                            <th class="h-10 w-8 px-2">
+                                <span class="sr-only">Razgradnja</span>
+                            </th>
                             <th
                                 class="h-10 px-2 text-left font-medium whitespace-nowrap"
                             >
@@ -508,69 +553,296 @@ function submitSnapshot(): void {
                         </tr>
                     </thead>
                     <tbody>
-                        <tr
-                            v-for="row in historyRows"
-                            :key="row.id"
-                            class="border-b transition-colors hover:bg-muted/50"
-                        >
-                            <td class="p-2 align-middle whitespace-nowrap">
-                                {{ row.month_label }}
-                            </td>
-                            <td
-                                class="p-2 text-right align-middle whitespace-nowrap"
+                        <template v-for="row in historyRows" :key="row.id">
+                            <tr
+                                class="border-b transition-colors hover:bg-muted/50"
                             >
-                                {{ formatMoney(row.savings_amount) }}
-                            </td>
-                            <td
-                                class="p-2 text-right align-middle whitespace-nowrap"
-                            >
-                                {{ formatMoney(row.bond_amount) }}
-                            </td>
-                            <td
-                                class="p-2 text-right align-middle whitespace-nowrap"
-                            >
-                                {{ formatMoney(row.etf_amount) }}
-                            </td>
-                            <td
-                                class="p-2 text-right align-middle whitespace-nowrap"
-                            >
-                                {{ formatMoney(row.crypto_amount) }}
-                            </td>
-                            <td
-                                class="p-2 text-right align-middle whitespace-nowrap"
-                            >
-                                {{ formatMoney(row.stock_amount) }}
-                            </td>
-                            <td
-                                class="p-2 text-right align-middle font-semibold whitespace-nowrap"
-                            >
-                                {{ formatMoney(row.total_amount) }}
-                            </td>
-                            <td
-                                class="p-2 text-right align-middle whitespace-nowrap"
-                                :class="valueTone(row.diff_percentage)"
-                            >
-                                {{ formatPercent(row.diff_percentage) }}
-                            </td>
-                            <td
-                                class="p-2 text-right align-middle whitespace-nowrap"
-                                :class="valueTone(row.diff_amount)"
-                            >
-                                {{ formatSignedMoney(row.diff_amount) }}
-                            </td>
-                            <td
-                                class="p-2 text-right align-middle whitespace-nowrap"
-                            >
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    @click="openEditSnapshot(row)"
+                                <td class="p-2 align-middle">
+                                    <button
+                                        type="button"
+                                        class="flex size-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                        :aria-expanded="
+                                            expandedRowId === row.id
+                                        "
+                                        :aria-label="`Razgradnja rasti za ${row.month_label}`"
+                                        @click="toggleBreakdown(row)"
+                                    >
+                                        <ChevronDown
+                                            v-if="expandedRowId === row.id"
+                                            class="size-4"
+                                        />
+                                        <ChevronRight v-else class="size-4" />
+                                    </button>
+                                </td>
+                                <td class="p-2 align-middle whitespace-nowrap">
+                                    {{ row.month_label }}
+                                </td>
+                                <td
+                                    class="p-2 text-right align-middle whitespace-nowrap"
                                 >
-                                    Uredi
-                                </Button>
-                            </td>
-                        </tr>
+                                    {{ formatMoney(row.savings_amount) }}
+                                </td>
+                                <td
+                                    class="p-2 text-right align-middle whitespace-nowrap"
+                                >
+                                    {{ formatMoney(row.bond_amount) }}
+                                </td>
+                                <td
+                                    class="p-2 text-right align-middle whitespace-nowrap"
+                                >
+                                    {{ formatMoney(row.etf_amount) }}
+                                </td>
+                                <td
+                                    class="p-2 text-right align-middle whitespace-nowrap"
+                                >
+                                    {{ formatMoney(row.crypto_amount) }}
+                                </td>
+                                <td
+                                    class="p-2 text-right align-middle whitespace-nowrap"
+                                >
+                                    {{ formatMoney(row.stock_amount) }}
+                                </td>
+                                <td
+                                    class="p-2 text-right align-middle font-semibold whitespace-nowrap"
+                                >
+                                    {{ formatMoney(row.total_amount) }}
+                                </td>
+                                <td
+                                    class="p-2 text-right align-middle whitespace-nowrap"
+                                    :class="valueTone(row.diff_percentage)"
+                                >
+                                    {{ formatPercent(row.diff_percentage) }}
+                                </td>
+                                <td
+                                    class="p-2 text-right align-middle whitespace-nowrap"
+                                    :class="valueTone(row.diff_amount)"
+                                >
+                                    {{ formatSignedMoney(row.diff_amount) }}
+                                </td>
+                                <td
+                                    class="p-2 text-right align-middle whitespace-nowrap"
+                                >
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        @click="openEditSnapshot(row)"
+                                    >
+                                        Uredi
+                                    </Button>
+                                </td>
+                            </tr>
+                            <tr
+                                v-if="expandedRowId === row.id"
+                                class="border-b bg-muted/30"
+                            >
+                                <td :colspan="10" class="p-4">
+                                    <div
+                                        v-if="!row.breakdown.available"
+                                        class="text-sm text-muted-foreground"
+                                    >
+                                        Za prvi mesec razgradnja ni na voljo —
+                                        ni predhodnega povzetka za primerjavo.
+                                    </div>
+
+                                    <div v-else class="space-y-2">
+                                        <p class="text-sm font-medium">
+                                            Razgradnja rasti —
+                                            {{ row.month_label }}
+                                        </p>
+                                        <Table>
+                                            <thead>
+                                                <tr class="border-b">
+                                                    <th
+                                                        class="h-9 px-2 text-left font-medium whitespace-nowrap"
+                                                    >
+                                                        Naložba
+                                                    </th>
+                                                    <th
+                                                        class="h-9 px-2 text-right font-medium whitespace-nowrap"
+                                                    >
+                                                        Sprememba
+                                                    </th>
+                                                    <th
+                                                        class="h-9 px-2 text-right font-medium whitespace-nowrap"
+                                                    >
+                                                        Vplačila
+                                                    </th>
+                                                    <th
+                                                        class="h-9 px-2 text-right font-medium whitespace-nowrap"
+                                                    >
+                                                        Trg
+                                                    </th>
+                                                    <th
+                                                        class="h-9 px-2 text-right font-medium whitespace-nowrap"
+                                                    >
+                                                        Provizije
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr
+                                                    v-for="entry in row
+                                                        .breakdown.types"
+                                                    :key="entry.key"
+                                                    class="border-b"
+                                                >
+                                                    <td
+                                                        class="p-2 align-middle whitespace-nowrap"
+                                                    >
+                                                        {{ entry.label }}
+                                                    </td>
+                                                    <td
+                                                        class="p-2 text-right align-middle whitespace-nowrap"
+                                                        :class="
+                                                            valueTone(
+                                                                entry.diff_amount,
+                                                            )
+                                                        "
+                                                    >
+                                                        {{
+                                                            formatSignedMoney(
+                                                                entry.diff_amount,
+                                                            )
+                                                        }}
+                                                    </td>
+                                                    <td
+                                                        class="p-2 text-right align-middle whitespace-nowrap"
+                                                        :class="
+                                                            valueTone(
+                                                                entry.contribution_amount,
+                                                            )
+                                                        "
+                                                    >
+                                                        {{
+                                                            formatSignedMoney(
+                                                                entry.contribution_amount,
+                                                            )
+                                                        }}
+                                                    </td>
+                                                    <td
+                                                        class="p-2 text-right align-middle whitespace-nowrap"
+                                                        :class="
+                                                            valueTone(
+                                                                entry.market_amount,
+                                                            )
+                                                        "
+                                                    >
+                                                        {{
+                                                            formatSignedMoney(
+                                                                entry.market_amount,
+                                                            )
+                                                        }}
+                                                    </td>
+                                                    <td
+                                                        class="p-2 text-right align-middle whitespace-nowrap text-muted-foreground"
+                                                    >
+                                                        {{
+                                                            formatMoney(
+                                                                entry.fee_amount,
+                                                            )
+                                                        }}
+                                                    </td>
+                                                </tr>
+                                                <tr
+                                                    v-if="
+                                                        row.breakdown
+                                                            .investments !==
+                                                        null
+                                                    "
+                                                    class="font-semibold"
+                                                >
+                                                    <td
+                                                        class="p-2 align-middle whitespace-nowrap"
+                                                    >
+                                                        {{
+                                                            row.breakdown
+                                                                .investments
+                                                                .label
+                                                        }}
+                                                    </td>
+                                                    <td
+                                                        class="p-2 text-right align-middle whitespace-nowrap"
+                                                        :class="
+                                                            valueTone(
+                                                                row.breakdown
+                                                                    .investments
+                                                                    .diff_amount,
+                                                            )
+                                                        "
+                                                    >
+                                                        {{
+                                                            formatSignedMoney(
+                                                                row.breakdown
+                                                                    .investments
+                                                                    .diff_amount,
+                                                            )
+                                                        }}
+                                                    </td>
+                                                    <td
+                                                        class="p-2 text-right align-middle whitespace-nowrap"
+                                                        :class="
+                                                            valueTone(
+                                                                row.breakdown
+                                                                    .investments
+                                                                    .contribution_amount,
+                                                            )
+                                                        "
+                                                    >
+                                                        {{
+                                                            formatSignedMoney(
+                                                                row.breakdown
+                                                                    .investments
+                                                                    .contribution_amount,
+                                                            )
+                                                        }}
+                                                    </td>
+                                                    <td
+                                                        class="p-2 text-right align-middle whitespace-nowrap"
+                                                        :class="
+                                                            valueTone(
+                                                                row.breakdown
+                                                                    .investments
+                                                                    .market_amount,
+                                                            )
+                                                        "
+                                                    >
+                                                        {{
+                                                            formatSignedMoney(
+                                                                row.breakdown
+                                                                    .investments
+                                                                    .market_amount,
+                                                            )
+                                                        }}
+                                                    </td>
+                                                    <td
+                                                        class="p-2 text-right align-middle whitespace-nowrap text-muted-foreground"
+                                                    >
+                                                        {{
+                                                            formatMoney(
+                                                                row.breakdown
+                                                                    .investments
+                                                                    .fee_amount,
+                                                            )
+                                                        }}
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </Table>
+                                        <p
+                                            class="text-xs text-muted-foreground"
+                                        >
+                                            Varčevanje ni vključeno — zgodovina
+                                            vplačil ni na voljo. Vplačila so
+                                            vrednotena po nakupni ceni (brez
+                                            provizij), vse ostalo (tečaj,
+                                            obresti, kuponi, staking) šteje pod
+                                            trg.
+                                        </p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
                     </tbody>
                 </Table>
             </CardContent>
