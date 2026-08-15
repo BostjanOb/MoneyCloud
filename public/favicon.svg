@@ -1,16 +1,7 @@
-<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-<title>Money Cloud</title>
-<desc>Cloud outline with a euro sign in the center.</desc>
-<defs>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none"><metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/"><rdf:Description><dc:creator>RealFaviconGenerator</dc:creator><dc:source>https://realfavicongenerator.net</dc:source></rdf:Description></rdf:RDF></metadata><title>Money Cloud</title><desc>Cloud outline with a euro sign in the center.</desc><defs>
 <linearGradient id="money-cloud-gradient" x1="10" y1="8" x2="55" y2="58" gradientUnits="userSpaceOnUse">
-<stop stop-color="#0F766E"/>
-<stop offset="0.56" stop-color="#10B981"/>
-<stop offset="1" stop-color="#6EE7B7"/>
+<stop stop-color="#0F766E"></stop>
+<stop offset="0.56" stop-color="#10B981"></stop>
+<stop offset="1" stop-color="#6EE7B7"></stop>
 </linearGradient>
-</defs>
-<rect x="4" y="4" width="56" height="56" rx="18" fill="url(#money-cloud-gradient)"/>
-<path d="M17.5 48H46.75C54.6201 48 61 41.9495 61 34.5C61 28.0469 56.2159 22.6071 49.8103 21.3988C48.7175 13.7047 41.9799 8 33.7288 8C24.1937 8 16.3525 15.4706 15.1676 24.965C8.60788 26.0792 3.75 31.9343 3.75 38.9531C3.75 43.9718 7.81327 48 12.7891 48H17.5Z" stroke="white" stroke-width="4.25" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M41 24.5C39.3723 22.8269 36.8528 21.8828 34.0801 22C28.4868 22.2363 24 26.7214 24 32.5C24 38.2786 28.4868 42.7637 34.0801 43C36.8528 43.1172 39.3723 42.1731 41 40.5" stroke="white" stroke-width="4.25" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M19.5 29.5H38" stroke="white" stroke-width="4.25" stroke-linecap="round"/>
-<path d="M18.5 35.5H36" stroke="white" stroke-width="4.25" stroke-linecap="round"/>
-</svg>
+</defs><rect x="4" y="4" width="56" height="56" rx="18" fill="url(#money-cloud-gradient)"></rect><path d="M17.5 48H46.75C54.6201 48 61 41.9495 61 34.5C61 28.0469 56.2159 22.6071 49.8103 21.3988C48.7175 13.7047 41.9799 8 33.7288 8C24.1937 8 16.3525 15.4706 15.1676 24.965C8.60788 26.0792 3.75 31.9343 3.75 38.9531C3.75 43.9718 7.81327 48 12.7891 48H17.5Z" stroke="white" stroke-width="4.25" stroke-linecap="round" stroke-linejoin="round"></path><path d="M41 24.5C39.3723 22.8269 36.8528 21.8828 34.0801 22C28.4868 22.2363 24 26.7214 24 32.5C24 38.2786 28.4868 42.7637 34.0801 43C36.8528 43.1172 39.3723 42.1731 41 40.5" stroke="white" stroke-width="4.25" stroke-linecap="round" stroke-linejoin="round"></path><path d="M19.5 29.5H38" stroke="white" stroke-width="4.25" stroke-linecap="round"></path><path d="M18.5 35.5H36" stroke="white" stroke-width="4.25" stroke-linecap="round"></path></svg>
