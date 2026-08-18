@@ -12,76 +12,52 @@ use Illuminate\Support\Collection;
 
 class DashboardService
 {
+    /**
+     * @var array<int, array<string, mixed>>|null
+     */
+    private ?array $memoizedSnapshotRows = null;
+
     public function __construct(
         private readonly InvestmentPortfolioService $investmentPortfolioService,
         private readonly MonthlyPortfolioSnapshotService $monthlyPortfolioSnapshotService,
+        private readonly PortfolioGrowthAttributionService $growthAttribution,
     ) {}
 
     /**
      * @return array{
-     *     hero: array<string, mixed>,
-     *     allocation: array<string, mixed>,
+     *     netWorth: array<string, mixed>,
+     *     snapshotChange: array<string, mixed>,
+     *     allocation: array<int, array<string, mixed>>,
      *     income: array<string, mixed>,
-     *     alerts: array<int, array<string, mixed>>,
-     *     quickActions: array<int, array<string, mixed>>
+     *     longView: array<string, mixed>
      * }
      */
     public function pageData(): array
     {
-        $activePeople = Person::query()
-            ->where('is_active', true)
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->orderBy('id')
-            ->get(['id', 'slug', 'name']);
-        $activePeopleCount = $activePeople->count();
+        $activePeopleCount = Person::where('is_active', true)->count();
         $currentStateTotals = $this->monthlyPortfolioSnapshotService->currentStateTotals();
         $currentTotalInCents = $this->sumAmountsInCents($currentStateTotals);
-        $snapshotComparison = $this->snapshotComparison($currentTotalInCents);
-        $latestFullMonth = $this->latestFullIncomeMonth($activePeopleCount);
-        $currentMonthIncome = $this->currentMonthIncome($activePeopleCount);
-        $monthlyInterest = $this->monthlySavingsInterest();
+        $snapshotRows = $this->snapshotRows();
 
         return [
-            'hero' => [
-                'current_total' => [
-                    'title' => 'Trenutno skupaj',
-                    'value' => $this->fromCents($currentTotalInCents),
-                    'subtitle' => 'Živo stanje vseh kategorij premoženja.',
-                    'tone' => 'neutral',
-                ],
-                'snapshot_change' => [
-                    'title' => 'Sprememba od zadnjega posnetka',
-                    'value' => $snapshotComparison['value'],
-                    'percentage' => $snapshotComparison['percentage'],
-                    'subtitle' => $snapshotComparison['subtitle'],
-                    'tone' => $snapshotComparison['tone'],
-                ],
-                'latest_income' => [
-                    'title' => 'Neto prejemki zadnjega polnega meseca',
-                    'value' => $latestFullMonth['total_net'] ?? null,
-                    'subtitle' => $latestFullMonth === null
-                        ? 'Ni še popolnega meseca z vsemi aktivnimi osebami.'
-                        : sprintf('Mesec: %s', $latestFullMonth['month_label']),
-                    'tone' => $latestFullMonth === null ? 'warning' : 'neutral',
-                ],
-                'monthly_interest' => [
-                    'title' => 'Mesečne obresti',
-                    'value' => $monthlyInterest,
-                    'subtitle' => 'Ocena pri trenutnih obrestnih merah.',
-                    'tone' => 'positive',
-                ],
+            'netWorth' => [
+                'current_total' => $this->fromCents($currentTotalInCents),
+                'as_of_label' => now('Europe/Ljubljana')
+                    ->locale('sl')
+                    ->translatedFormat('j. F Y'),
             ],
-            'allocation' => [
-                'total_amount' => $this->fromCents($currentTotalInCents),
-                'items' => $this->allocationItems($currentStateTotals, $currentTotalInCents),
-            ],
+            'snapshotChange' => $this->snapshotChange(
+                $currentStateTotals,
+                $currentTotalInCents,
+                $snapshotRows,
+            ),
+            'allocation' => $this->allocationItems($currentStateTotals, $currentTotalInCents, $snapshotRows),
             'income' => [
-                'latest_full_month' => $latestFullMonth,
-                'current_month' => $currentMonthIncome,
+                'latest_full_month' => $this->latestFullIncomeMonth($activePeopleCount),
+                'current_month' => $this->currentMonthIncome($activePeopleCount),
+                'monthly_interest' => $this->monthlySavingsInterest(),
             ],
-            'alerts' => $this->alerts($currentMonthIncome, $activePeopleCount, $activePeople),
-            'quickActions' => $this->quickActions($activePeople),
+            'longView' => $this->longView($snapshotRows),
         ];
     }
 
@@ -93,11 +69,11 @@ class DashboardService
      */
     public function trendData(): array
     {
-        $pageData = $this->monthlyPortfolioSnapshotService->pageData();
+        $rows = $this->snapshotRows();
 
         return [
-            'latest_snapshot' => $pageData['latest'],
-            'points' => collect($pageData['rows'])
+            'latest_snapshot' => $rows === [] ? null : $rows[array_key_last($rows)],
+            'points' => collect($rows)
                 ->map(fn (array $row): array => [
                     'month_date' => $row['month_date'],
                     'month_label' => $row['month_label'],
@@ -204,10 +180,14 @@ class DashboardService
     }
 
     /**
+     * Live category totals, ordered by value, each carrying the change the
+     * latest snapshot recorded against the one before it.
+     *
      * @param  array<string, string>  $totals
+     * @param  array<int, array<string, mixed>>  $snapshotRows
      * @return array<int, array<string, mixed>>
      */
-    private function allocationItems(array $totals, int $currentTotalInCents): array
+    private function allocationItems(array $totals, int $currentTotalInCents, array $snapshotRows): array
     {
         $meta = [
             'savings_amount' => ['label' => 'Varčevanje', 'color' => '#2563eb'],
@@ -216,150 +196,240 @@ class DashboardService
             'stock_amount' => ['label' => 'Delnice', 'color' => '#0f766e'],
             'crypto_amount' => ['label' => 'Kripto', 'color' => '#f59e0b'],
         ];
+        $monthDiffsInCents = $this->categoryMonthDiffsInCents($snapshotRows);
 
         return collect($meta)
-            ->map(function (array $item, string $key) use ($totals, $currentTotalInCents): array {
+            ->map(function (array $item, string $key) use ($totals, $currentTotalInCents, $monthDiffsInCents): array {
                 $amountInCents = $this->toCents($totals[$key] ?? 0);
 
                 return [
                     'key' => $key,
                     'label' => $item['label'],
                     'amount' => $this->fromCents($amountInCents),
+                    'amount_in_cents' => $amountInCents,
                     'share_percentage' => $currentTotalInCents === 0
                         ? 0
                         : round(($amountInCents / $currentTotalInCents) * 100, 2),
+                    'month_diff_amount' => array_key_exists($key, $monthDiffsInCents)
+                        ? $this->fromCents($monthDiffsInCents[$key])
+                        : null,
                     'color' => $item['color'],
                 ];
+            })
+            ->sortByDesc('amount_in_cents')
+            ->map(function (array $item): array {
+                unset($item['amount_in_cents']);
+
+                return $item;
             })
             ->values()
             ->all();
     }
 
     /**
-     * @param  Collection<int, Person>  $activePeople
-     * @param  array<string, mixed>  $currentMonthIncome
+     * Month-over-month change per category, keyed by snapshot column.
+     *
+     * @param  array<int, array<string, mixed>>  $snapshotRows
+     * @return array<string, int>
+     */
+    private function categoryMonthDiffsInCents(array $snapshotRows): array
+    {
+        if (count($snapshotRows) < 2) {
+            return [];
+        }
+
+        $latest = $snapshotRows[array_key_last($snapshotRows)];
+        $previous = $snapshotRows[count($snapshotRows) - 2];
+        $diffs = [];
+
+        foreach (['savings_amount', 'bond_amount', 'etf_amount', 'stock_amount', 'crypto_amount'] as $key) {
+            $diffs[$key] = $this->toCents($latest[$key]) - $this->toCents($previous[$key]);
+        }
+
+        return $diffs;
+    }
+
+    /**
+     * The headline change: how the live state has drifted since the last
+     * recorded snapshot, split into savings inflow, money paid into
+     * investments and market movement. The three segments add up to the total.
+     *
+     * @param  array<string, string>  $currentStateTotals
+     * @param  array<int, array<string, mixed>>  $snapshotRows
+     * @return array<string, mixed>
+     */
+    private function snapshotChange(
+        array $currentStateTotals,
+        int $currentTotalInCents,
+        array $snapshotRows,
+    ): array {
+        if ($snapshotRows === []) {
+            return [
+                'available' => false,
+                'snapshot_month_label' => null,
+                'snapshot_total' => null,
+                'current_total' => $this->fromCents($currentTotalInCents),
+                'diff_amount' => null,
+                'diff_percentage' => null,
+                'segments' => [],
+            ];
+        }
+
+        $latest = $snapshotRows[array_key_last($snapshotRows)];
+        $snapshotTotalInCents = $this->toCents($latest['total_amount']);
+        $diffInCents = $currentTotalInCents - $snapshotTotalInCents;
+
+        return [
+            'available' => true,
+            'snapshot_month_label' => $this->monthLabelFromDate($latest['month_date']),
+            'snapshot_total' => $this->fromCents($snapshotTotalInCents),
+            'current_total' => $this->fromCents($currentTotalInCents),
+            'diff_amount' => $this->fromCents($diffInCents),
+            'diff_percentage' => $snapshotTotalInCents === 0
+                ? null
+                : number_format(($diffInCents / $snapshotTotalInCents) * 100, 2, '.', ''),
+            'segments' => $this->withSegmentShares(
+                $this->snapshotChangeSegments($currentStateTotals, $latest),
+            ),
+        ];
+    }
+
+    /**
+     * Contributions are read straight off the transaction ledger for the window
+     * that starts at the snapshot, so the window is exact rather than rounded
+     * to whole months the way the snapshot-to-snapshot breakdown is.
+     *
+     * @param  array<string, string>  $currentStateTotals
+     * @param  array<string, mixed>  $latestSnapshot
      * @return array<int, array<string, mixed>>
      */
-    private function alerts(
-        array $currentMonthIncome,
-        int $activePeopleCount,
-        Collection $activePeople,
-    ): array {
-        $alerts = [];
-        $currentMonth = now('Europe/Ljubljana')->startOfMonth();
-        $paychecksHref = $this->paychecksHref($activePeople);
-
-        if (! MonthlyPortfolioSnapshot::query()->whereDate('month_date', $currentMonth)->exists()) {
-            $alerts[] = [
-                'key' => 'missing_snapshot',
-                'title' => sprintf('Manjka mesečni posnetek za %s', $this->monthLabel(
-                    (int) $currentMonth->year,
-                    (int) $currentMonth->month,
-                )),
-                'message' => 'Dashboard primerjavo uporablja zadnji obstoječi posnetek, zato je smiselno dodati novega.',
-                'href' => route('statistics.monthly-summary'),
-                'action_label' => 'Odpri mesečni povzetek',
-            ];
-        }
-
-        if (
-            $activePeopleCount > 0
-            && ! $currentMonthIncome['is_complete']
-            && $currentMonthIncome['entered_people_count'] < $currentMonthIncome['expected_people_count']
-        ) {
-            $alerts[] = [
-                'key' => 'incomplete_current_month_income',
-                'title' => sprintf('Plače za %s še niso popolne', $currentMonthIncome['month_label']),
-                'message' => sprintf(
-                    'Vnesenih je %d od %d aktivnih oseb.',
-                    $currentMonthIncome['entered_people_count'],
-                    $currentMonthIncome['expected_people_count'],
-                ),
-                'href' => $paychecksHref,
-                'action_label' => 'Odpri plače',
-            ];
-        }
-
-        return $alerts;
-    }
-
-    /**
-     * @param  Collection<int, Person>  $activePeople
-     * @return array<int, array<string, string>>
-     */
-    private function quickActions(Collection $activePeople): array
+    private function snapshotChangeSegments(array $currentStateTotals, array $latestSnapshot): array
     {
+        $savingsDiffInCents = $this->toCents($currentStateTotals['savings_amount'] ?? 0)
+            - $this->toCents($latestSnapshot['savings_amount']);
+
+        $flows = $this->growthAttribution->flowsBetween(
+            CarbonImmutable::parse($latestSnapshot['month_date'], 'Europe/Ljubljana'),
+            CarbonImmutable::now('Europe/Ljubljana'),
+        );
+
+        $investmentsDiffInCents = 0;
+        $contributionInCents = 0;
+
+        foreach ($this->growthAttribution->bucketKeys() as $key) {
+            $investmentsDiffInCents += $this->toCents($currentStateTotals[$key] ?? 0)
+                - $this->toCents($latestSnapshot[$key]);
+            $contributionInCents += $flows[$key]['contribution'] ?? 0;
+        }
+
         return [
             [
-                'label' => 'Dodaj mesečni posnetek',
-                'href' => route('statistics.monthly-summary'),
-                'variant' => 'default',
+                'key' => 'savings',
+                'label' => 'Prilivi in obresti',
+                'amount' => $this->fromCents($savingsDiffInCents),
+                'color' => '#0f766e',
             ],
             [
-                'label' => 'Odpri plače',
-                'href' => $this->paychecksHref($activePeople),
-                'variant' => 'outline',
+                'key' => 'contribution',
+                'label' => 'Vloženo v naložbe',
+                'amount' => $this->fromCents($contributionInCents),
+                'color' => '#10b981',
             ],
             [
-                'label' => 'Odpri varčevanje',
-                'href' => route('savings.index'),
-                'variant' => 'outline',
-            ],
-            [
-                'label' => 'Odpri investicije',
-                'href' => route('investments.providers.index'),
-                'variant' => 'outline',
-            ],
-            [
-                'label' => 'Odpri kripto',
-                'href' => route('crypto.balances.index'),
-                'variant' => 'outline',
+                'key' => 'market',
+                'label' => 'Tržna sprememba',
+                'amount' => $this->fromCents($investmentsDiffInCents - $contributionInCents),
+                'color' => '#6ee7b7',
             ],
         ];
     }
 
     /**
-     * @return array{
-     *     title: string,
-     *     value: string|null,
-     *     percentage: string|null,
-     *     subtitle: string,
-     *     tone: string
-     * }
+     * Shares are taken over absolute amounts so a negative segment still gets a
+     * visible width and the bar always adds up to 100 %.
+     *
+     * @param  array<int, array<string, mixed>>  $segments
+     * @return array<int, array<string, mixed>>
      */
-    private function snapshotComparison(int $currentTotalInCents): array
+    private function withSegmentShares(array $segments): array
     {
-        $latestSnapshot = MonthlyPortfolioSnapshot::query()
-            ->orderByDesc('month_date')
-            ->orderByDesc('id')
-            ->first();
+        $absoluteTotalInCents = collect($segments)
+            ->sum(fn (array $segment): int => abs($this->toCents($segment['amount'])));
 
-        if (! $latestSnapshot instanceof MonthlyPortfolioSnapshot) {
+        return collect($segments)
+            ->map(function (array $segment) use ($absoluteTotalInCents): array {
+                $segment['share_percentage'] = $absoluteTotalInCents === 0
+                    ? 0
+                    : round((abs($this->toCents($segment['amount'])) / $absoluteTotalInCents) * 100, 2);
+
+                return $segment;
+            })
+            ->all();
+    }
+
+    /**
+     * Trend context the chart only hints at: growth over the last year, the
+     * average month inside it, and how long the streak of growing months is.
+     *
+     * @param  array<int, array<string, mixed>>  $snapshotRows
+     * @return array<string, mixed>
+     */
+    private function longView(array $snapshotRows): array
+    {
+        $rowCount = count($snapshotRows);
+
+        if ($rowCount < 2) {
             return [
-                'title' => 'Sprememba od zadnjega posnetka',
-                'value' => null,
-                'percentage' => null,
-                'subtitle' => 'Mesečni posnetek še ni dodan.',
-                'tone' => 'warning',
+                'available' => false,
+                'months' => 0,
+                'growth_amount' => null,
+                'growth_percentage' => null,
+                'average_monthly_growth' => null,
+                'consecutive_growth_months' => 0,
             ];
         }
 
-        $snapshotTotalInCents = MonthlyPortfolioSnapshot::toCents($latestSnapshot->total_amount);
-        $diffInCents = $currentTotalInCents - $snapshotTotalInCents;
-        $diffPercentage = $snapshotTotalInCents === 0
-            ? null
-            : number_format(($diffInCents / $snapshotTotalInCents) * 100, 2, '.', '');
+        $months = min(12, $rowCount - 1);
+        $latestTotalInCents = $this->toCents($snapshotRows[array_key_last($snapshotRows)]['total_amount']);
+        $baseTotalInCents = $this->toCents($snapshotRows[$rowCount - 1 - $months]['total_amount']);
+        $growthInCents = $latestTotalInCents - $baseTotalInCents;
 
         return [
-            'title' => 'Sprememba od zadnjega posnetka',
-            'value' => $this->fromCents($diffInCents),
-            'percentage' => $diffPercentage,
-            'subtitle' => sprintf(
-                'Primerjava s posnetkom za %s.',
-                $this->monthLabel((int) $latestSnapshot->month_date?->year, (int) $latestSnapshot->month_date?->month),
-            ),
-            'tone' => $diffInCents > 0 ? 'positive' : ($diffInCents < 0 ? 'negative' : 'neutral'),
+            'available' => true,
+            'months' => $months,
+            'growth_amount' => $this->fromCents($growthInCents),
+            'growth_percentage' => $baseTotalInCents === 0
+                ? null
+                : number_format(($growthInCents / $baseTotalInCents) * 100, 2, '.', ''),
+            'average_monthly_growth' => $this->fromCents((int) round($growthInCents / $months)),
+            'consecutive_growth_months' => $this->consecutiveGrowthMonths($snapshotRows),
         ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $snapshotRows
+     */
+    private function consecutiveGrowthMonths(array $snapshotRows): int
+    {
+        $streak = 0;
+
+        foreach (array_reverse($snapshotRows) as $row) {
+            if ($row['diff_amount'] === null || $this->toCents($row['diff_amount']) <= 0) {
+                break;
+            }
+
+            $streak++;
+        }
+
+        return $streak;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function snapshotRows(): array
+    {
+        return $this->memoizedSnapshotRows ??= $this->monthlyPortfolioSnapshotService->pageData()['rows'];
     }
 
     /**
@@ -458,24 +528,22 @@ class DashboardService
         return $this->fromCents($amountInCents);
     }
 
-    /**
-     * @param  Collection<int, Person>  $activePeople
-     */
-    private function paychecksHref(Collection $activePeople): string
-    {
-        /** @var Person|null $primaryPerson */
-        $primaryPerson = $activePeople->first();
-
-        return $primaryPerson instanceof Person
-            ? route('place.index', ['person' => $primaryPerson->slug])
-            : route('people.index');
-    }
-
     private function monthLabel(int $year, int $month): string
     {
         return CarbonImmutable::create($year, $month, 1, 0, 0, 0, 'Europe/Ljubljana')
             ->locale('sl')
             ->translatedFormat('F Y');
+    }
+
+    private function monthLabelFromDate(?string $monthDate): ?string
+    {
+        if ($monthDate === null) {
+            return null;
+        }
+
+        $date = CarbonImmutable::parse($monthDate, 'Europe/Ljubljana');
+
+        return $this->monthLabel((int) $date->year, (int) $date->month);
     }
 
     /**

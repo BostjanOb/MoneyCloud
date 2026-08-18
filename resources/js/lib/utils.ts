@@ -39,3 +39,18 @@ export function formatUnitPrice(value: string | number): string {
 export function toUrl(href: NonNullable<InertiaLinkProps['href']>) {
     return typeof href === 'string' ? href : href?.url;
 }
+
+const NON_BREAKING_SPACE = ' ';
+
+/**
+ * Slovenian money format. The space before the unit is non-breaking so the
+ * amount and the € never end up on separate lines.
+ */
+export function formatEuro(value: string | number): string {
+    return `${formatSlovenianNumber(value)}${NON_BREAKING_SPACE}€`;
+}
+
+/** Slovenian percentage format, with the same non-breaking space rule. */
+export function formatSlovenianPercent(value: string | number): string {
+    return `${formatSlovenianNumber(value)}${NON_BREAKING_SPACE}%`;
+}
