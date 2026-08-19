@@ -1,20 +1,45 @@
-<script setup lang="ts">
-import AppLogoIcon from '@/components/AppLogoIcon.vue';
-</script>
-
 <template>
-    <div
-        class="flex size-9 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#0f766e_0%,#10b981_55%,#34d399_100%)] text-white shadow-sm ring-1 ring-black/5 dark:ring-white/10"
-    >
-        <AppLogoIcon class="size-5 text-white" />
-    </div>
-    <div class="ml-2 grid flex-1 text-left leading-none">
-        <span class="truncate text-sm font-semibold tracking-[-0.02em]"
-            >Money Cloud</span
-        >
-        <span
-            class="mt-1 truncate text-[0.65rem] font-semibold tracking-[0.26em] text-muted-foreground uppercase"
-            >osebne finance</span
-        >
+    <!--
+        The logo ships as static SVG files rather than inline markup. The light
+        and dark variants are swapped by the `dark` class on <html>, which
+        useAppearance keeps in sync, so the swap needs no JavaScript here.
+        The wrappers pick the sidebar state, the images pick the theme, so no
+        two utilities on one element ever fight over `display`.
+    -->
+    <div class="flex items-center">
+        <span class="flex group-data-[collapsible=icon]:hidden">
+            <img
+                src="/logo-light.svg"
+                alt="MoneyCloud — osebne finance"
+                width="143"
+                height="40"
+                class="h-10 w-auto dark:hidden"
+            />
+            <img
+                src="/logo-dark.svg"
+                alt="MoneyCloud — osebne finance"
+                width="143"
+                height="40"
+                class="hidden h-10 w-auto dark:block"
+            />
+        </span>
+
+        <!-- Collapsed sidebar: the medallion on its own. -->
+        <span class="hidden group-data-[collapsible=icon]:flex">
+            <img
+                src="/mark-light.svg"
+                alt="MoneyCloud"
+                width="64"
+                height="64"
+                class="size-8 shrink-0 dark:hidden"
+            />
+            <img
+                src="/mark-dark.svg"
+                alt="MoneyCloud"
+                width="64"
+                height="64"
+                class="hidden size-8 shrink-0 dark:block"
+            />
+        </span>
     </div>
 </template>

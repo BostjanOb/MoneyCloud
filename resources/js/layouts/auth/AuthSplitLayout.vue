@@ -24,7 +24,7 @@ defineProps<{
                 :href="dashboard()"
                 class="relative z-20 flex items-center text-lg font-medium"
             >
-                <AppLogoIcon class="mr-2 size-8 fill-current text-white" />
+                <AppLogoIcon inverted class="mr-2 size-8" />
                 {{ name }}
             </Link>
         </div>
