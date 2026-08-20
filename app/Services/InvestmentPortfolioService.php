@@ -192,7 +192,7 @@ class InvestmentPortfolioService
      *     last_purchase_at: string|null
      * }
      */
-    private function symbolStats(Collection $purchases): array
+    public function symbolStats(Collection $purchases): array
     {
         $buys = $purchases->filter(
             fn (InvestmentPurchase $purchase): bool => $purchase->transactionType() === InvestmentTransactionType::Buy,

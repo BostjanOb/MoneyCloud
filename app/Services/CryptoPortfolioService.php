@@ -13,6 +13,8 @@ use Illuminate\Support\Collection;
 
 class CryptoPortfolioService
 {
+    public function __construct(private InvestmentPortfolioService $investmentPortfolioService) {}
+
     /** @return array<int, array{id: int, slug: string, name: string}> */
     public function providerOptions(): array
     {
@@ -195,6 +197,7 @@ class CryptoPortfolioService
                         ),
                         'purchase_count' => $symbolPurchases->count(),
                     ],
+                    'stats' => $this->investmentPortfolioService->symbolStats($symbolPurchases),
                     'purchases' => $symbolPurchases
                         ->sortByDesc(fn (InvestmentPurchase $purchase): string => sprintf(
                             '%s-%010d',

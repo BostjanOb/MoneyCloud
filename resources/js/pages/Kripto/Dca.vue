@@ -7,6 +7,7 @@ import {
     useForm,
     usePage,
 } from '@inertiajs/vue3';
+import { VisAxis, VisLine, VisScatter, VisXYContainer } from '@unovis/vue';
 import type { AcceptableValue } from 'reka-ui';
 import { computed, ref } from 'vue';
 import { index as balancesIndex } from '@/actions/App/Http/Controllers/CryptoBalanceController';
@@ -23,6 +24,14 @@ import InputError from '@/components/InputError.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { ChartConfig } from '@/components/ui/chart';
+import {
+    ChartContainer,
+    ChartCrosshair,
+    ChartTooltip,
+    ChartTooltipContent,
+    componentToString,
+} from '@/components/ui/chart';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
     DropdownMenu,
@@ -56,6 +65,11 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+    buildCryptoDcaChartData,
+    countBuysBelowCurrentPrice,
+    type CryptoDcaChartPoint,
+} from '@/lib/cryptoDca';
 import { formatSlovenianNumber, formatUnitPrice } from '@/lib/utils';
 
 type ProviderOption = {
@@ -91,6 +105,20 @@ type DcaPurchase = {
     };
 };
 
+type SymbolStats = {
+    buy_count: number;
+    sell_count: number;
+    lowest_buy_price: string | null;
+    highest_buy_price: string | null;
+    average_buy_price: string | null;
+    break_even_price: string | null;
+    quantity_bought: string;
+    quantity_sold: string;
+    total_fees: string;
+    first_purchase_at: string | null;
+    last_purchase_at: string | null;
+};
+
 type SymbolGroup = {
     symbol: {
         id: number;
@@ -105,6 +133,7 @@ type SymbolGroup = {
         profit_loss_percentage: string;
         purchase_count: number;
     };
+    stats: SymbolStats;
     purchases: DcaPurchase[];
 };
 
@@ -140,6 +169,8 @@ setLayoutProps({
 
 const showPurchaseModal = ref(false);
 const showImportModal = ref(false);
+const showSymbolStatsModal = ref(false);
+const statsSymbolId = ref<string | null>(null);
 const editingPurchase = ref<DcaPurchase | null>(null);
 const importFileInput = ref<HTMLInputElement | null>(null);
 const binanceProvider = computed(() =>
@@ -178,6 +209,13 @@ const activeGroup = computed(() =>
     props.symbolGroups.find(
         (group) => String(group.symbol.id) === activeSymbolId.value,
     ),
+);
+
+const statsGroup = computed<SymbolGroup | null>(
+    () =>
+        props.symbolGroups.find(
+            (group) => String(group.symbol.id) === statsSymbolId.value,
+        ) ?? null,
 );
 
 const selectedSymbol = computed(() =>
@@ -271,6 +309,200 @@ function valueTone(value: string | number): string {
     }
 
     return 'text-foreground';
+}
+
+function formatOptionalUnitPriceMoney(value: string | null): string {
+    return value === null ? '–' : formatUnitPriceMoney(value);
+}
+
+function formatOptionalDateTime(value: string | null): string {
+    return value === null ? '–' : formatDateTime(value);
+}
+
+type SymbolStatsSection = {
+    title: string;
+    items: { label: string; value: string; tone?: string }[];
+};
+
+const symbolStatsSections = computed<SymbolStatsSection[]>(() => {
+    const group = statsGroup.value;
+
+    if (group === null) {
+        return [];
+    }
+
+    return [
+        {
+            title: 'Nakupne cene',
+            items: [
+                {
+                    label: 'Najnižja',
+                    value: formatOptionalUnitPriceMoney(
+                        group.stats.lowest_buy_price,
+                    ),
+                },
+                {
+                    label: 'Najvišja',
+                    value: formatOptionalUnitPriceMoney(
+                        group.stats.highest_buy_price,
+                    ),
+                },
+                {
+                    label: 'Povprečna',
+                    value: formatOptionalUnitPriceMoney(
+                        group.stats.average_buy_price,
+                    ),
+                },
+                {
+                    label: 'Prag donosa (s provizijami)',
+                    value: formatOptionalUnitPriceMoney(
+                        group.stats.break_even_price,
+                    ),
+                },
+            ],
+        },
+        {
+            title: 'Količina',
+            items: [
+                {
+                    label: 'Kupljeno',
+                    value: formatQuantity(group.stats.quantity_bought),
+                },
+                {
+                    label: 'Prodano',
+                    value: formatQuantity(group.stats.quantity_sold),
+                },
+                {
+                    label: 'Neto',
+                    value: formatQuantity(group.summary.quantity),
+                },
+            ],
+        },
+        {
+            title: 'Transakcije',
+            items: [
+                { label: 'Nakupov', value: String(group.stats.buy_count) },
+                { label: 'Prodaj', value: String(group.stats.sell_count) },
+                {
+                    label: 'Prva transakcija',
+                    value: formatOptionalDateTime(
+                        group.stats.first_purchase_at,
+                    ),
+                },
+                {
+                    label: 'Zadnja transakcija',
+                    value: formatOptionalDateTime(group.stats.last_purchase_at),
+                },
+                {
+                    label: 'Skupne provizije',
+                    value: formatMoney(group.stats.total_fees),
+                },
+            ],
+        },
+        {
+            title: 'Vrednost',
+            items: [
+                {
+                    label: 'Vložek',
+                    value: formatMoney(group.summary.buy_amount),
+                },
+                {
+                    label: 'Trenutna vrednost',
+                    value: formatMoney(group.summary.current_value),
+                },
+                {
+                    label: 'Donos',
+                    value: formatPercent(group.summary.profit_loss_percentage),
+                    tone: valueTone(group.summary.profit_loss_percentage),
+                },
+                {
+                    label: 'P/L',
+                    value: formatSignedMoney(group.summary.profit_loss_amount),
+                    tone: valueTone(group.summary.profit_loss_amount),
+                },
+            ],
+        },
+    ];
+});
+
+const statsChartData = computed<CryptoDcaChartPoint[]>(() => {
+    const group = statsGroup.value;
+
+    if (group === null) {
+        return [];
+    }
+
+    return buildCryptoDcaChartData(group.purchases, group.symbol.current_price);
+});
+
+const statsChartConfig = computed<ChartConfig>(() => ({
+    price: { label: 'Cena transakcije', color: 'var(--chart-2)' },
+    currentPrice: { label: 'Trenutna cena', color: 'var(--muted-foreground)' },
+}));
+
+const buysBelowCurrentPrice = computed(() =>
+    countBuysBelowCurrentPrice(statsChartData.value),
+);
+
+function statsChartXAccessor(point: CryptoDcaChartPoint): number {
+    return point.timestamp;
+}
+
+function statsChartPriceAccessor(point: CryptoDcaChartPoint): number {
+    return point.price;
+}
+
+function statsChartCurrentPriceAccessor(point: CryptoDcaChartPoint): number {
+    return point.currentPrice;
+}
+
+const statsChartCrosshairYAccessors = [
+    statsChartPriceAccessor,
+    statsChartCurrentPriceAccessor,
+];
+const statsChartCrosshairColors = [
+    'var(--color-price)',
+    'var(--color-currentPrice)',
+];
+
+function statsChartPointColor(point: CryptoDcaChartPoint): string {
+    if (point.transactionType === 'sell') {
+        return 'var(--chart-4)';
+    }
+
+    return point.price < point.currentPrice
+        ? 'var(--chart-2)'
+        : 'var(--destructive)';
+}
+
+function statsChartPointShape(point: CryptoDcaChartPoint): string {
+    return point.transactionType === 'sell' ? 'square' : 'circle';
+}
+
+function formatStatsChartDateTick(value: number | Date): string {
+    return new Intl.DateTimeFormat('sl-SI', {
+        dateStyle: 'short',
+    }).format(new Date(Number(value)));
+}
+
+function formatStatsChartPriceTick(value: number | Date): string {
+    return formatUnitPriceMoney(Number(value));
+}
+
+function formatStatsChartTooltipLabel(value: number | Date): string {
+    return new Intl.DateTimeFormat('sl-SI', {
+        dateStyle: 'short',
+        timeStyle: 'short',
+    }).format(new Date(Number(value)));
+}
+
+function formatStatsChartTooltipValue(value: unknown): string {
+    return formatUnitPriceMoney(Number(value));
+}
+
+function openSymbolStats(symbolId: number): void {
+    statsSymbolId.value = String(symbolId);
+    showSymbolStatsModal.value = true;
 }
 
 function resetPurchaseForm(symbolId?: number): void {
@@ -647,13 +879,23 @@ function deletePurchase(purchase: DcaPurchase): void {
                         <CardTitle>
                             {{ group.symbol.symbol }} transakcije
                         </CardTitle>
-                        <Button
-                            size="sm"
-                            :disabled="providerOptions.length === 0"
-                            @click="openCreatePurchase(group.symbol.id)"
-                        >
-                            Dodaj {{ group.symbol.symbol }}
-                        </Button>
+                        <div class="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                :disabled="group.purchases.length === 0"
+                                @click="openSymbolStats(group.symbol.id)"
+                            >
+                                Statistika
+                            </Button>
+                            <Button
+                                size="sm"
+                                :disabled="providerOptions.length === 0"
+                                @click="openCreatePurchase(group.symbol.id)"
+                            >
+                                Dodaj {{ group.symbol.symbol }}
+                            </Button>
+                        </div>
                     </CardHeader>
                     <CardContent class="overflow-x-auto">
                         <Table v-if="group.purchases.length > 0">
@@ -1058,6 +1300,180 @@ function deletePurchase(purchase: DcaPurchase): void {
                     </Button>
                 </DialogFooter>
             </form>
+        </DialogContent>
+    </Dialog>
+    <Dialog v-model:open="showSymbolStatsModal">
+        <DialogContent
+            v-if="statsGroup"
+            class="max-h-[90dvh] overflow-y-auto sm:max-w-3xl"
+        >
+            <DialogHeader>
+                <DialogTitle>{{ statsGroup.symbol.symbol }}</DialogTitle>
+                <DialogDescription>
+                    Trenutna cena:
+                    {{ formatUnitPriceMoney(statsGroup.symbol.current_price) }}
+                </DialogDescription>
+            </DialogHeader>
+
+            <div class="grid gap-5 sm:grid-cols-2">
+                <div
+                    v-for="section in symbolStatsSections"
+                    :key="section.title"
+                    class="space-y-2"
+                >
+                    <p
+                        class="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+                    >
+                        {{ section.title }}
+                    </p>
+                    <dl class="grid gap-1 text-sm">
+                        <div
+                            v-for="item in section.items"
+                            :key="item.label"
+                            class="flex items-baseline justify-between gap-4"
+                        >
+                            <dt class="text-muted-foreground">
+                                {{ item.label }}
+                            </dt>
+                            <dd
+                                class="font-medium tabular-nums"
+                                :class="item.tone"
+                            >
+                                {{ item.value }}
+                            </dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <p
+                    class="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+                >
+                    Cene transakcij vs. trenutna cena
+                </p>
+
+                <template
+                    v-if="showSymbolStatsModal && statsChartData.length > 0"
+                >
+                    <ChartContainer
+                        :config="statsChartConfig"
+                        cursor
+                        class="!aspect-auto h-[240px] w-full"
+                    >
+                        <VisXYContainer :data="statsChartData">
+                            <VisLine
+                                :x="statsChartXAccessor"
+                                :y="statsChartCurrentPriceAccessor"
+                                color="var(--color-currentPrice)"
+                                :line-width="2"
+                                :line-dash-array="[4, 4]"
+                            />
+                            <VisScatter
+                                :x="statsChartXAccessor"
+                                :y="statsChartPriceAccessor"
+                                :color="statsChartPointColor"
+                                :shape="statsChartPointShape"
+                                :size="10"
+                                stroke-color="var(--background)"
+                                :stroke-width="1.5"
+                            />
+                            <VisAxis
+                                type="x"
+                                :x="statsChartXAccessor"
+                                :tick-format="formatStatsChartDateTick"
+                                :tick-line="false"
+                                :domain-line="false"
+                                :grid-line="false"
+                            />
+                            <VisAxis
+                                type="y"
+                                :tick-format="formatStatsChartPriceTick"
+                                :tick-line="false"
+                                :domain-line="false"
+                                :grid-line="true"
+                            />
+                            <ChartTooltip />
+                            <ChartCrosshair
+                                :x="statsChartXAccessor"
+                                :y="statsChartCrosshairYAccessors"
+                                :color="statsChartCrosshairColors"
+                                :template="
+                                    componentToString(
+                                        statsChartConfig,
+                                        ChartTooltipContent,
+                                        {
+                                            labelFormatter:
+                                                formatStatsChartTooltipLabel,
+                                            valueFormatter:
+                                                formatStatsChartTooltipValue,
+                                        },
+                                    )
+                                "
+                            />
+                        </VisXYContainer>
+                    </ChartContainer>
+
+                    <div
+                        class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground"
+                    >
+                        <span class="flex items-center gap-1.5">
+                            <span
+                                class="size-2.5 rounded-full"
+                                :style="{ backgroundColor: 'var(--chart-2)' }"
+                            />
+                            Nakup pod trenutno ceno
+                        </span>
+                        <span class="flex items-center gap-1.5">
+                            <span
+                                class="size-2.5 rounded-full"
+                                :style="{
+                                    backgroundColor: 'var(--destructive)',
+                                }"
+                            />
+                            Nakup nad trenutno ceno
+                        </span>
+                        <span class="flex items-center gap-1.5">
+                            <span
+                                class="size-2.5"
+                                :style="{ backgroundColor: 'var(--chart-4)' }"
+                            />
+                            Prodaja
+                        </span>
+                        <span class="flex items-center gap-1.5">
+                            <span
+                                class="h-0.5 w-4"
+                                :style="{
+                                    backgroundColor: 'var(--muted-foreground)',
+                                }"
+                            />
+                            Trenutna cena
+                        </span>
+                    </div>
+
+                    <p class="text-sm">
+                        <span class="font-medium tabular-nums">
+                            {{ buysBelowCurrentPrice.below }} od
+                            {{ buysBelowCurrentPrice.total }}
+                        </span>
+                        nakupov je bilo pod trenutno ceno.
+                    </p>
+                </template>
+
+                <p v-else class="text-sm text-muted-foreground">
+                    Ni transakcij za prikaz grafa.
+                </p>
+            </div>
+
+            <DialogFooter>
+                <Button
+                    type="button"
+                    variant="outline"
+                    @click="showSymbolStatsModal = false"
+                >
+                    Zapri
+                </Button>
+            </DialogFooter>
         </DialogContent>
     </Dialog>
 </template>
