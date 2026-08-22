@@ -483,7 +483,7 @@ function pillClass(value: string | number | null): string {
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <h3 :class="blockTitleClass">Sestava premoženja</h3>
                     <span class="text-sm text-muted-foreground">
-                        Delež in mesečna sprememba po kategorijah
+                        Delež in sprememba od zadnjega posnetka
                     </span>
                 </div>
 
@@ -508,7 +508,7 @@ function pillClass(value: string | number | null): string {
                             <TableHead
                                 class="px-0 text-right text-xs tracking-wide text-muted-foreground uppercase"
                             >
-                                Ta mesec
+                                Od posnetka
                             </TableHead>
                         </TableRow>
                     </TableHeader>

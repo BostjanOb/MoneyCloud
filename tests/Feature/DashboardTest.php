@@ -62,7 +62,7 @@ test('authenticated users can view empty dashboard states', function () {
         );
 });
 
-test('dashboard uses live totals, compares the last two snapshots, and skips incomplete current month income', function () {
+test('dashboard uses live totals, compares them with the last snapshot, and skips incomplete current month income', function () {
     $user = User::factory()->create();
     $ana = Person::factory()->create([
         'name' => 'Ana',
@@ -202,11 +202,13 @@ test('dashboard uses live totals, compares the last two snapshots, and skips inc
             ->where('snapshotChange.segments.2.amount', '450.00')
             ->where('allocation.0.label', 'Varčevanje')
             ->where('allocation.0.amount', '5000.00')
-            ->where('allocation.0.month_diff_amount', '200.00')
+            ->where('allocation.0.month_diff_amount', '0.00')
             ->where('allocation.1.label', 'Kripto')
             ->where('allocation.1.amount', '1250.00')
+            ->where('allocation.1.month_diff_amount', '350.00')
             ->where('allocation.2.label', 'ETF')
             ->where('allocation.2.amount', '1200.00')
+            ->where('allocation.2.month_diff_amount', '100.00')
             ->where('income.latest_full_month.month_key', '2026-03')
             ->where('income.latest_full_month.total_net', '3500.00')
             ->where('income.monthly_interest', '7.50')
@@ -368,7 +370,7 @@ test('dashboard splits the change since the last snapshot into savings, contribu
             ->where('allocation.0.month_diff_amount', '150.00')
             ->where('allocation.1.label', 'ETF')
             ->where('allocation.1.amount', '784.00')
-            ->where('allocation.1.month_diff_amount', '560.00')
+            ->where('allocation.1.month_diff_amount', '224.00')
             ->where('longView.months', 2)
             ->where('longView.growth_amount', '810.00')
             ->where('longView.growth_percentage', '81.00')

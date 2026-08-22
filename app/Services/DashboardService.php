@@ -180,8 +180,8 @@ class DashboardService
     }
 
     /**
-     * Live category totals, ordered by value, each carrying the change the
-     * latest snapshot recorded against the one before it.
+     * Live category totals, ordered by value, each carrying the change since
+     * the latest snapshot.
      *
      * @param  array<string, string>  $totals
      * @param  array<int, array<string, mixed>>  $snapshotRows
@@ -196,10 +196,10 @@ class DashboardService
             'stock_amount' => ['label' => 'Delnice', 'color' => '#0f766e'],
             'crypto_amount' => ['label' => 'Kripto', 'color' => '#f59e0b'],
         ];
-        $monthDiffsInCents = $this->categoryMonthDiffsInCents($snapshotRows);
+        $diffsSinceSnapshotInCents = $this->categoryDiffsSinceSnapshotInCents($totals, $snapshotRows);
 
         return collect($meta)
-            ->map(function (array $item, string $key) use ($totals, $currentTotalInCents, $monthDiffsInCents): array {
+            ->map(function (array $item, string $key) use ($totals, $currentTotalInCents, $diffsSinceSnapshotInCents): array {
                 $amountInCents = $this->toCents($totals[$key] ?? 0);
 
                 return [
@@ -210,8 +210,8 @@ class DashboardService
                     'share_percentage' => $currentTotalInCents === 0
                         ? 0
                         : round(($amountInCents / $currentTotalInCents) * 100, 2),
-                    'month_diff_amount' => array_key_exists($key, $monthDiffsInCents)
-                        ? $this->fromCents($monthDiffsInCents[$key])
+                    'month_diff_amount' => array_key_exists($key, $diffsSinceSnapshotInCents)
+                        ? $this->fromCents($diffsSinceSnapshotInCents[$key])
                         : null,
                     'color' => $item['color'],
                 ];
@@ -227,23 +227,25 @@ class DashboardService
     }
 
     /**
-     * Month-over-month change per category, keyed by snapshot column.
+     * Change per category between the latest snapshot and the live state, so
+     * the column matches the amounts next to it instead of lagging a month
+     * behind.
      *
+     * @param  array<string, string>  $totals
      * @param  array<int, array<string, mixed>>  $snapshotRows
      * @return array<string, int>
      */
-    private function categoryMonthDiffsInCents(array $snapshotRows): array
+    private function categoryDiffsSinceSnapshotInCents(array $totals, array $snapshotRows): array
     {
-        if (count($snapshotRows) < 2) {
+        if ($snapshotRows === []) {
             return [];
         }
 
         $latest = $snapshotRows[array_key_last($snapshotRows)];
-        $previous = $snapshotRows[count($snapshotRows) - 2];
         $diffs = [];
 
         foreach (['savings_amount', 'bond_amount', 'etf_amount', 'stock_amount', 'crypto_amount'] as $key) {
-            $diffs[$key] = $this->toCents($latest[$key]) - $this->toCents($previous[$key]);
+            $diffs[$key] = $this->toCents($totals[$key] ?? 0) - $this->toCents($latest[$key]);
         }
 
         return $diffs;
