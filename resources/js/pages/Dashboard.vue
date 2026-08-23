@@ -23,6 +23,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
     buildTrendChartData,
+    buildTrendYAxis,
     type DashboardTrendChartPoint,
     type DashboardTrendPoint,
 } from '@/lib/dashboard';
@@ -176,6 +177,9 @@ const trendChartConfig = {
 
 const trendChartData = computed(() =>
     buildTrendChartData(visibleTrendPoints.value),
+);
+const trendYAxis = computed(() =>
+    buildTrendYAxis(trendChartData.value.map((point) => point.totalAmount)),
 );
 const trendChartTicks = computed(() => {
     const step = Math.max(1, Math.ceil(trendChartData.value.length / 8));
@@ -425,7 +429,7 @@ function pillClass(value: string | number | null): string {
                 >
                     <VisXYContainer
                         :data="trendChartData"
-                        :y-domain="[0, undefined]"
+                        :y-domain="trendYAxis.domain"
                     >
                         <VisLine
                             :x="trendXAccessor"
@@ -450,6 +454,7 @@ function pillClass(value: string | number | null): string {
                         />
                         <VisAxis
                             type="y"
+                            :tick-values="trendYAxis.ticks"
                             :tick-format="formatMoneyTick"
                             :tick-line="false"
                             :domain-line="false"
