@@ -44,7 +44,7 @@ class FinancialAdvisorChatController extends Controller
             'messages' => $this->messagesFor($activeConversationId, $user),
             'actualBudget' => $actualBudget->metadata(),
             'models' => AdvisorModel::options(),
-            'defaultModel' => AdvisorModel::ClaudeSonnet46->value,
+            'defaultModel' => AdvisorModel::ClaudeSonnet5->value,
         ]);
     }
 
@@ -74,7 +74,7 @@ class FinancialAdvisorChatController extends Controller
         ]);
 
         $user = $request->user();
-        $model = AdvisorModel::tryFrom($validated['model'] ?? '') ?? AdvisorModel::ClaudeSonnet46;
+        $model = AdvisorModel::tryFrom($validated['model'] ?? '') ?? AdvisorModel::ClaudeSonnet5;
         $conversationId = $this->resolveOrCreateConversation(
             $validated['conversation_id'] ?? null,
             $validated['message'],

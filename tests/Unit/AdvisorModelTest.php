@@ -5,23 +5,21 @@ use Laravel\Ai\Enums\Lab;
 
 test('each model maps to the correct provider lab', function () {
     expect(AdvisorModel::ClaudeSonnet5->lab())->toBe(Lab::Anthropic)
-        ->and(AdvisorModel::ClaudeSonnet46->lab())->toBe(Lab::Anthropic)
-        ->and(AdvisorModel::ClaudeOpus48->lab())->toBe(Lab::Anthropic)
         ->and(AdvisorModel::ClaudeOpus5->lab())->toBe(Lab::Anthropic)
-        ->and(AdvisorModel::Gpt54->lab())->toBe(Lab::OpenAI)
-        ->and(AdvisorModel::Gpt55->lab())->toBe(Lab::OpenAI);
+        ->and(AdvisorModel::Gpt56Terra->lab())->toBe(Lab::OpenAI)
+        ->and(AdvisorModel::Gpt56Sol->lab())->toBe(Lab::OpenAI);
 });
 
 test('prompt target keys the model by its provider lab value', function () {
-    expect(AdvisorModel::ClaudeOpus48->promptTarget())
-        ->toBe(['anthropic' => 'claude-opus-4-8'])
-        ->and(AdvisorModel::Gpt55->promptTarget())
-        ->toBe(['openai' => 'gpt-5.5']);
+    expect(AdvisorModel::ClaudeOpus5->promptTarget())
+        ->toBe(['anthropic' => 'claude-opus-5'])
+        ->and(AdvisorModel::Gpt56Terra->promptTarget())
+        ->toBe(['openai' => 'gpt-5.6-terra']);
 });
 
 test('labels are human friendly', function () {
-    expect(AdvisorModel::ClaudeSonnet46->label())->toBe('Claude Sonnet 4.6')
-        ->and(AdvisorModel::Gpt54->label())->toBe('GPT-5.4');
+    expect(AdvisorModel::ClaudeSonnet5->label())->toBe('Claude Sonnet 5')
+        ->and(AdvisorModel::Gpt56Terra->label())->toBe('GPT-5.6 Terra');
 });
 
 test('options are grouped by provider', function () {
@@ -29,7 +27,7 @@ test('options are grouped by provider', function () {
 
     expect($options)->toHaveCount(2)
         ->and($options[0]['provider'])->toBe('Anthropic')
-        ->and($options[0]['models'])->toHaveCount(4)
+        ->and($options[0]['models'])->toHaveCount(2)
         ->and($options[0]['models'][0])->toBe([
             'value' => 'claude-sonnet-5',
             'label' => 'Claude Sonnet 5',

@@ -3,6 +3,7 @@
 namespace App\Ai\Agents;
 
 use App\Ai\Concerns\AnalyzesHouseholdFinances;
+use App\Enums\AdvisorModel;
 use Laravel\Ai\Attributes\MaxSteps;
 use Laravel\Ai\Attributes\MaxTokens;
 use Laravel\Ai\Attributes\Model;
@@ -22,7 +23,7 @@ use Stringable;
  * history per user via the {@see RemembersConversations} trait.
  */
 #[Provider(Lab::Anthropic)]
-#[Model('claude-sonnet-4-6')]
+#[Model(AdvisorModel::ClaudeSonnet5->value)]
 #[MaxSteps(15)]
 #[MaxTokens(4000)]
 #[Timeout(180)]

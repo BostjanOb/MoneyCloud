@@ -29,8 +29,8 @@ test('report service generates, persists, and returns a structured report', func
     $payload = $service->generate();
 
     expect($payload)->toHaveKeys(['id', 'generated_at', 'model', 'usage', 'report'])
-        ->and($payload['model']['value'])->toBe('claude-sonnet-4-6')
-        ->and($payload['model']['label'])->toBe('Claude Sonnet 4.6')
+        ->and($payload['model']['value'])->toBe('claude-sonnet-5')
+        ->and($payload['model']['label'])->toBe('Claude Sonnet 5')
         ->and($payload['report'])->toHaveKeys([
             'povzetek',
             'ocena_neto_premozenja',
@@ -71,7 +71,7 @@ test('the response diagnostics are logged for every generation', function () {
 
     Log::shouldHaveReceived('info')
         ->withArgs(fn (string $message, array $context): bool => $message === 'advisor.report.response'
-            && $context['model'] === 'claude-sonnet-4-6'
+            && $context['model'] === 'claude-sonnet-5'
             && $context['steps'] === 1
             && $context['finish_reason'] === 'stop');
 });
@@ -125,10 +125,10 @@ test('the queued job generates and persists the report', function () {
 test('the report stores the chosen model', function () {
     FinancialAnalyst::fake();
 
-    app(FinancialAdvisorReportService::class)->generate(AdvisorModel::Gpt54);
+    app(FinancialAdvisorReportService::class)->generate(AdvisorModel::Gpt56Terra);
 
     expect(FinancialAdvisorReport::latestFirst()->first()->model)
-        ->toBe(AdvisorModel::Gpt54);
+        ->toBe(AdvisorModel::Gpt56Terra);
 });
 
 test('the report stores token usage from the response', function () {
@@ -154,11 +154,11 @@ test('the command generates the report synchronously', function () {
 test('the command generates with the selected model', function () {
     FinancialAnalyst::fake();
 
-    $this->artisan('advisor:generate-report', ['--sync' => true, '--model' => 'gpt-5.4'])
+    $this->artisan('advisor:generate-report', ['--sync' => true, '--model' => 'gpt-5.6-terra'])
         ->assertSuccessful();
 
     expect(FinancialAdvisorReport::latestFirst()->first()->model)
-        ->toBe(AdvisorModel::Gpt54);
+        ->toBe(AdvisorModel::Gpt56Terra);
 });
 
 test('the command rejects an invalid model', function () {

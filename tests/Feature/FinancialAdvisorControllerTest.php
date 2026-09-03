@@ -64,12 +64,12 @@ test('the latest stored report is passed to the page', function () {
 test('the history list and a specific report can be requested', function () {
     $older = FinancialAdvisorReport::factory()->create([
         'generated_at' => CarbonImmutable::parse('2026-05-01 08:00:00'),
-        'model' => AdvisorModel::ClaudeSonnet46,
+        'model' => AdvisorModel::ClaudeSonnet5,
         'report' => ['povzetek' => 'Stara analiza'] + FinancialAdvisorReport::factory()->raw()['report'],
     ]);
     FinancialAdvisorReport::factory()->create([
         'generated_at' => CarbonImmutable::parse('2026-06-04 08:00:00'),
-        'model' => AdvisorModel::Gpt54,
+        'model' => AdvisorModel::Gpt56Terra,
         'report' => ['povzetek' => 'Nova analiza'] + FinancialAdvisorReport::factory()->raw()['report'],
     ]);
 
@@ -80,10 +80,10 @@ test('the history list and a specific report can be requested', function () {
             ->component('Svetovalec')
             ->where('report.id', $older->id)
             ->where('report.report.povzetek', 'Stara analiza')
-            ->where('report.model.value', 'claude-sonnet-4-6')
-            ->where('report.model.label', 'Claude Sonnet 4.6')
+            ->where('report.model.value', 'claude-sonnet-5')
+            ->where('report.model.label', 'Claude Sonnet 5')
             ->has('history', 2)
-            ->where('history.0.model', 'GPT-5.4')
+            ->where('history.0.model', 'GPT-5.6 Terra')
         );
 });
 
@@ -96,7 +96,7 @@ test('generating dispatches the job and flags generation in progress', function 
 
     Queue::assertPushed(
         GenerateFinancialAdvisorReport::class,
-        fn (GenerateFinancialAdvisorReport $job) => $job->model === AdvisorModel::ClaudeSonnet46,
+        fn (GenerateFinancialAdvisorReport $job) => $job->model === AdvisorModel::ClaudeSonnet5,
     );
 
     expect(app(FinancialAdvisorReportService::class)->isGenerating())->toBeTrue();
@@ -106,12 +106,12 @@ test('generating uses the selected model', function () {
     Queue::fake();
 
     $this->actingAs(User::factory()->create())
-        ->post(route('advisor.generate'), ['model' => 'gpt-5.5'])
+        ->post(route('advisor.generate'), ['model' => 'gpt-5.6-terra'])
         ->assertRedirect();
 
     Queue::assertPushed(
         GenerateFinancialAdvisorReport::class,
-        fn (GenerateFinancialAdvisorReport $job) => $job->model === AdvisorModel::Gpt55,
+        fn (GenerateFinancialAdvisorReport $job) => $job->model === AdvisorModel::Gpt56Terra,
     );
 });
 

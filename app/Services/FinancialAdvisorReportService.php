@@ -40,7 +40,7 @@ class FinancialAdvisorReportService
      *
      * @return array{id: int, generated_at: string, model: array{value: string, label: string}|null, usage: array<string, int>|null, report: array<string, mixed>}
      */
-    public function generate(AdvisorModel $model = AdvisorModel::ClaudeSonnet46): array
+    public function generate(AdvisorModel $model = AdvisorModel::ClaudeSonnet5): array
     {
         try {
             [$response, $actualBudgetContext] = $this->actualBudget->isConfigured()

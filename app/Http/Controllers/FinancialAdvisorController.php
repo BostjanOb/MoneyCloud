@@ -22,7 +22,7 @@ class FinancialAdvisorController extends Controller
             'history' => $reports->history(),
             'isGenerating' => $reports->isGenerating(),
             'models' => AdvisorModel::options(),
-            'defaultModel' => AdvisorModel::ClaudeSonnet46->value,
+            'defaultModel' => AdvisorModel::ClaudeSonnet5->value,
         ]);
     }
 
@@ -32,7 +32,7 @@ class FinancialAdvisorController extends Controller
             'model' => ['nullable', Rule::enum(AdvisorModel::class)],
         ]);
 
-        $model = AdvisorModel::tryFrom($validated['model'] ?? '') ?? AdvisorModel::ClaudeSonnet46;
+        $model = AdvisorModel::tryFrom($validated['model'] ?? '') ?? AdvisorModel::ClaudeSonnet5;
 
         if ($reports->tryMarkGenerating()) {
             GenerateFinancialAdvisorReport::dispatch($model);

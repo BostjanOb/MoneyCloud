@@ -139,7 +139,7 @@ test('streaming accepts a model selection', function () {
 
     $response = $this->actingAs($user)->post(route('advisor.chat.stream'), [
         'message' => 'Kako mi gre?',
-        'model' => 'gpt-5.4',
+        'model' => 'gpt-5.6-terra',
     ]);
 
     $response->assertOk();
@@ -167,7 +167,7 @@ test('assistant messages expose token usage and model label', function () {
         'Odgovor',
         1,
         usage: ['prompt_tokens' => 100, 'completion_tokens' => 40],
-        meta: ['model' => 'claude-sonnet-4-6'],
+        meta: ['model' => 'claude-sonnet-5'],
     );
 
     $this->actingAs($user)
@@ -176,7 +176,7 @@ test('assistant messages expose token usage and model label', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->where('messages.1.usage.prompt_tokens', 100)
             ->where('messages.1.usage.completion_tokens', 40)
-            ->where('messages.1.model', 'Claude Sonnet 4.6')
+            ->where('messages.1.model', 'Claude Sonnet 5')
             ->etc()
         );
 });

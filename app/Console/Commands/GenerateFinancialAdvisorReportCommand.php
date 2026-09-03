@@ -9,16 +9,16 @@ use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 
-#[Signature('advisor:generate-report {--sync : Generiraj sinhrono namesto v ozadju} {--model=claude-sonnet-4-6 : AI model (claude-sonnet-4-6|claude-opus-4-8|gpt-5.4|gpt-5.5)}')]
+#[Signature('advisor:generate-report {--sync : Generiraj sinhrono namesto v ozadju} {--model= : AI model; privzeto claude-sonnet-5}')]
 #[Description('Generira strukturirano finančno analizo gospodinjstva.')]
 class GenerateFinancialAdvisorReportCommand extends Command
 {
     public function handle(FinancialAdvisorReportService $reports): int
     {
-        $model = AdvisorModel::tryFrom($this->option('model'));
+        $model = AdvisorModel::tryFrom($this->option('model') ?? AdvisorModel::ClaudeSonnet5->value);
 
         if (! $model) {
-            $this->error('Neveljaven model. Uporabi claude-sonnet-4-6, claude-opus-4-8, gpt-5.4 ali gpt-5.5.');
+            $this->error('Neveljaven model. Uporabi enega izmed: '.implode(', ', array_column(AdvisorModel::cases(), 'value')).'.');
 
             return self::FAILURE;
         }

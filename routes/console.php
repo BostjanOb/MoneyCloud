@@ -9,7 +9,7 @@ use App\Console\Commands\SyncCryptoPurchasesCommand;
 use Illuminate\Support\Facades\Schedule;
 
 Schedule::command(CaptureMonthlyPortfolioSnapshotCommand::class)
-    ->monthlyOn(1, '19:00')
+    ->monthlyOn(1, '00:01')
     ->withoutOverlapping();
 
 Schedule::command(RefreshCryptoPricesCommand::class)

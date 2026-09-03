@@ -23,7 +23,7 @@ class FinancialAdvisorReportFactory extends Factory
             'generated_at' => CarbonImmutable::instance(
                 fake()->dateTimeBetween('-3 months', 'now'),
             ),
-            'model' => AdvisorModel::ClaudeSonnet46,
+            'model' => AdvisorModel::ClaudeSonnet5,
             'usage' => [
                 'prompt_tokens' => fake()->numberBetween(1000, 5000),
                 'completion_tokens' => fake()->numberBetween(500, 3000),

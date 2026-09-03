@@ -19,7 +19,7 @@ class GenerateFinancialAdvisorReport implements ShouldQueue
     public int $timeout = 1800;
 
     public function __construct(
-        public AdvisorModel $model = AdvisorModel::ClaudeSonnet46,
+        public AdvisorModel $model = AdvisorModel::ClaudeSonnet5,
     ) {}
 
     public function handle(FinancialAdvisorReportService $reports): void
