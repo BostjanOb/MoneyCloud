@@ -10,6 +10,9 @@
     "guidelines": true,
     "mcp": true,
     "nightwatch_mcp": false,
+    "packages": [
+        "spatie/laravel-backup"
+    ],
     "sail": false,
     "skills": [
         "infer-conventions",
@@ -19,6 +22,7 @@
         "testing-best-practices",
         "wayfinder-development",
         "inertia-vue-development",
-        "tailwindcss-development"
+        "tailwindcss-development",
+        "laravel-backup"
     ]
 }
