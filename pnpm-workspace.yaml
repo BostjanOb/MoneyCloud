@@ -1,3 +1,6 @@
+publicHoistPattern:
+  - '@inertiajs/core'
+
 allowBuilds:
-  maplibre-gl: set this to true or false
-  vue-demi: set this to true or false
+  maplibre-gl: false
+  vue-demi: false
