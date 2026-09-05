@@ -16,8 +16,8 @@
         "ai-sdk-development",
         "fortify-development",
         "laravel-best-practices",
+        "testing-best-practices",
         "wayfinder-development",
-        "pest-testing",
         "inertia-vue-development",
         "tailwindcss-development"
     ]
