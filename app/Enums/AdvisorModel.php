@@ -13,8 +13,11 @@ enum AdvisorModel: string
 {
     case ClaudeSonnet5 = 'claude-sonnet-5';
     case ClaudeOpus5 = 'claude-opus-5';
+    case ClaudeOpus55 = 'claude-opus-5-5';
     case Gpt56Terra = 'gpt-5.6-terra';
     case Gpt56Sol = 'gpt-5.6-sol';
+    case Gpt6Sol = 'gpt-6-sol';
+    case Gpt6Luna = 'gpt-6-luna';
 
     /**
      * The AI provider (lab) this model belongs to.
@@ -22,8 +25,8 @@ enum AdvisorModel: string
     public function lab(): Lab
     {
         return match ($this) {
-            self::ClaudeSonnet5, self::ClaudeOpus5 => Lab::Anthropic,
-            self::Gpt56Terra, self::Gpt56Sol => Lab::OpenAI,
+            self::ClaudeSonnet5, self::ClaudeOpus5, self::ClaudeOpus55 => Lab::Anthropic,
+            self::Gpt56Terra, self::Gpt56Sol, self::Gpt6Sol, self::Gpt6Luna => Lab::OpenAI,
         };
     }
 
@@ -35,8 +38,11 @@ enum AdvisorModel: string
         return match ($this) {
             self::ClaudeSonnet5 => 'Claude Sonnet 5',
             self::ClaudeOpus5 => 'Claude Opus 5',
+            self::ClaudeOpus55 => 'Claude Opus 5.5',
             self::Gpt56Terra => 'GPT-5.6 Terra',
             self::Gpt56Sol => 'GPT-5.6 Sol',
+            self::Gpt6Sol => 'GPT-6 Sol',
+            self::Gpt6Luna => 'GPT-6 Luna',
         };
     }
 
