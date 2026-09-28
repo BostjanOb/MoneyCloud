@@ -13,6 +13,7 @@ import { computed, ref } from 'vue';
 import { index as balancesIndex } from '@/actions/App/Http/Controllers/CryptoBalanceController';
 import {
     destroy as dcaDestroy,
+    exportMethod as dcaExport,
     importMethod as dcaImport,
     index as dcaIndex,
     store as dcaStore,
@@ -169,6 +170,10 @@ setLayoutProps({
 
 const showPurchaseModal = ref(false);
 const showImportModal = ref(false);
+const showExportModal = ref(false);
+const exportSymbolIds = ref<number[]>([]);
+const exportFrom = ref('');
+const exportTo = ref('');
 const showSymbolStatsModal = ref(false);
 const statsSymbolId = ref<string | null>(null);
 const editingPurchase = ref<DcaPurchase | null>(null);
@@ -191,6 +196,21 @@ const activeSymbolId = ref(
     props.symbolGroups[0] !== undefined
         ? String(props.symbolGroups[0].symbol.id)
         : '',
+);
+
+const allExportSymbolsSelected = computed(
+    () => exportSymbolIds.value.length === props.symbolGroups.length,
+);
+
+const isExportDateRangeInvalid = computed(
+    () =>
+        exportFrom.value !== '' &&
+        exportTo.value !== '' &&
+        exportFrom.value > exportTo.value,
+);
+
+const canExport = computed(
+    () => exportSymbolIds.value.length > 0 && !isExportDateRangeInvalid.value,
 );
 
 const purchaseForm = useForm({
@@ -684,6 +704,45 @@ function submitImport(): void {
     });
 }
 
+function openExportModal(): void {
+    exportSymbolIds.value = props.symbolGroups.map((group) => group.symbol.id);
+    exportFrom.value = '';
+    exportTo.value = '';
+    showExportModal.value = true;
+}
+
+function updateExportSymbol(
+    symbolId: number,
+    value: boolean | 'indeterminate',
+): void {
+    exportSymbolIds.value =
+        value === true
+            ? [...exportSymbolIds.value, symbolId]
+            : exportSymbolIds.value.filter((id) => id !== symbolId);
+}
+
+function toggleAllExportSymbols(): void {
+    exportSymbolIds.value = allExportSymbolsSelected.value
+        ? []
+        : props.symbolGroups.map((group) => group.symbol.id);
+}
+
+function submitExport(): void {
+    if (!canExport.value) {
+        return;
+    }
+
+    window.location.href = dcaExport.url({
+        query: {
+            symbol_ids: exportSymbolIds.value,
+            from: exportFrom.value || undefined,
+            to: exportTo.value || undefined,
+        },
+    });
+
+    showExportModal.value = false;
+}
+
 function submitSync(providerId: number): void {
     router.post(
         dcaSync.url(),
@@ -727,6 +786,14 @@ function deletePurchase(purchase: DcaPurchase): void {
                     @click="openImportModal"
                 >
                     Uvozi CSV
+                </Button>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    :disabled="symbolGroups.length === 0"
+                    @click="openExportModal"
+                >
+                    Izvozi CSV
                 </Button>
                 <DropdownMenu v-if="syncProviderOptions.length > 0">
                     <DropdownMenuTrigger as-child>
@@ -1297,6 +1364,107 @@ function deletePurchase(purchase: DcaPurchase): void {
                         "
                     >
                         Uvozi
+                    </Button>
+                </DialogFooter>
+            </form>
+        </DialogContent>
+    </Dialog>
+    <Dialog v-model:open="showExportModal">
+        <DialogContent class="sm:max-w-lg">
+            <DialogHeader>
+                <DialogTitle>Izvozi DCA transakcije</DialogTitle>
+                <DialogDescription>
+                    Izberite simbole in po želji datumski razpon. Transakcije
+                    bodo izvožene v CSV datoteko.
+                </DialogDescription>
+            </DialogHeader>
+
+            <form class="grid gap-4" @submit.prevent="submitExport">
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between gap-2">
+                        <Label>Simboli</Label>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            @click="toggleAllExportSymbols"
+                        >
+                            {{
+                                allExportSymbolsSelected
+                                    ? 'Počisti'
+                                    : 'Izberi vse'
+                            }}
+                        </Button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        <Label
+                            v-for="group in symbolGroups"
+                            :key="group.symbol.id"
+                            :for="`export-symbol-${group.symbol.id}`"
+                            class="flex items-center gap-3"
+                        >
+                            <Checkbox
+                                :id="`export-symbol-${group.symbol.id}`"
+                                :model-value="
+                                    exportSymbolIds.includes(group.symbol.id)
+                                "
+                                @update:model-value="
+                                    (value) =>
+                                        updateExportSymbol(
+                                            group.symbol.id,
+                                            value,
+                                        )
+                                "
+                            />
+                            <span>{{ group.symbol.symbol }}</span>
+                        </Label>
+                    </div>
+                    <InputError
+                        :message="
+                            exportSymbolIds.length === 0
+                                ? 'Izberite vsaj en simbol.'
+                                : undefined
+                        "
+                    />
+                </div>
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div class="space-y-1.5">
+                        <Label for="export-from">Od</Label>
+                        <Input
+                            id="export-from"
+                            v-model="exportFrom"
+                            type="date"
+                        />
+                    </div>
+                    <div class="space-y-1.5">
+                        <Label for="export-to">Do</Label>
+                        <Input id="export-to" v-model="exportTo" type="date" />
+                    </div>
+                    <InputError
+                        class="sm:col-span-2"
+                        :message="
+                            isExportDateRangeInvalid
+                                ? 'Datum „do“ mora biti enak ali kasnejši od datuma „od“.'
+                                : undefined
+                        "
+                    />
+                </div>
+
+                <p class="text-sm text-muted-foreground">
+                    Prazen datum pomeni brez omejitve.
+                </p>
+
+                <DialogFooter>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="showExportModal = false"
+                    >
+                        Prekliči
+                    </Button>
+                    <Button type="submit" :disabled="!canExport">
+                        Izvozi
                     </Button>
                 </DialogFooter>
             </form>

@@ -605,3 +605,95 @@ test('dca sync flashes the error when the exchange call fails', function () {
         ->assertRedirect()
         ->assertSessionHas('error', 'Revolut X API error: Unauthorized');
 });
+
+test('crypto dca export requires authentication', function () {
+    $this->get(route('crypto.dca.export'))
+        ->assertRedirect(route('login'));
+});
+
+test('crypto dca export streams selected symbols within the date range as csv', function () {
+    $user = User::factory()->create();
+    $provider = InvestmentProvider::factory()->crypto('binance', 'Binance')->create();
+    $btc = InvestmentSymbol::factory()->crypto('BTC')->create();
+    $eth = InvestmentSymbol::factory()->crypto('ETH')->create();
+    $sol = InvestmentSymbol::factory()->crypto('SOL')->create();
+
+    InvestmentPurchase::factory()->create([
+        'investment_provider_id' => $provider->id,
+        'investment_symbol_id' => $btc->id,
+        'purchased_at' => '2026-04-10 09:00:00',
+        'quantity' => '0.10000000',
+        'price_per_unit' => '40000.00',
+        'fee' => '5.00',
+    ]);
+    InvestmentPurchase::factory()->create([
+        'investment_provider_id' => $provider->id,
+        'investment_symbol_id' => $eth->id,
+        'purchased_at' => '2026-04-20 23:30:00',
+        'transaction_type' => 'sell',
+        'quantity' => '2.00000000',
+        'price_per_unit' => '3000.00',
+        'fee' => '4.00',
+    ]);
+    InvestmentPurchase::factory()->create([
+        'investment_provider_id' => $provider->id,
+        'investment_symbol_id' => $btc->id,
+        'purchased_at' => '2026-03-31 23:59:00',
+    ]);
+    InvestmentPurchase::factory()->create([
+        'investment_provider_id' => $provider->id,
+        'investment_symbol_id' => $sol->id,
+        'purchased_at' => '2026-04-15 09:00:00',
+    ]);
+
+    $response = $this->actingAs($user)
+        ->get(route('crypto.dca.export', [
+            'symbol_ids' => [$btc->id, $eth->id],
+            'from' => '2026-04-01',
+            'to' => '2026-04-20',
+        ]))
+        ->assertOk()
+        ->assertDownload('dca-transakcije-'.now()->format('Y-m-d').'.csv');
+
+    expect($response->headers->get('Content-Type'))->toContain('text/csv');
+
+    $lines = explode("\n", trim($response->streamedContent()));
+
+    expect($lines)->toBe([
+        "\xEF\xBB\xBFDatum,Simbol,Tip,Platforma,Količina,\"Cena na enoto\",Znesek,Provizija,Neto",
+        '"2026-04-10 09:00:00",BTC,buy,Binance,0.10000000,40000.000,4000.00,5.00,4005.00',
+        '"2026-04-20 23:30:00",ETH,sell,Binance,2.00000000,3000.000,6000.00,4.00,5996.00',
+    ]);
+});
+
+test('crypto dca export without a date range returns all transactions of selected symbols', function () {
+    $user = User::factory()->create();
+    $provider = InvestmentProvider::factory()->crypto()->create();
+    $btc = InvestmentSymbol::factory()->crypto('BTC')->create();
+
+    InvestmentPurchase::factory()->count(3)->create([
+        'investment_provider_id' => $provider->id,
+        'investment_symbol_id' => $btc->id,
+    ]);
+
+    $response = $this->actingAs($user)
+        ->get(route('crypto.dca.export', ['symbol_ids' => [$btc->id]]))
+        ->assertOk();
+
+    expect(explode("\n", trim($response->streamedContent())))->toHaveCount(4);
+});
+
+test('crypto dca export validates symbols and date range', function () {
+    $user = User::factory()->create();
+    $etf = InvestmentSymbol::factory()->create([
+        'type' => InvestmentSymbolType::ETF,
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('crypto.dca.export', ['from' => '2026-04-20', 'to' => '2026-04-01']))
+        ->assertSessionHasErrors(['symbol_ids', 'to']);
+
+    $this->actingAs($user)
+        ->get(route('crypto.dca.export', ['symbol_ids' => [$etf->id]]))
+        ->assertSessionHasErrors('symbol_ids.0');
+});

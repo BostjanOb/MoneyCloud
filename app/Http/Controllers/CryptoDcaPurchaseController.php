@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\InvestmentSymbolType;
+use App\Http\Requests\ExportCryptoDcaCsvRequest;
 use App\Http\Requests\ImportCryptoDcaCsvRequest;
 use App\Http\Requests\StoreCryptoDcaPurchaseRequest;
 use App\Http\Requests\SyncCryptoPurchaseRequest;
@@ -17,6 +18,7 @@ use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 class CryptoDcaPurchaseController extends Controller
@@ -26,6 +28,18 @@ class CryptoDcaPurchaseController extends Controller
      * historical queries by the width of the requested period.
      */
     private const SYNC_DAYS = 14;
+
+    private const EXPORT_COLUMNS = [
+        'Datum',
+        'Simbol',
+        'Tip',
+        'Platforma',
+        'Količina',
+        'Cena na enoto',
+        'Znesek',
+        'Provizija',
+        'Neto',
+    ];
 
     public function index(CryptoPortfolioService $cryptoPortfolioService): Response
     {
@@ -76,6 +90,42 @@ class CryptoDcaPurchaseController extends Controller
         }
 
         return back()->with('status', $this->buildImportStatus($summary));
+    }
+
+    public function export(
+        ExportCryptoDcaCsvRequest $request,
+        CryptoPortfolioService $cryptoPortfolioService,
+    ): StreamedResponse {
+        $rows = $cryptoPortfolioService->dcaExportRows(
+            $request->symbolIds(),
+            $request->from(),
+            $request->to(),
+        );
+
+        return response()->streamDownload(function () use ($rows): void {
+            $handle = fopen('php://output', 'w');
+
+            fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, self::EXPORT_COLUMNS, escape: '');
+
+            foreach ($rows as $row) {
+                fputcsv($handle, [
+                    CarbonImmutable::parse($row['purchased_at'])->timezone(config('app.timezone'))->format('Y-m-d H:i:s'),
+                    $row['symbol']['symbol'],
+                    $row['transaction_type'],
+                    $row['provider']['name'],
+                    $row['quantity'],
+                    $row['price_per_unit'],
+                    $row['trade_value'],
+                    $row['fee'],
+                    $row['net_amount'],
+                ], escape: '');
+            }
+
+            fclose($handle);
+        }, 'dca-transakcije-'.now()->format('Y-m-d').'.csv', [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
     }
 
     public function sync(

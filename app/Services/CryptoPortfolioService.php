@@ -8,6 +8,7 @@ use App\Models\CryptoBalance;
 use App\Models\InvestmentProvider;
 use App\Models\InvestmentPurchase;
 use App\Models\InvestmentSymbol;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -210,6 +211,26 @@ class CryptoPortfolioService
                 ];
             })
             ->values()
+            ->all();
+    }
+
+    /**
+     * DCA transactions of the given symbols, oldest first, optionally limited to a date range.
+     *
+     * @param  list<int>  $symbolIds
+     * @return array<int, array<string, mixed>>
+     */
+    public function dcaExportRows(array $symbolIds, ?CarbonImmutable $from, ?CarbonImmutable $to): array
+    {
+        return $this->cryptoPurchases()
+            ->with(['provider', 'symbol'])
+            ->whereIn('investment_symbol_id', $symbolIds)
+            ->when($from, fn (Builder $query, CarbonImmutable $from): Builder => $query->where('purchased_at', '>=', $from))
+            ->when($to, fn (Builder $query, CarbonImmutable $to): Builder => $query->where('purchased_at', '<=', $to))
+            ->orderBy('purchased_at')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (InvestmentPurchase $purchase): array => $this->transformDcaPurchase($purchase))
             ->all();
     }
 
