@@ -13,6 +13,7 @@ use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 use Laravel\Ai\Contracts\ConversationStore;
+use Laravel\Ai\Enums\MessageStatus;
 use Laravel\Ai\Models\Conversation;
 use Laravel\Ai\Models\ConversationMessage;
 use Symfony\Component\HttpFoundation\Response;
@@ -138,6 +139,7 @@ class FinancialAdvisorChatController extends Controller
             ->where('participant_type', $user->getMorphClass())
             ->where('participant_id', $user->getKey())
             ->whereIn('role', ['user', 'assistant'])
+            ->where('status', MessageStatus::Completed)
             ->orderBy('created_at')
             ->orderBy('id')
             ->get(['id', 'role', 'content', 'usage', 'meta'])

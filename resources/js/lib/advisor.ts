@@ -7,12 +7,19 @@ export type AdvisorModelGroup = {
     models: AdvisorModelOption[];
 };
 
+/**
+ * Token usage as serialized by the AI SDK. Rows stored before Laravel AI 1.0
+ * use `prompt_tokens` / `completion_tokens` instead of `input_tokens` /
+ * `output_tokens`.
+ */
 export type TokenUsage = {
+    input_tokens?: number;
+    output_tokens?: number;
     prompt_tokens?: number;
     completion_tokens?: number;
-    cache_write_input_tokens?: number;
-    cache_read_input_tokens?: number;
-    reasoning_tokens?: number;
+    cache_write_input_tokens?: number | null;
+    cache_read_input_tokens?: number | null;
+    reasoning_tokens?: number | null;
 };
 
 /**
@@ -26,8 +33,8 @@ export function formatTokenUsage(
         return null;
     }
 
-    const input = usage.prompt_tokens ?? 0;
-    const output = usage.completion_tokens ?? 0;
+    const input = usage.input_tokens ?? usage.prompt_tokens ?? 0;
+    const output = usage.output_tokens ?? usage.completion_tokens ?? 0;
     const total = input + output;
 
     if (total === 0) {

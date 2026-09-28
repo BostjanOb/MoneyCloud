@@ -139,7 +139,7 @@ test('the report stores token usage from the response', function () {
     $report = FinancialAdvisorReport::latestFirst()->first();
 
     expect($report->usage)->toBeArray()
-        ->toHaveKeys(['prompt_tokens', 'completion_tokens']);
+        ->toHaveKeys(['input_tokens', 'output_tokens']);
 });
 
 test('the command generates the report synchronously', function () {

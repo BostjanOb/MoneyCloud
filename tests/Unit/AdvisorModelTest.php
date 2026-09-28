@@ -6,8 +6,11 @@ use Laravel\Ai\Enums\Lab;
 test('each model maps to the correct provider lab', function () {
     expect(AdvisorModel::ClaudeSonnet5->lab())->toBe(Lab::Anthropic)
         ->and(AdvisorModel::ClaudeOpus5->lab())->toBe(Lab::Anthropic)
+        ->and(AdvisorModel::ClaudeOpus55->lab())->toBe(Lab::Anthropic)
         ->and(AdvisorModel::Gpt56Terra->lab())->toBe(Lab::OpenAI)
-        ->and(AdvisorModel::Gpt56Sol->lab())->toBe(Lab::OpenAI);
+        ->and(AdvisorModel::Gpt56Sol->lab())->toBe(Lab::OpenAI)
+        ->and(AdvisorModel::Gpt6Sol->lab())->toBe(Lab::OpenAI)
+        ->and(AdvisorModel::Gpt6Luna->lab())->toBe(Lab::OpenAI);
 });
 
 test('prompt target keys the model by its provider lab value', function () {
@@ -27,11 +30,11 @@ test('options are grouped by provider', function () {
 
     expect($options)->toHaveCount(2)
         ->and($options[0]['provider'])->toBe('Anthropic')
-        ->and($options[0]['models'])->toHaveCount(2)
+        ->and($options[0]['models'])->toHaveCount(3)
         ->and($options[0]['models'][0])->toBe([
             'value' => 'claude-sonnet-5',
             'label' => 'Claude Sonnet 5',
         ])
         ->and($options[1]['provider'])->toBe('OpenAI')
-        ->and($options[1]['models'])->toHaveCount(2);
+        ->and($options[1]['models'])->toHaveCount(4);
 });

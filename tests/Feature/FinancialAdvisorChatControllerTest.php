@@ -65,8 +65,7 @@ test('assistant messages are rendered from markdown to html', function () {
         'role' => 'assistant',
         'content' => "Predlogi:\n\n- **Diverzificiraj**\n- Zmanjšaj gotovino",
         'attachments' => [],
-        'tool_calls' => [],
-        'tool_results' => [],
+        'steps' => [],
         'usage' => [],
         'meta' => [],
     ]);

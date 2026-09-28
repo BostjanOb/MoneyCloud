@@ -25,8 +25,8 @@ class FinancialAdvisorReportFactory extends Factory
             ),
             'model' => AdvisorModel::ClaudeSonnet5,
             'usage' => [
-                'prompt_tokens' => fake()->numberBetween(1000, 5000),
-                'completion_tokens' => fake()->numberBetween(500, 3000),
+                'input_tokens' => fake()->numberBetween(1000, 5000),
+                'output_tokens' => fake()->numberBetween(500, 3000),
             ],
             'report' => [
                 'povzetek' => fake()->sentence(),

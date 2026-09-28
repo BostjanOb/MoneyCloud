@@ -5,6 +5,7 @@ use App\Models\User;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Ai\Contracts\ConversationStore;
+use Laravel\Ai\Enums\MessageStatus;
 use Laravel\Ai\Models\Conversation;
 use Laravel\Ai\Models\ConversationMessage;
 use Laravel\Ai\Prompts\AgentPrompt;
@@ -25,7 +26,7 @@ function makeConversation(User $user, string $title = 'Pogovor'): Conversation
  * @param  array<string, int>  $usage
  * @param  array<string, mixed>  $meta
  */
-function addMessage(Conversation $conversation, string $role, string $content, int $secondsOffset = 0, array $usage = [], array $meta = []): void
+function addMessage(Conversation $conversation, string $role, string $content, int $secondsOffset = 0, array $usage = [], array $meta = [], MessageStatus $status = MessageStatus::Completed): void
 {
     ConversationMessage::create([
         'id' => (string) Str::uuid(),
@@ -36,10 +37,10 @@ function addMessage(Conversation $conversation, string $role, string $content, i
         'role' => $role,
         'content' => $content,
         'attachments' => [],
-        'tool_calls' => [],
-        'tool_results' => [],
+        'steps' => [],
         'usage' => $usage,
         'meta' => $meta,
+        'status' => $status,
         'created_at' => now()->addSeconds($secondsOffset),
         'updated_at' => now()->addSeconds($secondsOffset),
     ]);
@@ -77,6 +78,21 @@ test('chat page renders the active conversation messages', function () {
             ->has('messages', 2)
             ->where('messages.0.role', 'user')
             ->where('messages.1.content', 'Razporeditev je naslednja …')
+        );
+});
+
+test('chat page hides assistant turns that failed', function () {
+    $user = User::factory()->create();
+    $conversation = makeConversation($user);
+    addMessage($conversation, 'user', 'Vprašanje', 0);
+    addMessage($conversation, 'assistant', 'Delni odgovor', 1, meta: ['error' => 'Timeout.'], status: MessageStatus::Failed);
+
+    $this->actingAs($user)
+        ->get(route('advisor.chat', ['conversation' => $conversation->id]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('messages', 1)
+            ->where('messages.0.role', 'user')
         );
 });
 
@@ -166,7 +182,7 @@ test('assistant messages expose token usage and model label', function () {
         'assistant',
         'Odgovor',
         1,
-        usage: ['prompt_tokens' => 100, 'completion_tokens' => 40],
+        usage: ['input_tokens' => 100, 'output_tokens' => 40],
         meta: ['model' => 'claude-sonnet-5'],
     );
 
@@ -174,8 +190,8 @@ test('assistant messages expose token usage and model label', function () {
         ->get(route('advisor.chat', ['conversation' => $conversation->id]))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->where('messages.1.usage.prompt_tokens', 100)
-            ->where('messages.1.usage.completion_tokens', 40)
+            ->where('messages.1.usage.input_tokens', 100)
+            ->where('messages.1.usage.output_tokens', 40)
             ->where('messages.1.model', 'Claude Sonnet 5')
             ->etc()
         );
@@ -211,7 +227,7 @@ test('a persistence failure yields a graceful error event instead of a fatal', f
     // flushed) to fail, mirroring the production "Data too long" exception.
     $this->app->bind(ConversationStore::class, fn () => new class extends DatabaseConversationStore
     {
-        public function storeAssistantMessage(string $conversationId, ?string $participantType, string|int|null $participantId, AgentPrompt $prompt, AgentResponse $response): ?string
+        public function storeAssistantMessage(string $conversationId, ?string $participantType, string|int|null $participantId, AgentPrompt $prompt, AgentResponse $response, ?Throwable $exception = null): ?string
         {
             throw new RuntimeException('Persistence boom.');
         }
