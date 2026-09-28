@@ -660,9 +660,9 @@ test('crypto dca export streams selected symbols within the date range as csv', 
     $lines = explode("\n", trim($response->streamedContent()));
 
     expect($lines)->toBe([
-        "\xEF\xBB\xBFDatum,Simbol,Tip,Platforma,Količina,\"Cena na enoto\",Znesek,Provizija,Neto",
-        '"2026-04-10 09:00:00",BTC,buy,Binance,0.10000000,40000.000,4000.00,5.00,4005.00',
-        '"2026-04-20 23:30:00",ETH,sell,Binance,2.00000000,3000.000,6000.00,4.00,5996.00',
+        "\xEF\xBB\xBFDate,Symbol,Type,Platform,Quantity,\"Price per unit\",Amount,Fee,Net",
+        '2026-04-10T09:00:00+02:00,BTC,buy,Binance,0.10000000,40000.000,4000.00,5.00,4005.00',
+        '2026-04-20T23:30:00+02:00,ETH,sell,Binance,2.00000000,3000.000,6000.00,4.00,5996.00',
     ]);
 });
 

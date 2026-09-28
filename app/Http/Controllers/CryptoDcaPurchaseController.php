@@ -30,15 +30,15 @@ class CryptoDcaPurchaseController extends Controller
     private const SYNC_DAYS = 14;
 
     private const EXPORT_COLUMNS = [
-        'Datum',
-        'Simbol',
-        'Tip',
-        'Platforma',
-        'Količina',
-        'Cena na enoto',
-        'Znesek',
-        'Provizija',
-        'Neto',
+        'Date',
+        'Symbol',
+        'Type',
+        'Platform',
+        'Quantity',
+        'Price per unit',
+        'Amount',
+        'Fee',
+        'Net',
     ];
 
     public function index(CryptoPortfolioService $cryptoPortfolioService): Response
@@ -110,7 +110,7 @@ class CryptoDcaPurchaseController extends Controller
 
             foreach ($rows as $row) {
                 fputcsv($handle, [
-                    CarbonImmutable::parse($row['purchased_at'])->timezone(config('app.timezone'))->format('Y-m-d H:i:s'),
+                    CarbonImmutable::parse($row['purchased_at'])->timezone(config('app.timezone'))->toIso8601String(),
                     $row['symbol']['symbol'],
                     $row['transaction_type'],
                     $row['provider']['name'],
