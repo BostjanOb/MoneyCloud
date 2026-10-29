@@ -28,7 +28,13 @@ class PaycheckGrowthStatisticsService
      *         cumulative_net: array<int, string>,
      *         cumulative_gross: array<int, string>,
      *         cumulative_bonuses_gross: array<int, string>,
-     *         cumulative_bonuses_net: array<int, string>
+     *         cumulative_bonuses_net: array<int, string>,
+     *         monthly_net: array<int, string>,
+     *         monthly_gross: array<int, string>,
+     *         monthly_bonuses_gross: array<int, string>,
+     *         monthly_bonuses_net: array<int, string>,
+     *         recorded_months: array<int, int>,
+     *         partial_months: array<int, int>
      *     }>,
      *     chartSeries: array<int, array{key: string, label: string, color: string, values: array<int, float>}>,
      *     summary: array{
@@ -142,7 +148,13 @@ class PaycheckGrowthStatisticsService
      *     cumulative_net: array<int, string>,
      *     cumulative_gross: array<int, string>,
      *     cumulative_bonuses_gross: array<int, string>,
-     *     cumulative_bonuses_net: array<int, string>
+     *     cumulative_bonuses_net: array<int, string>,
+     *     monthly_net: array<int, string>,
+     *     monthly_gross: array<int, string>,
+     *     monthly_bonuses_gross: array<int, string>,
+     *     monthly_bonuses_net: array<int, string>,
+     *     recorded_months: array<int, int>,
+     *     partial_months: array<int, int>
      * }>
      */
     private function buildRows(Collection $paycheckYears, int $expectedPeopleCount): array
@@ -171,6 +183,8 @@ class PaycheckGrowthStatisticsService
                 'cumulative_gross' => $this->emptyMonthlyAmounts(),
                 'cumulative_bonuses_gross' => $this->emptyMonthlyAmounts(),
                 'cumulative_bonuses_net' => $this->emptyMonthlyAmounts(),
+                'month_people' => array_fill(0, 12, []),
+                'partial_months' => [],
             ];
         }
 
@@ -183,6 +197,7 @@ class PaycheckGrowthStatisticsService
 
                 $rowMap[$year]['cumulative_net'][$monthIndex] += MonthlyPortfolioSnapshot::toCents($paycheck->net);
                 $rowMap[$year]['cumulative_gross'][$monthIndex] += MonthlyPortfolioSnapshot::toCents($paycheck->gross);
+                $rowMap[$year]['month_people'][$monthIndex][$paycheckYear->person_id] = true;
             }
 
             foreach ($paycheckYear->bonuses as $bonus) {
@@ -210,6 +225,16 @@ class PaycheckGrowthStatisticsService
             $rowMap[$currentYear]['is_partial'] = true;
         }
 
+        if (array_key_exists($currentYear, $rowMap)) {
+            $rowMap[$currentYear]['partial_months'] = array_values(array_map(
+                fn (int $monthIndex): int => $monthIndex + 1,
+                array_keys(array_filter(
+                    $rowMap[$currentYear]['month_people'],
+                    fn (array $people): bool => $people !== [] && count($people) < $expectedPeopleCount,
+                )),
+            ));
+        }
+
         return array_values(array_map(fn (array $row): array => $this->finalizeRow($row), $rowMap));
     }
 
@@ -233,7 +258,9 @@ class PaycheckGrowthStatisticsService
      *     cumulative_net: array<int, int>,
      *     cumulative_gross: array<int, int>,
      *     cumulative_bonuses_gross: array<int, int>,
-     *     cumulative_bonuses_net: array<int, int>
+     *     cumulative_bonuses_net: array<int, int>,
+     *     month_people: array<int, array<int, bool>>,
+     *     partial_months: array<int, int>
      * }  $row
      * @return array{
      *     year: int,
@@ -248,7 +275,13 @@ class PaycheckGrowthStatisticsService
      *     cumulative_net: array<int, string>,
      *     cumulative_gross: array<int, string>,
      *     cumulative_bonuses_gross: array<int, string>,
-     *     cumulative_bonuses_net: array<int, string>
+     *     cumulative_bonuses_net: array<int, string>,
+     *     monthly_net: array<int, string>,
+     *     monthly_gross: array<int, string>,
+     *     monthly_bonuses_gross: array<int, string>,
+     *     monthly_bonuses_net: array<int, string>,
+     *     recorded_months: array<int, int>,
+     *     partial_months: array<int, int>
      * }
      */
     private function finalizeRow(array $row): array
@@ -278,7 +311,25 @@ class PaycheckGrowthStatisticsService
             'cumulative_gross' => $cumulativeGross,
             'cumulative_bonuses_gross' => $cumulativeBonusesGross,
             'cumulative_bonuses_net' => $cumulativeBonusesNet,
+            'monthly_net' => $this->toMonthlyAmounts($row['cumulative_net']),
+            'monthly_gross' => $this->toMonthlyAmounts($row['cumulative_gross']),
+            'monthly_bonuses_gross' => $this->toMonthlyAmounts($row['cumulative_bonuses_gross']),
+            'monthly_bonuses_net' => $this->toMonthlyAmounts($row['cumulative_bonuses_net']),
+            'recorded_months' => array_values(array_map(
+                fn (int $monthIndex): int => $monthIndex + 1,
+                array_keys(array_filter($row['month_people'])),
+            )),
+            'partial_months' => $row['partial_months'],
         ];
+    }
+
+    /**
+     * @param  array<int, int>  $amounts
+     * @return array<int, string>
+     */
+    private function toMonthlyAmounts(array $amounts): array
+    {
+        return array_map(fn (int $amount): string => MonthlyPortfolioSnapshot::fromCents($amount), $amounts);
     }
 
     /** @param  array<int, int>  $amounts */
@@ -333,7 +384,13 @@ class PaycheckGrowthStatisticsService
      *     cumulative_net: array<int, string>,
      *     cumulative_gross: array<int, string>,
      *     cumulative_bonuses_gross: array<int, string>,
-     *     cumulative_bonuses_net: array<int, string>
+     *     cumulative_bonuses_net: array<int, string>,
+     *     monthly_net: array<int, string>,
+     *     monthly_gross: array<int, string>,
+     *     monthly_bonuses_gross: array<int, string>,
+     *     monthly_bonuses_net: array<int, string>,
+     *     recorded_months: array<int, int>,
+     *     partial_months: array<int, int>
      * }>  $rows
      * @return array<int, array{key: string, label: string, color: string, values: array<int, float>}>
      */
@@ -371,7 +428,13 @@ class PaycheckGrowthStatisticsService
      *     cumulative_net: array<int, string>,
      *     cumulative_gross: array<int, string>,
      *     cumulative_bonuses_gross: array<int, string>,
-     *     cumulative_bonuses_net: array<int, string>
+     *     cumulative_bonuses_net: array<int, string>,
+     *     monthly_net: array<int, string>,
+     *     monthly_gross: array<int, string>,
+     *     monthly_bonuses_gross: array<int, string>,
+     *     monthly_bonuses_net: array<int, string>,
+     *     recorded_months: array<int, int>,
+     *     partial_months: array<int, int>
      * }>  $rows
      * @return array{
      *     latest_year: int|null,

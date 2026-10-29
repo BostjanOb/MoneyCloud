@@ -29,9 +29,12 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Table } from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
     buildPaycheckGrowthChartData,
     buildPaycheckGrowthSummary,
+    buildPaycheckMonthlyChartData,
+    buildPaycheckMonthlyRows,
     displayedPaycheckGrowthRows,
     displayedPaycheckGrowthSeries,
     type PaycheckGrowthChartPoint,
@@ -47,6 +50,8 @@ type PersonFilter = {
     label: string;
     value: string;
 };
+
+type ViewMode = 'yearly' | 'monthly';
 
 type Props = {
     filters: PersonFilter[];
@@ -73,9 +78,8 @@ setLayoutProps({
 });
 
 const includeBonuses = ref(props.includeBonusesDefault);
-const yearNumberFormatter = new Intl.NumberFormat('sl-SI', {
-    maximumFractionDigits: 0,
-});
+const viewMode = ref<ViewMode>('yearly');
+const maxYearTicks = 8;
 
 const visibleSeries = computed(() =>
     displayedPaycheckGrowthSeries(props.chartSeries, includeBonuses.value),
@@ -85,8 +89,13 @@ const displayedSummary = computed(() =>
     buildPaycheckGrowthSummary(props.rows, includeBonuses.value),
 );
 const displayedRows = computed(() => displayedPaycheckGrowthRows(props.rows));
+const displayedMonthlyRows = computed(() =>
+    buildPaycheckMonthlyRows(props.rows),
+);
 const visibleChartData = computed(() =>
-    buildPaycheckGrowthChartData(props.rows, visibleSeries.value),
+    viewMode.value === 'monthly'
+        ? buildPaycheckMonthlyChartData(props.rows, visibleSeries.value)
+        : buildPaycheckGrowthChartData(props.rows, visibleSeries.value),
 );
 const visibleChartConfig = computed<ChartConfig>(() =>
     Object.fromEntries(
@@ -99,8 +108,20 @@ const visibleChartConfig = computed<ChartConfig>(() =>
         ]),
     ),
 );
-const visibleChartTicks = computed(() =>
-    visibleChartData.value.map((point) => point.year),
+const visibleChartTicks = computed(() => {
+    const ticks = visibleChartData.value.map((point) => point.x);
+
+    if (!usesYearTicks.value) {
+        return ticks;
+    }
+
+    const januaryTicks = ticks.filter((x) => x % 12 === 0);
+    const step = Math.ceil(januaryTicks.length / maxYearTicks);
+
+    return januaryTicks.filter((_, index) => index % step === 0);
+});
+const usesYearTicks = computed(
+    () => viewMode.value === 'monthly' && visibleChartData.value.length > 12,
 );
 const visibleChartYAccessors = computed(() =>
     visibleSeries.value.map(
@@ -164,8 +185,14 @@ function updatePersonFilter(value: AcceptableValue): void {
     );
 }
 
+function updateViewMode(value: string | number): void {
+    if (value === 'yearly' || value === 'monthly') {
+        viewMode.value = value;
+    }
+}
+
 function paycheckGrowthXAccessor(point: PaycheckGrowthChartPoint): number {
-    return point.year;
+    return point.x;
 }
 
 function paycheckGrowthYAccessor(
@@ -174,24 +201,24 @@ function paycheckGrowthYAccessor(
     return (point) => Number(point[key] ?? 0);
 }
 
-function formatPaycheckYearTick(value: number | Date): string {
-    const year = Number(value);
-    const point = visibleChartData.value.find((item) => item.year === year);
+function findChartPoint(
+    value: number | Date,
+): PaycheckGrowthChartPoint | undefined {
+    const x = Number(value);
 
-    return point?.yearLabel ?? yearNumberFormatter.format(year);
+    return visibleChartData.value.find((point) => point.x === x);
+}
+
+function formatPaycheckTick(value: number | Date): string {
+    if (usesYearTicks.value) {
+        return String(Math.floor(Number(value) / 12));
+    }
+
+    return findChartPoint(value)?.tickLabel ?? String(value);
 }
 
 function formatPaycheckTooltipLabel(value: number | Date): string {
-    const year = Number(value);
-    const point = visibleChartData.value.find((item) => item.year === year);
-
-    if (!point) {
-        return yearNumberFormatter.format(year);
-    }
-
-    return point.isPartial
-        ? `${point.yearLabel} (delno leto)`
-        : point.yearLabel;
+    return findChartPoint(value)?.tooltipLabel ?? String(value);
 }
 
 function formatMoneyTick(value: number | Date): string {
@@ -203,6 +230,10 @@ function formatTooltipMoney(value: unknown): string {
 }
 
 function paycheckPointSize(point: PaycheckGrowthChartPoint): number {
+    if (viewMode.value === 'monthly') {
+        return point.isPartial ? 7 : 4;
+    }
+
     return point.isPartial ? 10 : 7;
 }
 
@@ -240,7 +271,13 @@ function formatSignedPercent(value: string | number | null): string {
     return `${prefix}${formatSlovenianNumber(amount)} %`;
 }
 
-function partialYearsLabel(): string {
+function partialPeriodsLabel(): string {
+    if (viewMode.value === 'monthly') {
+        return visibleChartData.value.some((point) => point.isPartial)
+            ? '* nepopoln mesec: plača ni vnesena za vse osebe'
+            : '';
+    }
+
     const partialYears = props.rows
         .filter((row) => row.is_partial)
         .map((row) => row.year);
@@ -283,10 +320,25 @@ function summaryComparisonText(): string {
         >
             <Heading
                 title="Rast plač"
-                description="Letni pregled neto, bruto in bonusov z grafom rasti po letih."
+                description="Pregled neto, bruto in bonusov z grafom rasti po letih ali mesecih."
             />
 
             <div class="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <div class="grid gap-2">
+                    <Label>Prikaz</Label>
+                    <Tabs
+                        :model-value="viewMode"
+                        @update:model-value="updateViewMode"
+                    >
+                        <TabsList>
+                            <TabsTrigger value="yearly">Po letih</TabsTrigger>
+                            <TabsTrigger value="monthly">
+                                Po mesecih
+                            </TabsTrigger>
+                        </TabsList>
+                    </Tabs>
+                </div>
+
                 <div class="grid gap-2">
                     <Label for="person-filter">Oseba</Label>
                     <Select
@@ -348,7 +400,13 @@ function summaryComparisonText(): string {
 
         <Card>
             <CardHeader>
-                <CardTitle>Graf rasti po letih</CardTitle>
+                <CardTitle>
+                    {{
+                        viewMode === 'monthly'
+                            ? 'Graf rasti po mesecih'
+                            : 'Graf rasti po letih'
+                    }}
+                </CardTitle>
             </CardHeader>
             <CardContent>
                 <div
@@ -391,7 +449,7 @@ function summaryComparisonText(): string {
                                 type="x"
                                 :x="paycheckGrowthXAccessor"
                                 :tick-values="visibleChartTicks"
-                                :tick-format="formatPaycheckYearTick"
+                                :tick-format="formatPaycheckTick"
                                 :tick-line="false"
                                 :domain-line="false"
                                 :grid-line="false"
@@ -428,7 +486,7 @@ function summaryComparisonText(): string {
                     </ChartContainer>
 
                     <p class="text-xs text-muted-foreground">
-                        {{ partialYearsLabel() }}
+                        {{ partialPeriodsLabel() }}
                     </p>
                 </div>
             </CardContent>
@@ -436,7 +494,13 @@ function summaryComparisonText(): string {
 
         <Card>
             <CardHeader>
-                <CardTitle>Letni pregled</CardTitle>
+                <CardTitle>
+                    {{
+                        viewMode === 'monthly'
+                            ? 'Mesečni pregled'
+                            : 'Letni pregled'
+                    }}
+                </CardTitle>
             </CardHeader>
             <CardContent>
                 <div
@@ -445,6 +509,81 @@ function summaryComparisonText(): string {
                 >
                     Za izbran filter še ni vnesenih plač.
                 </div>
+
+                <Table v-else-if="viewMode === 'monthly'">
+                    <thead>
+                        <tr class="border-b">
+                            <th
+                                class="h-10 px-2 text-left font-medium whitespace-nowrap"
+                            >
+                                Mesec
+                            </th>
+                            <th
+                                class="h-10 px-2 text-right font-medium whitespace-nowrap"
+                            >
+                                Neto
+                            </th>
+                            <th
+                                class="h-10 px-2 text-right font-medium whitespace-nowrap"
+                            >
+                                Bruto
+                            </th>
+                            <th
+                                class="h-10 px-2 text-right font-medium whitespace-nowrap"
+                            >
+                                Bonusi neto
+                            </th>
+                            <th
+                                class="h-10 px-2 text-right font-medium whitespace-nowrap"
+                            >
+                                Neto seštevek
+                            </th>
+                            <th
+                                class="h-10 px-2 text-left font-medium whitespace-nowrap"
+                            >
+                                Status
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr
+                            v-for="row in displayedMonthlyRows"
+                            :key="row.key"
+                            class="border-b transition-colors hover:bg-muted/50"
+                        >
+                            <td
+                                class="p-2 align-middle font-medium whitespace-nowrap"
+                            >
+                                {{ row.label }}
+                            </td>
+                            <td
+                                class="p-2 text-right align-middle whitespace-nowrap"
+                            >
+                                {{ formatMoney(row.net) }}
+                            </td>
+                            <td
+                                class="p-2 text-right align-middle whitespace-nowrap"
+                            >
+                                {{ formatMoney(row.gross) }}
+                            </td>
+                            <td
+                                class="p-2 text-right align-middle whitespace-nowrap"
+                            >
+                                {{ formatMoney(row.bonuses_net) }}
+                            </td>
+                            <td
+                                class="p-2 text-right align-middle whitespace-nowrap"
+                            >
+                                {{ formatMoney(row.net_with_bonuses) }}
+                            </td>
+                            <td class="p-2 align-middle whitespace-nowrap">
+                                <Badge v-if="row.isPartial" variant="outline">
+                                    Nepopoln mesec
+                                </Badge>
+                            </td>
+                        </tr>
+                    </tbody>
+                </Table>
 
                 <Table v-else>
                     <thead>

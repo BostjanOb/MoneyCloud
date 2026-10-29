@@ -12,6 +12,12 @@ export type PaycheckGrowthRow = {
     cumulative_gross: string[];
     cumulative_bonuses_gross: string[];
     cumulative_bonuses_net: string[];
+    monthly_net: string[];
+    monthly_gross: string[];
+    monthly_bonuses_gross: string[];
+    monthly_bonuses_net: string[];
+    recorded_months: number[];
+    partial_months: number[];
 };
 
 export type PaycheckGrowthSeries = {
@@ -31,11 +37,37 @@ export type PaycheckGrowthSummary = {
 };
 
 export type PaycheckGrowthChartPoint = {
-    year: number;
-    yearLabel: string;
+    x: number;
+    tickLabel: string;
+    tooltipLabel: string;
     isPartial: boolean;
     [key: string]: boolean | number | string;
 };
+
+export type PaycheckGrowthMonthlyRow = {
+    key: string;
+    label: string;
+    isPartial: boolean;
+    net: string;
+    gross: string;
+    bonuses_net: string;
+    net_with_bonuses: string;
+};
+
+type MonthlyEntry = {
+    row: PaycheckGrowthRow;
+    month: number;
+    isPartial: boolean;
+};
+
+const monthTickFormatter = new Intl.DateTimeFormat('sl-SI', {
+    month: 'short',
+    year: 'numeric',
+});
+const monthTooltipFormatter = new Intl.DateTimeFormat('sl-SI', {
+    month: 'long',
+    year: 'numeric',
+});
 
 export function displayedPaycheckGrowthSeries(
     chartSeries: PaycheckGrowthSeries[],
@@ -110,8 +142,11 @@ export function buildPaycheckGrowthChartData(
     chartSeries: readonly PaycheckGrowthSeries[],
 ): PaycheckGrowthChartPoint[] {
     return rows.map((row, index) => ({
-        year: row.year,
-        yearLabel: row.is_partial ? `${row.year}*` : String(row.year),
+        x: row.year,
+        tickLabel: row.is_partial ? `${row.year}*` : String(row.year),
+        tooltipLabel: row.is_partial
+            ? `${row.year} (delno leto)`
+            : String(row.year),
         isPartial: row.is_partial,
         ...Object.fromEntries(
             chartSeries.map((series) => [
@@ -120,6 +155,101 @@ export function buildPaycheckGrowthChartData(
             ]),
         ),
     }));
+}
+
+export function buildPaycheckMonthlyChartData(
+    rows: readonly PaycheckGrowthRow[],
+    chartSeries: readonly PaycheckGrowthSeries[],
+): PaycheckGrowthChartPoint[] {
+    return monthlyEntries(rows, false).map(({ row, month, isPartial }) => {
+        const date = new Date(row.year, month - 1, 1);
+        const tooltipLabel = monthTooltipFormatter.format(date);
+
+        return {
+            x: row.year * 12 + month - 1,
+            tickLabel: monthTickFormatter.format(date),
+            tooltipLabel: isPartial
+                ? `${tooltipLabel} (nepopoln mesec)`
+                : tooltipLabel,
+            isPartial,
+            ...Object.fromEntries(
+                chartSeries.map((series) => [
+                    series.key,
+                    Number(monthlySeriesValue(row, month, series.key)),
+                ]),
+            ),
+        };
+    });
+}
+
+export function buildPaycheckMonthlyRows(
+    rows: readonly PaycheckGrowthRow[],
+): PaycheckGrowthMonthlyRow[] {
+    return monthlyEntries(rows, true)
+        .map(({ row, month, isPartial }) => ({
+            key: `${row.year}-${month}`,
+            label: monthTooltipFormatter.format(
+                new Date(row.year, month - 1, 1),
+            ),
+            isPartial,
+            net: monthlySeriesValue(row, month, 'net'),
+            gross: monthlySeriesValue(row, month, 'gross'),
+            bonuses_net: row.monthly_bonuses_net[month - 1] ?? '0.00',
+            net_with_bonuses: monthlySeriesValue(
+                row,
+                month,
+                'net_with_bonuses',
+            ),
+        }))
+        .reverse();
+}
+
+function monthlyEntries(
+    rows: readonly PaycheckGrowthRow[],
+    includeBonusOnlyMonths: boolean,
+): MonthlyEntry[] {
+    return rows.flatMap((row) =>
+        Array.from({ length: 12 }, (_, index) => index + 1)
+            .filter(
+                (month) =>
+                    row.recorded_months.includes(month) ||
+                    (includeBonusOnlyMonths &&
+                        Number(row.monthly_bonuses_gross[month - 1] ?? 0) !==
+                            0),
+            )
+            .map((month) => ({
+                row,
+                month,
+                isPartial: row.partial_months.includes(month),
+            })),
+    );
+}
+
+function monthlySeriesValue(
+    row: PaycheckGrowthRow,
+    month: number,
+    key: string,
+): string {
+    const index = month - 1;
+    const net = row.monthly_net[index] ?? '0.00';
+    const gross = row.monthly_gross[index] ?? '0.00';
+
+    switch (key) {
+        case 'net':
+            return net;
+        case 'gross':
+            return gross;
+        case 'net_with_bonuses':
+            return (
+                Number(net) + Number(row.monthly_bonuses_net[index] ?? 0)
+            ).toFixed(2);
+        case 'gross_with_bonuses':
+            return (
+                Number(gross) + Number(row.monthly_bonuses_gross[index] ?? 0)
+            ).toFixed(2);
+        default:
+            return '0.00';
+    }
 }
 
 function emptySummary(): PaycheckGrowthSummary {
