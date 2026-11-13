@@ -74,6 +74,25 @@ class SavingsAccount extends Model
         ])->save();
     }
 
+    /**
+     * Subaccounts are virtual, so they always share the parent's APY.
+     */
+    public function syncApyFromParent(): void
+    {
+        $parent = $this->parent()->first(['id', 'apy']);
+
+        if ($parent === null || $this->apy === $parent->apy) {
+            return;
+        }
+
+        $this->forceFill(['apy' => $parent->apy])->save();
+    }
+
+    public function syncChildrenApy(): void
+    {
+        $this->children()->update(['apy' => $this->apy]);
+    }
+
     public static function toCents(string|int|float|null $amount): int
     {
         return (int) round(((float) ($amount ?? 0)) * 100);

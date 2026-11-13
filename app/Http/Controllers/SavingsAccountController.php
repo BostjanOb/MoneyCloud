@@ -6,6 +6,8 @@ use App\Http\Requests\StoreSavingsAccountRequest;
 use App\Http\Requests\UpdateSavingsAccountRequest;
 use App\Models\Person;
 use App\Models\SavingsAccount;
+use App\Models\SavingsTransferTemplate;
+use App\Models\SavingsTransferTemplateItem;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -35,6 +37,7 @@ class SavingsAccountController extends Controller
                     'label' => $person->name,
                 ])->values()->all(),
             'leafAccountOptions' => $this->leafAccountOptions(),
+            'transferTemplates' => $this->transferTemplates(),
             'totals' => [
                 'amount' => SavingsAccount::fromCents(
                     $accounts->sum(fn (SavingsAccount $account): int => SavingsAccount::toCents($account->amount)),
@@ -54,9 +57,13 @@ class SavingsAccountController extends Controller
         $validated = $request->validated();
 
         DB::transaction(function () use ($validated): void {
-            $account = SavingsAccount::query()->create($validated);
+            $account = SavingsAccount::query()->create([
+                ...$validated,
+                'apy' => $validated['apy'] ?? 0,
+            ]);
 
             if ($account->parent !== null) {
+                $account->syncApyFromParent();
                 $account->parent()->lockForUpdate()->first()?->syncAmountFromChildren();
             }
         });
@@ -71,18 +78,23 @@ class SavingsAccountController extends Controller
 
         DB::transaction(function () use ($validated, $savingsAccount, $originalParentId): void {
             $account = SavingsAccount::query()->lockForUpdate()->findOrFail($savingsAccount->id);
-            $account->update($validated);
+            $account->update([
+                ...$validated,
+                'apy' => $validated['apy'] ?? $account->apy,
+            ]);
 
             if ($originalParentId !== null && $originalParentId !== $account->parent_id) {
                 SavingsAccount::query()->lockForUpdate()->find($originalParentId)?->syncAmountFromChildren();
             }
 
             if ($account->parent_id !== null) {
+                $account->syncApyFromParent();
                 $account->parent()->lockForUpdate()->first()?->syncAmountFromChildren();
             }
 
             if ($account->hasChildren()) {
                 $account->syncAmountFromChildren();
+                $account->syncChildrenApy();
             }
         });
 
@@ -130,6 +142,42 @@ class SavingsAccountController extends Controller
         );
     }
 
+    /**
+     * @return array<int, array{id: int, name: string, source_account_id: int|null, source_label: string|null, sort_order: int, total: string, items: array<int, array{savings_account_id: int, label: string, amount: string}>}>
+     */
+    private function transferTemplates(): array
+    {
+        return SavingsTransferTemplate::with(['items.account.parent', 'sourceAccount.parent'])
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (SavingsTransferTemplate $template): array => [
+                'id' => $template->id,
+                'name' => $template->name,
+                'source_account_id' => $template->source_account_id,
+                'source_label' => $template->sourceAccount ? $this->accountLabel($template->sourceAccount) : null,
+                'sort_order' => $template->sort_order,
+                'total' => SavingsAccount::fromCents($template->totalInCents()),
+                'items' => $template->items
+                    ->map(fn (SavingsTransferTemplateItem $item): array => [
+                        'savings_account_id' => $item->savings_account_id,
+                        'label' => $this->accountLabel($item->account),
+                        'amount' => $item->amount,
+                    ])
+                    ->values()
+                    ->all(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function accountLabel(SavingsAccount $account): string
+    {
+        return $account->parent
+            ? sprintf('%s / %s', $account->parent->name, $account->name)
+            : $account->name;
+    }
+
     /** @return array<int, array{id: int, label: string, amount: string}> */
     private function leafAccountOptions(): array
     {
@@ -138,17 +186,11 @@ class SavingsAccountController extends Controller
             ->doesntHave('children')
             ->orderBy('name')
             ->get()
-            ->map(function (SavingsAccount $account): array {
-                $label = $account->parent
-                    ? sprintf('%s / %s', $account->parent->name, $account->name)
-                    : $account->name;
-
-                return [
-                    'id' => $account->id,
-                    'label' => $label,
-                    'amount' => $account->amount,
-                ];
-            })
+            ->map(fn (SavingsAccount $account): array => [
+                'id' => $account->id,
+                'label' => $this->accountLabel($account),
+                'amount' => $account->amount,
+            ])
             ->values()
             ->all();
     }

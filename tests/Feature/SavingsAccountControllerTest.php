@@ -285,3 +285,96 @@ test('deleting a parent account cascades to its subaccounts', function () {
     $this->assertDatabaseMissing('savings_accounts', ['id' => $parent->id]);
     $this->assertDatabaseMissing('savings_accounts', ['id' => $child->id]);
 });
+
+test('new subaccount inherits the parent apy instead of the submitted one', function () {
+    $user = User::factory()->create();
+    $person = Person::factory()->create();
+    $parent = SavingsAccount::factory()->create(['apy' => 2.5]);
+
+    $this->actingAs($user)
+        ->post(route('savings.store'), [
+            'name' => 'Taja',
+            'person_id' => $person->id,
+            'amount' => 100,
+            'apy' => 7,
+            'sort_order' => 0,
+            'parent_id' => $parent->id,
+        ])
+        ->assertRedirect();
+
+    expect(SavingsAccount::where('name', 'Taja')->firstOrFail()->apy)->toBe('2.50');
+});
+
+test('new subaccount can be created without apy', function () {
+    $user = User::factory()->create();
+    $person = Person::factory()->create();
+    $parent = SavingsAccount::factory()->create(['apy' => 1.75]);
+
+    $this->actingAs($user)
+        ->post(route('savings.store'), [
+            'name' => 'Pika',
+            'person_id' => $person->id,
+            'amount' => 100,
+            'sort_order' => 0,
+            'parent_id' => $parent->id,
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect(SavingsAccount::where('name', 'Pika')->firstOrFail()->apy)->toBe('1.75');
+});
+
+test('root account requires apy', function () {
+    $user = User::factory()->create();
+    $person = Person::factory()->create();
+
+    $this->actingAs($user)
+        ->post(route('savings.store'), [
+            'name' => 'Brez APY',
+            'person_id' => $person->id,
+            'amount' => 100,
+            'sort_order' => 0,
+        ])
+        ->assertSessionHasErrors('apy');
+});
+
+test('updating parent apy updates apy of all subaccounts', function () {
+    $user = User::factory()->create();
+    $parent = SavingsAccount::factory()->create(['apy' => 2.5]);
+    $firstChild = SavingsAccount::factory()->create(['parent_id' => $parent->id, 'apy' => 2.5]);
+    $secondChild = SavingsAccount::factory()->create(['parent_id' => $parent->id, 'apy' => 2.5]);
+    $unrelatedAccount = SavingsAccount::factory()->create(['apy' => 2.5]);
+
+    $this->actingAs($user)
+        ->put(route('savings.update', $parent), [
+            'name' => $parent->name,
+            'person_id' => $parent->person_id,
+            'apy' => 2.25,
+            'sort_order' => $parent->sort_order,
+        ])
+        ->assertRedirect();
+
+    expect($parent->fresh()->apy)->toBe('2.25')
+        ->and($firstChild->fresh()->apy)->toBe('2.25')
+        ->and($secondChild->fresh()->apy)->toBe('2.25')
+        ->and($unrelatedAccount->fresh()->apy)->toBe('2.50');
+});
+
+test('moving a root account under a parent adopts the parent apy', function () {
+    $user = User::factory()->create();
+    $parent = SavingsAccount::factory()->create(['apy' => 2.5]);
+    SavingsAccount::factory()->create(['parent_id' => $parent->id, 'apy' => 2.5]);
+    $account = SavingsAccount::factory()->create(['apy' => 4, 'amount' => 50]);
+
+    $this->actingAs($user)
+        ->put(route('savings.update', $account), [
+            'name' => $account->name,
+            'person_id' => $account->person_id,
+            'amount' => 50,
+            'apy' => 4,
+            'sort_order' => 0,
+            'parent_id' => $parent->id,
+        ])
+        ->assertRedirect();
+
+    expect($account->fresh()->apy)->toBe('2.50');
+});

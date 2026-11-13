@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, router, useForm } from '@inertiajs/vue3';
+import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import type { AcceptableValue } from 'reka-ui';
 import { computed, ref } from 'vue';
 import {
@@ -10,8 +10,15 @@ import {
 } from '@/actions/App/Http/Controllers/SavingsAccountController';
 import { store as savingsBalanceAdjustmentStore } from '@/actions/App/Http/Controllers/SavingsBalanceAdjustmentController';
 import { store as savingsInterestStore } from '@/actions/App/Http/Controllers/SavingsInterestController';
+import {
+    store as transferTemplateStore,
+    update as transferTemplateUpdate,
+    destroy as transferTemplateDestroy,
+} from '@/actions/App/Http/Controllers/SavingsTransferTemplateController';
+import { store as transferTemplateExecute } from '@/actions/App/Http/Controllers/SavingsTransferTemplateExecutionController';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -68,6 +75,27 @@ type LeafAccountOption = {
     amount: string;
 };
 
+type TransferTemplateItem = {
+    savings_account_id: number;
+    label: string;
+    amount: string;
+};
+
+type TransferTemplate = {
+    id: number;
+    name: string;
+    source_account_id: number | null;
+    source_label: string | null;
+    sort_order: number;
+    total: string;
+    items: TransferTemplateItem[];
+};
+
+type TemplateFormItem = {
+    savings_account_id: string;
+    amount: string;
+};
+
 type Totals = {
     amount: string;
     annual_yield: string;
@@ -78,6 +106,7 @@ type Props = {
     accounts: AccountNode[];
     personOptions: PersonOption[];
     leafAccountOptions: LeafAccountOption[];
+    transferTemplates: TransferTemplate[];
     totals: Totals;
 };
 
@@ -102,6 +131,7 @@ defineOptions({
 
 const NO_PARENT_VALUE = '__none__';
 const NO_RELATED_ACCOUNT_VALUE = '__none__';
+const NO_SOURCE_ACCOUNT_VALUE = '__none__';
 const defaultPerson = props.personOptions[0]?.value ?? '';
 
 const showAccountModal = ref(false);
@@ -110,6 +140,10 @@ const showInterestModal = ref(false);
 const editingAccount = ref<AccountNode | null>(null);
 const selectedBalanceAccount = ref<AccountNode | null>(null);
 const selectedInterestAccount = ref<AccountNode | null>(null);
+const showTemplateModal = ref(false);
+const showExecuteModal = ref(false);
+const editingTemplate = ref<TransferTemplate | null>(null);
+const selectedExecuteTemplate = ref<TransferTemplate | null>(null);
 
 const accountForm = useForm({
     name: '',
@@ -130,7 +164,103 @@ const balanceForm = useForm({
     related_account_id: NO_RELATED_ACCOUNT_VALUE,
 });
 
+const page = usePage();
+const flash = computed(
+    () =>
+        (page.props.flash ?? {}) as {
+            status?: string;
+        },
+);
+const executingTemplateId = ref<number | null>(null);
+const templateExecutionErrors = ref<Record<number, string | undefined>>({});
+
+const templateForm = useForm<{
+    name: string;
+    source_account_id: string;
+    items: TemplateFormItem[];
+}>({
+    name: '',
+    source_account_id: NO_SOURCE_ACCOUNT_VALUE,
+    items: [{ savings_account_id: '', amount: '' }],
+});
+
+const executeForm = useForm({
+    source_account_id: '',
+});
+
 const rootAccounts = computed(() => props.accounts);
+
+const isSubaccountForm = computed(
+    () =>
+        !editingAccount.value?.has_children &&
+        accountForm.parent_id !== NO_PARENT_VALUE,
+);
+
+const inheritedApy = computed(
+    () =>
+        rootAccounts.value.find(
+            (account) => String(account.id) === accountForm.parent_id,
+        )?.apy ?? null,
+);
+
+const templateTotal = computed(() =>
+    fromCents(
+        templateForm.items.reduce((sum, item) => sum + toCents(item.amount), 0),
+    ),
+);
+
+const executeSourceOptions = computed(() => {
+    const targetIds = new Set(
+        selectedExecuteTemplate.value?.items.map(
+            (item) => item.savings_account_id,
+        ) ?? [],
+    );
+
+    return props.leafAccountOptions.filter(
+        (account) => !targetIds.has(account.id),
+    );
+});
+
+const selectedExecuteSource = computed(
+    () =>
+        executeSourceOptions.value.find(
+            (account) => String(account.id) === executeForm.source_account_id,
+        ) ?? null,
+);
+
+const executePreviewRows = computed(() => {
+    const template = selectedExecuteTemplate.value;
+
+    if (template === null) {
+        return [];
+    }
+
+    return template.items.map((item) => {
+        const currentAmount =
+            props.leafAccountOptions.find(
+                (account) => account.id === item.savings_account_id,
+            )?.amount ?? '0';
+
+        return {
+            id: item.savings_account_id,
+            label: item.label,
+            amount: item.amount,
+            currentAmount,
+            newAmount: fromCents(toCents(currentAmount) + toCents(item.amount)),
+        };
+    });
+});
+
+const executeSourceNewAmount = computed(() => {
+    const source = selectedExecuteSource.value;
+    const template = selectedExecuteTemplate.value;
+
+    if (source === null || template === null) {
+        return null;
+    }
+
+    return fromCents(toCents(source.amount) - toCents(template.total));
+});
 
 const parentOptions = computed(() =>
     rootAccounts.value
@@ -320,16 +450,15 @@ function submitAccount(): void {
             };
         }
 
+        const isSubaccount = data.parent_id !== NO_PARENT_VALUE;
+
         return {
             name: data.name,
             person_id: Number(data.person_id),
             amount: data.amount,
-            apy: data.apy,
+            ...(isSubaccount ? {} : { apy: data.apy }),
             sort_order: Number(data.sort_order),
-            parent_id:
-                data.parent_id === NO_PARENT_VALUE
-                    ? null
-                    : Number(data.parent_id),
+            parent_id: isSubaccount ? Number(data.parent_id) : null,
         };
     });
 
@@ -422,6 +551,213 @@ function submitInterest(): void {
     });
 }
 
+function resetTemplateForm(): void {
+    templateForm.defaults({
+        name: '',
+        source_account_id: NO_SOURCE_ACCOUNT_VALUE,
+        items: [{ savings_account_id: '', amount: '' }],
+    });
+    templateForm.reset();
+    templateForm.clearErrors();
+}
+
+function openCreateTemplate(): void {
+    editingTemplate.value = null;
+    resetTemplateForm();
+    showTemplateModal.value = true;
+}
+
+function openEditTemplate(template: TransferTemplate): void {
+    editingTemplate.value = template;
+    templateForm.clearErrors();
+    templateForm.name = template.name;
+    templateForm.source_account_id =
+        template.source_account_id === null
+            ? NO_SOURCE_ACCOUNT_VALUE
+            : String(template.source_account_id);
+    templateForm.items = template.items.map((item) => ({
+        savings_account_id: String(item.savings_account_id),
+        amount: item.amount,
+    }));
+    showTemplateModal.value = true;
+}
+
+function addTemplateItem(): void {
+    templateForm.items.push({ savings_account_id: '', amount: '' });
+}
+
+function removeTemplateItem(index: number): void {
+    templateForm.items.splice(index, 1);
+}
+
+function updateTemplateItemAccount(
+    index: number,
+    value: AcceptableValue,
+): void {
+    const item = templateForm.items[index];
+
+    if (item !== undefined && typeof value === 'string') {
+        item.savings_account_id = value;
+    }
+}
+
+function templateItemError(
+    index: number,
+    field: keyof TemplateFormItem,
+): string | undefined {
+    return (templateForm.errors as Record<string, string | undefined>)[
+        `items.${index}.${field}`
+    ];
+}
+
+const templateSourceOptions = computed(() => {
+    const targetIds = new Set(
+        templateForm.items.map((item) => item.savings_account_id),
+    );
+
+    return props.leafAccountOptions.filter(
+        (account) => !targetIds.has(String(account.id)),
+    );
+});
+
+function updateTemplateSource(value: AcceptableValue): void {
+    if (typeof value === 'string') {
+        templateForm.source_account_id = value;
+    }
+}
+
+function templateAccountOptions(index: number): LeafAccountOption[] {
+    const selectedElsewhere = new Set([
+        ...templateForm.items
+            .filter((_, itemIndex) => itemIndex !== index)
+            .map((item) => item.savings_account_id),
+        templateForm.source_account_id,
+    ]);
+
+    return props.leafAccountOptions.filter(
+        (account) => !selectedElsewhere.has(String(account.id)),
+    );
+}
+
+function submitTemplate(): void {
+    templateForm.transform((data) => ({
+        name: data.name,
+        source_account_id:
+            data.source_account_id === NO_SOURCE_ACCOUNT_VALUE
+                ? null
+                : Number(data.source_account_id),
+        items: data.items.map((item) => ({
+            savings_account_id:
+                item.savings_account_id === ''
+                    ? null
+                    : Number(item.savings_account_id),
+            amount: item.amount,
+        })),
+    }));
+
+    const options = {
+        preserveScroll: true,
+        onSuccess: () => {
+            showTemplateModal.value = false;
+            editingTemplate.value = null;
+            resetTemplateForm();
+        },
+    };
+
+    if (editingTemplate.value) {
+        templateForm.put(
+            transferTemplateUpdate.url(editingTemplate.value.id),
+            options,
+        );
+
+        return;
+    }
+
+    templateForm.post(transferTemplateStore.url(), options);
+}
+
+function deleteTemplate(template: TransferTemplate): void {
+    if (
+        !confirm(
+            `Ste prepričani, da želite izbrisati predlogo ${template.name}?`,
+        )
+    ) {
+        return;
+    }
+
+    router.delete(transferTemplateDestroy.url(template.id), {
+        preserveScroll: true,
+    });
+}
+
+function runTemplate(template: TransferTemplate): void {
+    if (template.source_account_id === null) {
+        openExecuteTemplate(template);
+
+        return;
+    }
+
+    executingTemplateId.value = template.id;
+    templateExecutionErrors.value[template.id] = undefined;
+
+    router.post(
+        transferTemplateExecute.url(template.id),
+        {},
+        {
+            preserveScroll: true,
+            onError: (errors) => {
+                templateExecutionErrors.value[template.id] =
+                    errors.source_account_id;
+            },
+            onFinish: () => {
+                executingTemplateId.value = null;
+            },
+        },
+    );
+}
+
+function openExecuteTemplate(template: TransferTemplate): void {
+    selectedExecuteTemplate.value = template;
+    executeForm.defaults({
+        source_account_id:
+            template.source_account_id === null
+                ? ''
+                : String(template.source_account_id),
+    });
+    executeForm.reset();
+    executeForm.clearErrors();
+    showExecuteModal.value = true;
+}
+
+function updateExecuteSource(value: AcceptableValue): void {
+    if (typeof value === 'string') {
+        executeForm.source_account_id = value;
+    }
+}
+
+function submitExecute(): void {
+    const template = selectedExecuteTemplate.value;
+
+    if (template === null) {
+        return;
+    }
+
+    executeForm.transform((data) => ({
+        source_account_id:
+            data.source_account_id === ''
+                ? null
+                : Number(data.source_account_id),
+    }));
+
+    executeForm.post(transferTemplateExecute.url(template.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            showExecuteModal.value = false;
+            selectedExecuteTemplate.value = null;
+        },
+    });
+}
+
 function updatePerson(value: AcceptableValue): void {
     if (typeof value === 'string') {
         accountForm.person_id = value;
@@ -451,6 +787,11 @@ function updateRelatedAccount(value: AcceptableValue): void {
     <Head title="Varčevanje" />
 
     <div class="flex flex-col gap-6 p-4">
+        <Alert v-if="flash.status">
+            <AlertTitle>Prenos izveden</AlertTitle>
+            <AlertDescription>{{ flash.status }}</AlertDescription>
+        </Alert>
+
         <div
             class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
         >
@@ -622,7 +963,400 @@ function updateRelatedAccount(value: AcceptableValue): void {
                 </p>
             </CardContent>
         </Card>
+
+        <Card>
+            <CardHeader
+                class="flex flex-row items-center justify-between gap-4"
+            >
+                <CardTitle>Predloge prenosov</CardTitle>
+                <Button size="sm" variant="outline" @click="openCreateTemplate">
+                    Dodaj predlogo
+                </Button>
+            </CardHeader>
+            <CardContent class="overflow-x-auto">
+                <Table v-if="transferTemplates.length > 0">
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Ime</TableHead>
+                            <TableHead>Iz računa</TableHead>
+                            <TableHead>Ciljni računi</TableHead>
+                            <TableHead numeric class="text-right"
+                                >Skupaj</TableHead
+                            >
+                            <TableHead class="text-right">Akcije</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        <TableRow
+                            v-for="template in transferTemplates"
+                            :key="template.id"
+                        >
+                            <TableCell class="font-medium">{{
+                                template.name
+                            }}</TableCell>
+                            <TableCell class="text-sm">
+                                <span v-if="template.source_label">{{
+                                    template.source_label
+                                }}</span>
+                                <span v-else class="text-muted-foreground"
+                                    >Izbere se ob izvedbi</span
+                                >
+                            </TableCell>
+                            <TableCell>
+                                <div class="flex flex-col gap-0.5 text-sm">
+                                    <span
+                                        v-for="item in template.items"
+                                        :key="item.savings_account_id"
+                                    >
+                                        {{ item.label }}:
+                                        {{ formatNumber(item.amount) }} €
+                                    </span>
+                                </div>
+                            </TableCell>
+                            <TableCell numeric class="text-right"
+                                >{{ formatNumber(template.total) }} €</TableCell
+                            >
+                            <TableCell class="text-right">
+                                <div class="flex justify-end gap-1">
+                                    <Button
+                                        size="sm"
+                                        :disabled="
+                                            template.items.length === 0 ||
+                                            executingTemplateId !== null
+                                        "
+                                        @click="runTemplate(template)"
+                                        >Izvedi</Button
+                                    >
+                                    <Button
+                                        v-if="
+                                            template.source_account_id !== null
+                                        "
+                                        variant="ghost"
+                                        size="sm"
+                                        :disabled="template.items.length === 0"
+                                        @click="openExecuteTemplate(template)"
+                                        >Drug vir</Button
+                                    >
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        @click="openEditTemplate(template)"
+                                        >Uredi</Button
+                                    >
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        class="text-destructive"
+                                        @click="deleteTemplate(template)"
+                                        >Briši</Button
+                                    >
+                                </div>
+                                <InputError
+                                    class="mt-1"
+                                    :message="
+                                        templateExecutionErrors[template.id]
+                                    "
+                                />
+                            </TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
+                <p
+                    v-else
+                    class="py-8 text-center text-sm text-muted-foreground"
+                >
+                    Ni še predlog. Predloga omogoča prenos na več računov z enim
+                    klikom (npr. otroški dodatki).
+                </p>
+            </CardContent>
+        </Card>
     </div>
+
+    <Dialog v-model:open="showTemplateModal">
+        <DialogContent class="sm:max-w-xl">
+            <DialogHeader>
+                <DialogTitle>{{
+                    editingTemplate ? 'Uredi predlogo' : 'Dodaj predlogo'
+                }}</DialogTitle>
+                <DialogDescription>
+                    Določite izvorni račun, ciljne račune in zneske. Če
+                    izvornega računa ne določite, ga izberete ob vsaki izvedbi.
+                </DialogDescription>
+            </DialogHeader>
+
+            <form class="grid gap-4" @submit.prevent="submitTemplate">
+                <div class="grid gap-2">
+                    <Label for="template-name">Ime</Label>
+                    <Input
+                        id="template-name"
+                        v-model="templateForm.name"
+                        placeholder="Otroški dodatki"
+                    />
+                    <InputError :message="templateForm.errors.name" />
+                </div>
+
+                <div class="grid gap-2">
+                    <Label for="template-source">Iz računa</Label>
+                    <Select
+                        :model-value="templateForm.source_account_id"
+                        @update:model-value="updateTemplateSource"
+                    >
+                        <SelectTrigger id="template-source">
+                            <SelectValue placeholder="Izberi ob izvedbi" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem :value="NO_SOURCE_ACCOUNT_VALUE"
+                                >Izberi ob izvedbi</SelectItem
+                            >
+                            <SelectItem
+                                v-for="option in templateSourceOptions"
+                                :key="option.id"
+                                :value="String(option.id)"
+                            >
+                                {{ option.label }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <InputError
+                        :message="templateForm.errors.source_account_id"
+                    />
+                </div>
+
+                <div class="grid gap-3">
+                    <Label>Ciljni računi</Label>
+                    <div
+                        v-for="(item, index) in templateForm.items"
+                        :key="index"
+                        class="grid gap-1"
+                    >
+                        <div class="flex items-start gap-2">
+                            <Select
+                                :model-value="item.savings_account_id"
+                                @update:model-value="
+                                    (value) =>
+                                        updateTemplateItemAccount(index, value)
+                                "
+                            >
+                                <SelectTrigger class="flex-1">
+                                    <SelectValue placeholder="Izberite račun" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem
+                                        v-for="option in templateAccountOptions(
+                                            index,
+                                        )"
+                                        :key="option.id"
+                                        :value="String(option.id)"
+                                    >
+                                        {{ option.label }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <Input
+                                v-model="item.amount"
+                                type="number"
+                                min="0.01"
+                                step="0.01"
+                                placeholder="Znesek"
+                                class="w-32"
+                            />
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                class="text-destructive"
+                                :disabled="templateForm.items.length === 1"
+                                @click="removeTemplateItem(index)"
+                                >Odstrani</Button
+                            >
+                        </div>
+                        <InputError
+                            :message="
+                                templateItemError(index, 'savings_account_id')
+                            "
+                        />
+                        <InputError
+                            :message="templateItemError(index, 'amount')"
+                        />
+                    </div>
+                    <InputError :message="templateForm.errors.items" />
+                    <div class="flex items-center justify-between">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            @click="addTemplateItem"
+                            >Dodaj račun</Button
+                        >
+                        <span class="text-sm text-muted-foreground">
+                            Skupaj: {{ formatNumber(templateTotal) }} €
+                        </span>
+                    </div>
+                </div>
+
+                <DialogFooter>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="showTemplateModal = false"
+                        >Prekliči</Button
+                    >
+                    <Button type="submit" :disabled="templateForm.processing">
+                        {{
+                            editingTemplate
+                                ? 'Shrani spremembe'
+                                : 'Dodaj predlogo'
+                        }}
+                    </Button>
+                </DialogFooter>
+            </form>
+        </DialogContent>
+    </Dialog>
+
+    <Dialog v-model:open="showExecuteModal">
+        <DialogContent class="sm:max-w-xl">
+            <DialogHeader>
+                <DialogTitle>Izvedi predlogo</DialogTitle>
+                <DialogDescription>
+                    Skupaj
+                    {{ formatNumber(selectedExecuteTemplate?.total ?? 0) }} € bo
+                    prenesenih iz izbranega računa na ciljne račune predloge
+                    {{ selectedExecuteTemplate?.name }}.
+                </DialogDescription>
+            </DialogHeader>
+
+            <form class="grid gap-4" @submit.prevent="submitExecute">
+                <div class="grid gap-2">
+                    <Label for="execute-source">Izvorni račun</Label>
+                    <Select
+                        :model-value="executeForm.source_account_id"
+                        @update:model-value="updateExecuteSource"
+                    >
+                        <SelectTrigger id="execute-source">
+                            <SelectValue placeholder="Izberite izvorni račun" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem
+                                v-for="option in executeSourceOptions"
+                                :key="option.id"
+                                :value="String(option.id)"
+                            >
+                                {{ option.label }} ({{
+                                    formatNumber(option.amount)
+                                }}
+                                €)
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <InputError
+                        :message="executeForm.errors.source_account_id"
+                    />
+                </div>
+
+                <div class="overflow-x-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Račun</TableHead>
+                                <TableHead numeric class="text-right"
+                                    >Sprememba</TableHead
+                                >
+                                <TableHead numeric class="text-right"
+                                    >Trenutno</TableHead
+                                >
+                                <TableHead numeric class="text-right"
+                                    >Novo</TableHead
+                                >
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            <TableRow v-if="selectedExecuteSource">
+                                <TableCell>{{
+                                    selectedExecuteSource.label
+                                }}</TableCell>
+                                <TableCell
+                                    numeric
+                                    class="text-right text-destructive"
+                                    >−{{
+                                        formatNumber(
+                                            selectedExecuteTemplate?.total ?? 0,
+                                        )
+                                    }}
+                                    €</TableCell
+                                >
+                                <TableCell numeric class="text-right"
+                                    >{{
+                                        formatNumber(
+                                            selectedExecuteSource.amount,
+                                        )
+                                    }}
+                                    €</TableCell
+                                >
+                                <TableCell
+                                    numeric
+                                    :class="
+                                        cn(
+                                            'text-right',
+                                            Number(executeSourceNewAmount) < 0
+                                                ? 'text-destructive'
+                                                : '',
+                                        )
+                                    "
+                                    >{{
+                                        formatNumber(
+                                            executeSourceNewAmount ?? 0,
+                                        )
+                                    }}
+                                    €</TableCell
+                                >
+                            </TableRow>
+                            <TableRow
+                                v-for="row in executePreviewRows"
+                                :key="row.id"
+                            >
+                                <TableCell>{{ row.label }}</TableCell>
+                                <TableCell numeric class="text-right"
+                                    >+{{
+                                        formatNumber(row.amount)
+                                    }}
+                                    €</TableCell
+                                >
+                                <TableCell numeric class="text-right"
+                                    >{{
+                                        formatNumber(row.currentAmount)
+                                    }}
+                                    €</TableCell
+                                >
+                                <TableCell numeric class="text-right"
+                                    >{{
+                                        formatNumber(row.newAmount)
+                                    }}
+                                    €</TableCell
+                                >
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+                </div>
+
+                <DialogFooter>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="showExecuteModal = false"
+                        >Prekliči</Button
+                    >
+                    <Button
+                        type="submit"
+                        :disabled="
+                            executeForm.processing ||
+                            executeForm.source_account_id === ''
+                        "
+                        >Izvedi prenos</Button
+                    >
+                </DialogFooter>
+            </form>
+        </DialogContent>
+    </Dialog>
 
     <Dialog v-model:open="showAccountModal">
         <DialogContent class="sm:max-w-xl">
@@ -671,6 +1405,14 @@ function updateRelatedAccount(value: AcceptableValue): void {
                 <div class="grid gap-2">
                     <Label for="account-apy">APY (%)</Label>
                     <Input
+                        v-if="isSubaccountForm"
+                        id="account-apy"
+                        :model-value="inheritedApy ?? ''"
+                        type="number"
+                        disabled
+                    />
+                    <Input
+                        v-else
                         id="account-apy"
                         v-model="accountForm.apy"
                         type="number"
@@ -678,6 +1420,18 @@ function updateRelatedAccount(value: AcceptableValue): void {
                         max="100"
                         step="0.01"
                     />
+                    <p
+                        v-if="isSubaccountForm"
+                        class="text-sm text-muted-foreground"
+                    >
+                        APY se podeduje od nadrejenega računa.
+                    </p>
+                    <p
+                        v-else-if="editingAccount?.has_children"
+                        class="text-sm text-muted-foreground"
+                    >
+                        Sprememba APY-ja se prenese na vse podračune.
+                    </p>
                     <InputError :message="accountForm.errors.apy" />
                 </div>
 
