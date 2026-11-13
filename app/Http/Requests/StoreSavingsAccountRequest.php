@@ -21,7 +21,7 @@ class StoreSavingsAccountRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'person_id' => ['required', 'integer', Rule::exists('people', 'id')],
             'amount' => ['required', 'numeric', 'min:0'],
-            'apy' => ['required', 'numeric', 'min:0', 'max:100'],
+            'apy' => ['required_without:parent_id', 'nullable', 'numeric', 'min:0', 'max:100'],
             'sort_order' => ['required', 'integer', 'min:0'],
             'parent_id' => [
                 'nullable',

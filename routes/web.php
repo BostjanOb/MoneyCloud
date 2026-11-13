@@ -17,6 +17,8 @@ use App\Http\Controllers\PersonController;
 use App\Http\Controllers\SavingsAccountController;
 use App\Http\Controllers\SavingsBalanceAdjustmentController;
 use App\Http\Controllers\SavingsInterestController;
+use App\Http\Controllers\SavingsTransferTemplateController;
+use App\Http\Controllers\SavingsTransferTemplateExecutionController;
 use App\Http\Controllers\StatisticsController;
 use App\Http\Controllers\TaxSettingController;
 use Illuminate\Support\Facades\Route;
@@ -57,6 +59,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/{savingsAccount}/stanje', [SavingsBalanceAdjustmentController::class, 'store'])
             ->name('savings.balance-adjustments.store');
         Route::post('/{savingsAccount}/obresti', [SavingsInterestController::class, 'store'])->name('savings.interest.store');
+        Route::post('/predloge', [SavingsTransferTemplateController::class, 'store'])->name('savings.transfer-templates.store');
+        Route::put('/predloge/{savingsTransferTemplate}', [SavingsTransferTemplateController::class, 'update'])
+            ->name('savings.transfer-templates.update');
+        Route::delete('/predloge/{savingsTransferTemplate}', [SavingsTransferTemplateController::class, 'destroy'])
+            ->name('savings.transfer-templates.destroy');
+        Route::post('/predloge/{savingsTransferTemplate}/izvedi', [SavingsTransferTemplateExecutionController::class, 'store'])
+            ->name('savings.transfer-templates.execute');
     });
 
     Route::get('statistika', [StatisticsController::class, 'index'])->name('statistics.index');
